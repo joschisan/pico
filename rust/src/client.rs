@@ -1,0 +1,575 @@
+use picomint_client::{ClientHandleArc, OperationId};
+use picomint_core::Amount;
+use picomint_core::config::FederationId;
+use picomint_core::db::{Database, IDatabaseTransactionOpsCoreTyped};
+use picomint_core::module::AmountUnit;
+use picomint_core::module::serde_json;
+use picomint_core::util::SafeUrl;
+use picomint_eventlog::EventLogId;
+use picomint_lnv2_client::LightningClientModule;
+use picomint_lnv2_common::Bolt11InvoiceDescription;
+use picomint_mint_client::MintClientModule;
+use picomint_mintv2_client::MintClientModule as MintV2ClientModule;
+use picomint_wallet_client::client_db::TweakIdx;
+use picomint_wallet_client::{WalletClientModule, WalletOperationMeta, WalletOperationMetaVariant};
+use picomint_walletv2_client::WalletClientModule as WalletV2ClientModule;
+use flutter_rust_bridge::frb;
+use futures_util::StreamExt;
+
+use std::str::FromStr;
+
+use crate::db::{EventLogEntryKey, EventLogEntryPrefix};
+use crate::events::{
+    PicoPayment, ParsedEvent, PaymentNotification, RecentPaymentsUpdate, apply_update,
+    parse_event_log_entry, snapshot,
+};
+use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
+use crate::frb_generated::StreamSink;
+use crate::{
+    BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, EcashToken, InviteCodeWrapper,
+};
+
+#[frb]
+pub struct PicoRecoveryProgress {
+    pub module_id: i64,
+    pub complete: i64,
+    pub total: i64,
+}
+
+#[frb]
+#[derive(Clone)]
+pub struct PicoClient {
+    pub(crate) client: ClientHandleArc,
+    pub(crate) db: Database,
+    pub(crate) federation_id: FederationId,
+    pub(crate) currency_code: String,
+    pub(crate) exchange_rate_cache: ExchangeRateCache,
+}
+
+impl PicoClient {
+    #[frb]
+    pub async fn federation_name(&self) -> Option<String> {
+        self.client
+            .config()
+            .await
+            .global
+            .federation_name()
+            .map(|name| name.to_string())
+    }
+
+    #[frb(sync)]
+    pub fn federation_id(&self) -> FederationId {
+        self.federation_id
+    }
+
+    #[frb(sync)]
+    pub fn currency_code(&self) -> String {
+        self.currency_code.clone()
+    }
+
+    #[frb]
+    pub async fn shutdown(&self) {
+        self.client.executor().stop_executor();
+        self.client
+            .task_group()
+            .clone()
+            .shutdown_join_all(None)
+            .await
+            .expect("Client shutdown failed");
+    }
+
+    #[frb]
+    pub async fn prefetch_exchange_rates(&self) {
+        tokio::task::spawn(fetch_exchange_rate(
+            self.exchange_rate_cache.clone(),
+            self.currency_code.clone(),
+        ));
+    }
+
+    #[frb]
+    pub async fn fiat_to_sats(&self, amount_fiat: f64) -> Result<i64, String> {
+        fetch_exchange_rate(self.exchange_rate_cache.clone(), self.currency_code.clone())
+            .await
+            .map(|r| ((amount_fiat / r) * 100_000_000.0).round() as i64)
+    }
+
+    #[frb]
+    pub async fn subscribe_balance(&self, sink: StreamSink<i64>) {
+        let mut stream = self
+            .client
+            .subscribe_balance_changes(AmountUnit::bitcoin())
+            .await;
+
+        while let Some(amount) = stream.next().await {
+            if sink.add((amount.msats / 1000) as i64).is_err() {
+                break;
+            }
+        }
+    }
+
+    #[frb]
+    pub async fn subscribe_connection_status(&self, sink: StreamSink<Vec<(String, bool)>>) {
+        let names: Vec<String> = self
+            .client
+            .config()
+            .await
+            .global
+            .api_endpoints
+            .iter()
+            .map(|(_, peer)| peer.name.clone())
+            .collect();
+
+        let mut stream = self.client.connection_status_stream();
+
+        while let Some(status_map) = stream.next().await {
+            let statuses: Vec<(String, bool)> = names
+                .iter()
+                .zip(status_map.into_values())
+                .map(|(name, status)| (name.clone(), status))
+                .collect();
+
+            if sink.add(statuses).is_err() {
+                break;
+            }
+        }
+    }
+
+    #[frb(sync)]
+    pub fn has_pending_recoveries(&self) -> bool {
+        self.client.has_pending_recoveries()
+    }
+
+    #[frb]
+    pub async fn expiration_date(&self) -> Option<i64> {
+        self.client
+            .meta_service()
+            .get_field::<u64>(self.client.db(), "federation_expiry_timestamp")
+            .await
+            .and_then(|mv| mv.value)
+            .map(|ts| ts as i64)
+    }
+
+    #[frb]
+    pub async fn expiration_successor(&self) -> Option<InviteCodeWrapper> {
+        self.client
+            .meta_service()
+            .get_field::<String>(self.client.db(), "federation_successor")
+            .await
+            .and_then(|mv| mv.value)
+            .and_then(|s| picomint_core::invite_code::InviteCode::from_str(&s).ok())
+            .map(InviteCodeWrapper)
+    }
+
+    #[frb]
+    pub async fn wait_for_all_recoveries(&self) -> Result<(), String> {
+        self.client
+            .wait_for_all_recoveries()
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    #[frb]
+    pub async fn subscribe_recovery_progress(&self, sink: StreamSink<PicoRecoveryProgress>) {
+        let mut stream = self.client.subscribe_to_recovery_progress();
+
+        while let Some((module_id, progress)) = stream.next().await {
+            let pico_progress = PicoRecoveryProgress {
+                module_id: module_id as i64,
+                complete: progress.complete as i64,
+                total: progress.total as i64,
+            };
+
+            if sink.add(pico_progress).is_err() {
+                break;
+            }
+        }
+    }
+
+    #[frb]
+    pub async fn ecash_send(&self, amount_sat: i64) -> Result<ECashWrapper, String> {
+        let amount = Amount::from_sats(amount_sat as u64);
+
+        if let Ok(module) = self.client.get_first_module::<MintV2ClientModule>() {
+            return module
+                .send(amount, serde_json::Value::Null)
+                .await
+                .map(|ecash| ECashWrapper(EcashToken::V2(ecash)))
+                .map_err(|e| e.to_string());
+        }
+
+        self.client
+            .get_first_module::<MintClientModule>()
+            .unwrap()
+            .send_oob_notes(amount, ())
+            .await
+            .map(|notes| ECashWrapper(EcashToken::V1(notes)))
+            .map_err(|e| e.to_string())
+    }
+
+    #[frb]
+    pub async fn ecash_receive(&self, notes: &ECashWrapper) -> Result<(), String> {
+        match &notes.0 {
+            EcashToken::V2(ecash) => self
+                .client
+                .get_first_module::<MintV2ClientModule>()
+                .unwrap()
+                .receive(ecash.clone(), serde_json::Value::Null)
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string()),
+            EcashToken::V1(oob) => self
+                .client
+                .get_first_module::<MintClientModule>()
+                .unwrap()
+                .reissue_external_notes(oob.clone(), ())
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string()),
+        }
+    }
+
+    #[frb]
+    pub async fn ln_receive(&self, amount_sat: i64) -> Result<String, String> {
+        let invoice = self
+            .client
+            .get_first_module::<LightningClientModule>()
+            .unwrap()
+            .receive(
+                Amount::from_sats(amount_sat as u64),
+                60 * 60 * 24,
+                Bolt11InvoiceDescription::Direct(String::new()),
+                None,
+                ().into(),
+            )
+            .await
+            .map_err(|e| e.to_string())?
+            .0;
+
+        Ok(invoice.to_string())
+    }
+
+    #[frb]
+    pub async fn ln_send(&self, invoice: &Bolt11InvoiceWrapper) -> Result<OperationId, String> {
+        self.client
+            .get_first_module::<LightningClientModule>()
+            .unwrap()
+            .send(invoice.0.clone(), None, ().into())
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    #[frb]
+    pub async fn lnurl(&self) -> Result<String, String> {
+        let recurringd = SafeUrl::parse("https://recurringdv2.picomint.org").unwrap();
+
+        self.client
+            .get_first_module::<LightningClientModule>()
+            .unwrap()
+            .generate_lnurl(recurringd, None)
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    #[frb]
+    pub async fn onchain_calculate_fees(
+        &self,
+        address: &BitcoinAddressWrapper,
+        amount_sats: i64,
+    ) -> Result<i64, String> {
+        if let Ok(module) = self.client.get_first_module::<WalletV2ClientModule>() {
+            return module
+                .send_fee()
+                .await
+                .map(|fee| fee.to_sat() as i64)
+                .map_err(|e| e.to_string());
+        }
+
+        let wallet_module = self
+            .client
+            .get_first_module::<WalletClientModule>()
+            .map_err(|e| e.to_string())?;
+
+        let address_checked = address
+            .0
+            .clone()
+            .require_network(wallet_module.get_network())
+            .map_err(|e| e.to_string())?;
+
+        let amount = bitcoin::Amount::from_sat(amount_sats as u64);
+
+        let fees = wallet_module
+            .get_withdraw_fees(&address_checked, amount)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(fees.amount().to_sat() as i64)
+    }
+
+    #[frb]
+    pub async fn onchain_send(
+        &self,
+        address: &BitcoinAddressWrapper,
+        amount_sats: i64,
+    ) -> Result<(), String> {
+        let amount = bitcoin::Amount::from_sat(amount_sats as u64);
+
+        if let Ok(module) = self.client.get_first_module::<WalletV2ClientModule>() {
+            return module
+                .send(address.0.clone(), amount, None)
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string());
+        }
+
+        let wallet_module = self
+            .client
+            .get_first_module::<WalletClientModule>()
+            .map_err(|e| e.to_string())?;
+
+        let address_checked = address
+            .0
+            .clone()
+            .require_network(wallet_module.get_network())
+            .map_err(|e| e.to_string())?;
+
+        let fees = wallet_module
+            .get_withdraw_fees(&address_checked, amount)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        wallet_module
+            .withdraw(&address_checked, amount, fees, ())
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    #[frb]
+    pub async fn onchain_receive_address(&self) -> Result<String, String> {
+        let wallet_module = self
+            .client
+            .get_first_module::<WalletClientModule>()
+            .map_err(|e| e.to_string())?;
+
+        let (_, address, _) = wallet_module
+            .safe_allocate_deposit_address(())
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(address.to_string())
+    }
+
+    #[frb]
+    pub async fn onchain_list_addresses(&self) -> Vec<(i64, String)> {
+        let operation_log = self.client.operation_log();
+        let mut addresses = Vec::new();
+        let mut next_key = None;
+
+        // Paginate through all operations
+        loop {
+            let page = operation_log.paginate_operations_rev(100, next_key).await;
+
+            if page.is_empty() {
+                break;
+            }
+
+            for (_key, op_log_entry) in &page {
+                if op_log_entry.operation_module_kind() != "wallet" {
+                    continue;
+                }
+
+                match op_log_entry.meta::<WalletOperationMeta>().variant {
+                    WalletOperationMetaVariant::Deposit {
+                        address, tweak_idx, ..
+                    } => {
+                        if let Some(tweak_idx) = tweak_idx {
+                            addresses.push((
+                                tweak_idx.0 as i64,
+                                address.clone().assume_checked().to_string(),
+                            ));
+                        }
+                    }
+                    _ => continue,
+                }
+            }
+
+            next_key = page.last().map(|entry| entry.0.clone());
+        }
+
+        addresses.into_iter().rev().collect()
+    }
+
+    #[frb]
+    pub async fn onchain_recheck_address(&self, tweak_idx: i64) -> Result<(), String> {
+        let wallet_module = self
+            .client
+            .get_first_module::<WalletClientModule>()
+            .map_err(|e| e.to_string())?;
+
+        wallet_module
+            .recheck_pegin_address(TweakIdx(tweak_idx as u64))
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+
+    #[frb]
+    pub async fn wallet_v2_receive(&self) -> Option<String> {
+        let address = self
+            .client
+            .get_first_module::<WalletV2ClientModule>()
+            .ok()?
+            .receive()
+            .await;
+
+        Some(address.to_string())
+    }
+
+    #[frb]
+    pub async fn get_payment_history(&self) -> Vec<PicoPayment> {
+        let mut payments = Vec::new();
+
+        let entries = self
+            .db
+            .begin_transaction_nc()
+            .await
+            .find_by_prefix(&EventLogEntryPrefix(self.federation_id))
+            .await
+            .collect::<Vec<_>>()
+            .await;
+
+        for entry in entries {
+            if let Some(parsed) = parse_event_log_entry(&entry.1) {
+                match parsed {
+                    ParsedEvent::Payment(payment) => {
+                        payments.push(payment);
+                    }
+                    ParsedEvent::Update {
+                        operation_id,
+                        success,
+                        oob,
+                    } => {
+                        apply_update(&mut payments, &operation_id, success, oob);
+                    }
+                }
+            }
+        }
+
+        payments.reverse();
+
+        payments
+    }
+
+    #[frb]
+    pub async fn subscribe_event_log(&self, sink: StreamSink<RecentPaymentsUpdate>) {
+        let mut position = EventLogId::LOG_START;
+        let mut payments = Vec::new();
+
+        // Load historical events from our database
+        let entries = self
+            .db
+            .begin_transaction_nc()
+            .await
+            .find_by_prefix(&EventLogEntryPrefix(self.federation_id))
+            .await
+            .collect::<Vec<_>>()
+            .await;
+
+        for (key, entry) in entries {
+            position = key.1.saturating_add(1);
+
+            if let Some(parsed) = parse_event_log_entry(&entry) {
+                match parsed {
+                    ParsedEvent::Payment(payment) => {
+                        payments.push(payment);
+                    }
+                    ParsedEvent::Update {
+                        operation_id,
+                        success,
+                        oob,
+                    } => {
+                        apply_update(&mut payments, &operation_id, success, oob);
+                    }
+                }
+            }
+        }
+
+        let mut n_display = 3;
+
+        // Send initial snapshot without notifications
+        if sink
+            .add(RecentPaymentsUpdate {
+                payments: snapshot(&payments, n_display),
+                notification: None,
+            })
+            .is_err()
+        {
+            return;
+        }
+
+        let mut log_event_rx = self.client.log_event_added_rx();
+
+        loop {
+            let changed = log_event_rx.changed();
+
+            let batch = self.client.get_event_log(Some(position), 100).await;
+
+            for persisted_entry in &batch {
+                position = persisted_entry.id().saturating_add(1);
+
+                let Some(parsed) = parse_event_log_entry(persisted_entry.as_raw()) else {
+                    continue;
+                };
+
+                let notification = match parsed {
+                    ParsedEvent::Payment(payment) => {
+                        n_display += 1;
+
+                        payments.push(payment.clone());
+
+                        payment.success.map(|success| PaymentNotification {
+                            incoming: payment.incoming,
+                            success,
+                            amount_sats: payment.amount_sats,
+                            payment_type: payment.payment_type.clone(),
+                        })
+                    }
+                    ParsedEvent::Update {
+                        operation_id,
+                        success,
+                        oob,
+                    } => apply_update(&mut payments, &operation_id, success, oob),
+                };
+
+                if sink
+                    .add(RecentPaymentsUpdate {
+                        payments: snapshot(&payments, n_display),
+                        notification,
+                    })
+                    .is_err()
+                {
+                    return;
+                }
+
+                let mut dbtx = self.db.begin_transaction().await;
+
+                dbtx.insert_entry(
+                    &EventLogEntryKey(self.federation_id, persisted_entry.id()),
+                    persisted_entry.as_raw(),
+                )
+                .await;
+
+                if dbtx.commit_tx_result().await.is_err() {
+                    return;
+                }
+            }
+
+            if batch.len() < 100 {
+                if changed.await.is_err() {
+                    return;
+                }
+            }
+        }
+    }
+}

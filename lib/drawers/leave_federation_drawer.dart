@@ -1,0 +1,60 @@
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/widgets/drawer_shell_widget.dart';
+import 'package:pico/widgets/async_button_widget.dart';
+import 'package:pico/utils/drawer_utils.dart';
+
+class LeaveFederationDrawer extends StatefulWidget {
+  final FederationInfo federation;
+  final PicoClientFactory clientFactory;
+  final VoidCallback onSuccess;
+
+  const LeaveFederationDrawer({
+    super.key,
+    required this.federation,
+    required this.clientFactory,
+    required this.onSuccess,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    required FederationInfo federation,
+    required PicoClientFactory clientFactory,
+    required VoidCallback onSuccess,
+  }) {
+    return DrawerUtils.show(
+      context: context,
+      child: LeaveFederationDrawer(
+        federation: federation,
+        clientFactory: clientFactory,
+        onSuccess: onSuccess,
+      ),
+    );
+  }
+
+  @override
+  State<LeaveFederationDrawer> createState() => _LeaveFederationDrawerState();
+}
+
+class _LeaveFederationDrawerState extends State<LeaveFederationDrawer> {
+  Future<void> _handleLeaveFederation() async {
+    await widget.clientFactory.leave(federationId: widget.federation.id);
+
+    if (!mounted) return;
+
+    Navigator.of(context).pop();
+    widget.onSuccess();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DrawerShell(
+      icon: PhosphorIconsRegular.signOut,
+      title: 'Leave ${widget.federation.name}?',
+      children: [
+        AsyncButton(text: 'Confirm', onPressed: _handleLeaveFederation),
+      ],
+    );
+  }
+}

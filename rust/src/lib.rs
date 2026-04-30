@@ -1,0 +1,177 @@
+mod client;
+mod currency;
+mod db;
+mod events;
+mod exchange;
+mod factory;
+mod fountain;
+mod frb_generated;
+mod lnurl;
+
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use bitcoin::address::NetworkUnchecked;
+use picomint_bip39::{Language, Mnemonic};
+use picomint_core::base32::decode_prefixed;
+use picomint_core::base32::{PICOMINT_PREFIX, encode_prefixed};
+use picomint_core::db::Database;
+use picomint_core::invite_code::InviteCode;
+use picomint_mint_client::OOBNotes;
+use picomint_mintv2_client::ECash;
+use picomint_rocksdb::RocksDb;
+use flutter_rust_bridge::frb;
+use lightning_invoice::Bolt11Invoice;
+
+// Re-export types needed by FRB generated code
+pub use picomint_client::OperationId;
+pub use picomint_core::config::FederationId;
+
+// Re-export public API for FRB
+pub use client::{PicoClient, PicoRecoveryProgress};
+pub use currency::{FiatCurrency, find_fiat_currency, list_fiat_currencies};
+pub use events::{PicoPayment, PaymentNotification, PaymentType, RecentPaymentsUpdate};
+pub use factory::{PicoClientFactory, PicoContact, FederationInfo};
+pub use fountain::{ECashDecoder, ECashEncoder};
+pub use lnurl::{LnurlWrapper, PayResponseWrapper, lnurl_fetch_limits, lnurl_resolve, parse_lnurl};
+
+#[frb(sync)]
+pub fn word_list() -> Vec<String> {
+    Language::English
+        .word_list()
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+#[frb]
+pub struct MnemonicWrapper(pub(crate) Mnemonic);
+
+#[frb]
+pub fn parse_mnemonic(words: Vec<String>) -> Option<MnemonicWrapper> {
+    Mnemonic::from_str(&words.join(" "))
+        .ok()
+        .map(MnemonicWrapper)
+}
+
+#[frb]
+pub fn generate_mnemonic() -> MnemonicWrapper {
+    MnemonicWrapper(Mnemonic::generate(12).unwrap())
+}
+
+#[frb]
+pub struct DatabaseWrapper(pub(crate) Database);
+
+#[frb]
+pub async fn open_database(db_path: &str) -> DatabaseWrapper {
+    picomint_core::rustls::install_crypto_provider().await;
+
+    let db_path = PathBuf::from_str(&db_path)
+        .expect("Could not parse db path")
+        .join("client.db");
+
+    RocksDb::open_blocking(db_path, None)
+        .map(|db| DatabaseWrapper(db.into()))
+        .expect("Could not open database")
+}
+
+#[frb]
+#[derive(Clone)]
+pub struct InviteCodeWrapper(pub(crate) InviteCode);
+
+#[frb(sync)]
+pub fn parse_invite_code(invite: &str) -> Option<InviteCodeWrapper> {
+    InviteCode::from_str(invite).ok().map(InviteCodeWrapper)
+}
+
+pub(crate) enum EcashToken {
+    V1(OOBNotes),
+    V2(ECash),
+}
+
+#[frb(opaque)]
+pub struct ECashWrapper(pub(crate) EcashToken);
+
+impl ECashWrapper {
+    #[frb(sync)]
+    pub fn amount_sats(&self) -> i64 {
+        match &self.0 {
+            EcashToken::V1(notes) => notes.total_amount().msats as i64 / 1000,
+            EcashToken::V2(ecash) => ecash.amount().msats as i64 / 1000,
+        }
+    }
+
+    #[frb(sync)]
+    pub fn to_string(&self) -> String {
+        match &self.0 {
+            EcashToken::V1(notes) => encode_prefixed(PICOMINT_PREFIX, notes),
+            EcashToken::V2(ecash) => encode_prefixed(PICOMINT_PREFIX, ecash),
+        }
+    }
+}
+
+#[frb(sync)]
+pub fn parse_ecash(notes: &str) -> Option<ECashWrapper> {
+    if let Some(stripped) = notes.strip_prefix("picomint:") {
+        return parse_ecash(stripped);
+    }
+
+    if let Ok(v1) = OOBNotes::from_str(notes) {
+        return Some(ECashWrapper(EcashToken::V1(v1)));
+    }
+
+    if let Ok(v2) = decode_prefixed::<ECash>(PICOMINT_PREFIX, notes) {
+        return Some(ECashWrapper(EcashToken::V2(v2)));
+    }
+
+    None
+}
+
+#[frb]
+pub struct Bolt11InvoiceWrapper(pub(crate) Bolt11Invoice);
+
+impl Bolt11InvoiceWrapper {
+    #[frb(sync)]
+    pub fn amount_sats(&self) -> i64 {
+        self.0
+            .amount_milli_satoshis()
+            .map(|msat| msat as i64 / 1000)
+            .unwrap()
+    }
+}
+
+#[frb(sync)]
+pub fn parse_bolt11_invoice(invoice: &str) -> Option<Bolt11InvoiceWrapper> {
+    if let Some(invoice) = invoice.strip_prefix("lightning:") {
+        return parse_bolt11_invoice(invoice);
+    }
+
+    Bolt11Invoice::from_str(invoice)
+        .ok()
+        .filter(|invoice| invoice.amount_milli_satoshis().is_some())
+        .map(Bolt11InvoiceWrapper)
+}
+
+#[frb]
+pub struct BitcoinAddressWrapper(pub(crate) bitcoin::Address<NetworkUnchecked>);
+
+impl BitcoinAddressWrapper {
+    #[frb(sync)]
+    pub fn to_string(&self) -> String {
+        self.0.clone().assume_checked().to_string()
+    }
+}
+
+#[frb(sync)]
+pub fn parse_bitcoin_address(address: &str) -> Option<BitcoinAddressWrapper> {
+    if let Some(stripped) = address.strip_prefix("bitcoin:") {
+        return parse_bitcoin_address(stripped);
+    }
+
+    // Strip query parameters from BIP21 URIs
+    let address = address.split('?').next().unwrap_or(address);
+
+    bitcoin::Address::from_str(address)
+        .ok()
+        .map(BitcoinAddressWrapper)
+}

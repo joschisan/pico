@@ -1,0 +1,40 @@
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:flutter/material.dart';
+import 'package:pico/widgets/drawer_shell_widget.dart';
+import 'package:pico/widgets/async_button_widget.dart';
+import 'package:pico/utils/drawer_utils.dart';
+
+class GenerateOnchainAddressDrawer extends StatelessWidget {
+  final VoidCallback onConfirm;
+
+  const GenerateOnchainAddressDrawer({super.key, required this.onConfirm});
+
+  static Future<void> show(
+    BuildContext context, {
+    required VoidCallback onConfirm,
+  }) {
+    return DrawerUtils.show(
+      context: context,
+      child: GenerateOnchainAddressDrawer(onConfirm: onConfirm),
+    );
+  }
+
+  void _handleConfirm(BuildContext context) {
+    Navigator.of(context).pop();
+    onConfirm();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DrawerShell(
+      icon: PhosphorIconsRegular.plus,
+      title: 'Generate Onchain Address?',
+      children: [
+        AsyncButton(
+          text: 'Confirm',
+          onPressed: () async => _handleConfirm(context),
+        ),
+      ],
+    );
+  }
+}

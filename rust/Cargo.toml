@@ -1,0 +1,42 @@
+[package]
+name = "pico"
+version = "0.1.0"
+edition = "2024"
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(frb_expand)'] }
+
+[dependencies]
+# picomint workspace crates (sibling repo at github.com/joschisan/picomint)
+picomint-client = { git = "https://github.com/joschisan/picomint" }
+picomint-core = { git = "https://github.com/joschisan/picomint" }
+picomint-eventlog = { git = "https://github.com/joschisan/picomint" }
+picomint-redb = { git = "https://github.com/joschisan/picomint" }
+picomint-lnurl = { git = "https://github.com/joschisan/picomint" }
+
+bip39 = "2.1"
+bitcoin = "0.32.5"
+log = "0.4"
+flutter_rust_bridge = "=2.10.0"
+futures-util = "0.3.30"
+lightning-invoice = { version = "0.33.2", features = ["std"] }
+reqwest = { version = "=0.12.22", features = ["rustls-tls", "json"], default-features = false }
+serde = { version = "1.0.219", features = ["derive"] }
+tokio = "=1.48.0"
+regex = "1"
+url = "2"
+
+[profile.dev.package]
+secp256k1 = { opt-level = 3 }
+secp256k1-sys = { opt-level = 3 }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = false
+debug = "line-tables-only"
+
+[profile.release.package]
+secp256k1 = { opt-level = 3 }
+secp256k1-sys = { opt-level = 3 }

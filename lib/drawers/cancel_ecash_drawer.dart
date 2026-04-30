@@ -1,0 +1,49 @@
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/widgets/drawer_shell_widget.dart';
+import 'package:pico/widgets/async_button_widget.dart';
+import 'package:pico/utils/drawer_utils.dart';
+
+class CancelEcashDrawer extends StatelessWidget {
+  final PicoClient client;
+  final ECashWrapper notes;
+
+  const CancelEcashDrawer({
+    super.key,
+    required this.client,
+    required this.notes,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    required PicoClient client,
+    required ECashWrapper notes,
+  }) {
+    return DrawerUtils.show(
+      context: context,
+      child: CancelEcashDrawer(client: client, notes: notes),
+    );
+  }
+
+  Future<void> _handleConfirm(BuildContext context) async {
+    await client.ecashReceive(notes: notes);
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pop(); // Close drawer
+    Navigator.of(context).pop(); // Return to home screen
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DrawerShell(
+      icon: PhosphorIconsRegular.xCircle,
+      title: 'Cancel Payment?',
+      children: [
+        AsyncButton(text: 'Confirm', onPressed: () => _handleConfirm(context)),
+      ],
+    );
+  }
+}
