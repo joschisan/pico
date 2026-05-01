@@ -42,7 +42,10 @@ class _RecoveryDrawerState extends State<RecoveryDrawer> {
   }
 
   Future<void> _performRecovery() async {
-    await widget.client.waitForAllRecoveries();
+    // Picomint runs recovery silently in the background — the client
+    // is already usable. Once the eventlog exposes recovery progress
+    // events we can poll/await them here. For now we just navigate
+    // through to the federation screen.
     await widget.client.shutdown();
 
     final newClient = await widget.clientFactory.load(

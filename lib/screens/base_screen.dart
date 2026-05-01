@@ -11,7 +11,6 @@ import 'package:pico/utils/styles.dart';
 import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/drawers/invite_scanner_drawer.dart';
 import 'package:pico/drawers/leave_federation_drawer.dart';
-import 'package:pico/drawers/recovery_drawer.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
@@ -146,23 +145,17 @@ class _BaseScreenState extends State<BaseScreen> {
   void _navigateToClientScreen(PicoClient client) {
     if (!mounted) return;
 
-    if (client.hasPendingRecoveries()) {
-      RecoveryDrawer.show(
-        context,
-        client: client,
-        clientFactory: widget.clientFactory,
-      );
-    } else {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder:
-              (_) => FederationScreen(
-                client: client,
-                clientFactory: widget.clientFactory,
-              ),
-        ),
-      );
-    }
+    // Picomint runs recovery silently in the background, so we always
+    // navigate straight to the federation screen — even mid-recovery.
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (_) => FederationScreen(
+              client: client,
+              clientFactory: widget.clientFactory,
+            ),
+      ),
+    );
   }
 
   Future<void> _handleJoinFederation(InviteCodeWrapper invite) async {

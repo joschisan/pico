@@ -13,10 +13,7 @@ class PaymentDetailsDrawer extends StatelessWidget {
 
   const PaymentDetailsDrawer({super.key, required this.event});
 
-  static Future<void> show(
-    BuildContext context, {
-    required PicoPayment event,
-  }) {
+  static Future<void> show(BuildContext context, {required PicoPayment event}) {
     return DrawerUtils.show(
       context: context,
       child: PaymentDetailsDrawer(event: event),

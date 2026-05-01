@@ -12,32 +12,23 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use bitcoin::address::NetworkUnchecked;
-use picomint_bip39::{Language, Mnemonic};
-use picomint_core::base32::decode_prefixed;
-use picomint_core::base32::{PICOMINT_PREFIX, encode_prefixed};
-use picomint_core::db::Database;
-use picomint_core::invite_code::InviteCode;
-use picomint_mint_client::OOBNotes;
-use picomint_mintv2_client::ECash;
-use picomint_rocksdb::RocksDb;
 use flutter_rust_bridge::frb;
 use lightning_invoice::Bolt11Invoice;
+use picomint_client::Mnemonic;
+use picomint_client::mint::ECash;
+use picomint_core::invite::InviteCode;
+use picomint_redb::Database;
 
-// Re-export types needed by FRB generated code
-pub use picomint_client::OperationId;
-pub use picomint_core::config::FederationId;
-
-// Re-export public API for FRB
-pub use client::{PicoClient, PicoRecoveryProgress};
+pub use client::PicoClient;
 pub use currency::{FiatCurrency, find_fiat_currency, list_fiat_currencies};
-pub use events::{PicoPayment, PaymentNotification, PaymentType, RecentPaymentsUpdate};
-pub use factory::{PicoClientFactory, PicoContact, FederationInfo};
+pub use events::{PaymentNotification, PaymentType, PicoPayment, RecentPaymentsUpdate};
+pub use factory::{FederationInfo, PicoClientFactory, PicoContact};
 pub use fountain::{ECashDecoder, ECashEncoder};
 pub use lnurl::{LnurlWrapper, PayResponseWrapper, lnurl_fetch_limits, lnurl_resolve, parse_lnurl};
 
 #[frb(sync)]
 pub fn word_list() -> Vec<String> {
-    Language::English
+    bip39::Language::English
         .word_list()
         .iter()
         .map(|s| s.to_string())
@@ -56,7 +47,7 @@ pub fn parse_mnemonic(words: Vec<String>) -> Option<MnemonicWrapper> {
 
 #[frb]
 pub fn generate_mnemonic() -> MnemonicWrapper {
-    MnemonicWrapper(Mnemonic::generate(12).unwrap())
+    MnemonicWrapper(Mnemonic::generate(12).expect("12 is a valid bip39 word count"))
 }
 
 #[frb]
@@ -64,15 +55,13 @@ pub struct DatabaseWrapper(pub(crate) Database);
 
 #[frb]
 pub async fn open_database(db_path: &str) -> DatabaseWrapper {
-    picomint_core::rustls::install_crypto_provider().await;
+    let db_path = PathBuf::from_str(db_path)
+        .expect("db_path is a valid path")
+        .join("pico.redb");
 
-    let db_path = PathBuf::from_str(&db_path)
-        .expect("Could not parse db path")
-        .join("client.db");
+    let db = Database::open(db_path).expect("could not open database");
 
-    RocksDb::open_blocking(db_path, None)
-        .map(|db| DatabaseWrapper(db.into()))
-        .expect("Could not open database")
+    DatabaseWrapper(db)
 }
 
 #[frb]
@@ -81,32 +70,23 @@ pub struct InviteCodeWrapper(pub(crate) InviteCode);
 
 #[frb(sync)]
 pub fn parse_invite_code(invite: &str) -> Option<InviteCodeWrapper> {
-    InviteCode::from_str(invite).ok().map(InviteCodeWrapper)
-}
-
-pub(crate) enum EcashToken {
-    V1(OOBNotes),
-    V2(ECash),
+    picomint_base32::decode::<InviteCode>(invite)
+        .ok()
+        .map(InviteCodeWrapper)
 }
 
 #[frb(opaque)]
-pub struct ECashWrapper(pub(crate) EcashToken);
+pub struct ECashWrapper(pub(crate) ECash);
 
 impl ECashWrapper {
     #[frb(sync)]
     pub fn amount_sats(&self) -> i64 {
-        match &self.0 {
-            EcashToken::V1(notes) => notes.total_amount().msats as i64 / 1000,
-            EcashToken::V2(ecash) => ecash.amount().msats as i64 / 1000,
-        }
+        (self.0.amount().msats / 1000) as i64
     }
 
     #[frb(sync)]
     pub fn to_string(&self) -> String {
-        match &self.0 {
-            EcashToken::V1(notes) => encode_prefixed(PICOMINT_PREFIX, notes),
-            EcashToken::V2(ecash) => encode_prefixed(PICOMINT_PREFIX, ecash),
-        }
+        picomint_base32::encode(&self.0)
     }
 }
 
@@ -116,15 +96,9 @@ pub fn parse_ecash(notes: &str) -> Option<ECashWrapper> {
         return parse_ecash(stripped);
     }
 
-    if let Ok(v1) = OOBNotes::from_str(notes) {
-        return Some(ECashWrapper(EcashToken::V1(v1)));
-    }
-
-    if let Ok(v2) = decode_prefixed::<ECash>(PICOMINT_PREFIX, notes) {
-        return Some(ECashWrapper(EcashToken::V2(v2)));
-    }
-
-    None
+    picomint_base32::decode::<ECash>(notes)
+        .ok()
+        .map(ECashWrapper)
 }
 
 #[frb]
@@ -133,10 +107,11 @@ pub struct Bolt11InvoiceWrapper(pub(crate) Bolt11Invoice);
 impl Bolt11InvoiceWrapper {
     #[frb(sync)]
     pub fn amount_sats(&self) -> i64 {
-        self.0
+        (self
+            .0
             .amount_milli_satoshis()
-            .map(|msat| msat as i64 / 1000)
-            .unwrap()
+            .expect("amount-bearing invoice")
+            / 1000) as i64
     }
 }
 
@@ -148,7 +123,7 @@ pub fn parse_bolt11_invoice(invoice: &str) -> Option<Bolt11InvoiceWrapper> {
 
     Bolt11Invoice::from_str(invoice)
         .ok()
-        .filter(|invoice| invoice.amount_milli_satoshis().is_some())
+        .filter(|i| i.amount_milli_satoshis().is_some())
         .map(Bolt11InvoiceWrapper)
 }
 
@@ -168,7 +143,6 @@ pub fn parse_bitcoin_address(address: &str) -> Option<BitcoinAddressWrapper> {
         return parse_bitcoin_address(stripped);
     }
 
-    // Strip query parameters from BIP21 URIs
     let address = address.split('?').next().unwrap_or(address);
 
     bitcoin::Address::from_str(address)

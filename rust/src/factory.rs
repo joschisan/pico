@@ -1,70 +1,56 @@
+use std::str::FromStr;
 use std::sync::Arc;
 
+use flutter_rust_bridge::frb;
+use iroh::Endpoint;
+use iroh::address_lookup::MdnsAddressLookup;
+use iroh::endpoint::presets::N0;
+use picomint_client::{Client, Mnemonic, download};
+use picomint_core::config::{ConsensusConfig, FederationId};
+use picomint_core::invite::InviteCode;
+use picomint_encoding::{Decodable, Encodable};
+use picomint_redb::Database;
+use tokio::sync::Mutex;
+
 use crate::client::PicoClient;
-use crate::db::{
-    ClientConfigKey, ClientConfigPrefix, ContactKey, ContactPrefix, DbKeyPrefix,
-    EventLogEntryPrefix, RootEntropyKey, SelectedCurrencyKey,
-};
+use crate::db::{Blob, CLIENT_CONFIG, CONTACT, ROOT_ENTROPY, SELECTED_CURRENCY};
 use crate::lnurl::LnurlWrapper;
 use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
-use picomint_bip39::Bip39RootSecretStrategy;
-use picomint_client::meta::MetaService;
-use picomint_client::module_init::ClientModuleInitRegistry;
-use picomint_client::secret::RootSecretStrategy;
-use picomint_client::{Client, ClientBuilder, ClientHandleArc, ModuleKind, RootSecret};
-use picomint_client_module::meta::LegacyMetaSource;
-use picomint_connectors::ConnectorRegistry;
-use picomint_core::BitcoinHash;
-use picomint_core::base32::{PICOMINT_PREFIX, encode_prefixed};
-use picomint_core::config::{ClientConfig, FederationId};
-use picomint_core::db::{Database, IDatabaseTransactionOpsCore, IDatabaseTransactionOpsCoreTyped};
-use picomint_core::invite_code::InviteCode;
-use picomint_lnv2_client::LightningClientInit;
-use picomint_lnv2_common::KIND as LIGHTNING_KIND;
-use picomint_meta_client::{MetaClientInit, MetaModuleMetaSourceWithFallback};
-use picomint_mint_client::{KIND as MINT_KIND, MintClientInit};
-use picomint_mintv2_client::MintClientInit as MintV2ClientInit;
-use picomint_wallet_client::{KIND as WALLET_KIND, WalletClientInit};
-use picomint_walletv2_client::WalletClientInit as WalletV2ClientInit;
-use picomint_mintv2_common::KIND as MINTV2_KIND;
-use picomint_walletv2_common::KIND as WALLETV2_KIND;
-use flutter_rust_bridge::frb;
-use futures_util::StreamExt;
-use tokio::sync::Mutex;
 
 #[frb]
 pub struct PicoClientFactory {
     db: Database,
-    mnemonic: picomint_bip39::Mnemonic,
+    mnemonic: Mnemonic,
+    /// Single iroh endpoint shared across all per-federation clients.
+    /// Address grinding is the slowest part of bringup so we bind once
+    /// at factory construction and reuse for every `Client::new`.
+    endpoint: Endpoint,
 }
 
 #[frb]
 pub struct FederationInfo {
-    pub id: FederationId,
+    pub id: String,
     pub name: String,
     pub invite: String,
 }
 
 impl FederationInfo {
-    pub(crate) fn new(id: FederationId, config: ClientConfig) -> Self {
-        let name = config
-            .global
-            .federation_name()
-            .map(|name| name.to_string())
-            .unwrap_or(id.to_prefix().to_string());
+    pub(crate) fn new(id: FederationId, config: &picomint_core::config::ConsensusConfig) -> Self {
+        let name = config.name.clone();
 
-        let api_endpoints = config
-            .global
-            .api_endpoints
-            .into_iter()
-            .map(|(id, peer)| (id, peer.url))
-            .collect();
+        let (_, peer_endpoint) = config
+            .peers
+            .iter()
+            .next()
+            .expect("federation has at least one peer");
 
-        let invite = InviteCode::new_with_essential_num_guardians(&api_endpoints, id);
+        let invite = picomint_base32::encode(&InviteCode::new(peer_endpoint.iroh_pk, id));
 
-        let invite = encode_prefixed(PICOMINT_PREFIX, &invite);
-
-        Self { id, name, invite }
+        Self {
+            id: id.to_string(),
+            name,
+            invite,
+        }
     }
 }
 
@@ -95,50 +81,43 @@ impl PicoContact {
     }
 }
 
-fn ensure_one_of(config: &ClientConfig, a: &ModuleKind, b: &ModuleKind) -> Result<(), String> {
-    let has_a = config.modules.values().any(|m| m.kind() == a);
-    let has_b = config.modules.values().any(|m| m.kind() == b);
-    match (has_a, has_b) {
-        (true, false) | (false, true) => Ok(()),
-        (true, true) => Err(format!("Both {a} and {b} present")),
-        (false, false) => Err(format!("Neither {a} nor {b} present")),
-    }
-}
-
-fn ensure_module(config: &ClientConfig, kind: &ModuleKind) -> Result<(), String> {
-    match config.modules.values().any(|module| module.kind() == kind) {
-        true => Ok(()),
-        false => Err(format!("Module {} is not present", kind)),
-    }
-}
-
 impl PicoClientFactory {
     #[frb]
     pub async fn init(db: &DatabaseWrapper, mnemonic: &MnemonicWrapper) -> Result<Self, String> {
-        let mut dbtx = db.0.begin_transaction().await;
+        let dbtx = db.0.begin_write();
 
-        dbtx.insert_new_entry(&RootEntropyKey, &mnemonic.0.to_entropy())
-            .await;
+        dbtx.insert(
+            &ROOT_ENTROPY,
+            &(),
+            &Blob {
+                bytes: mnemonic.0.to_entropy().to_vec(),
+            },
+        );
 
-        dbtx.commit_tx_result().await.map_err(|e| e.to_string())?;
+        dbtx.commit();
+
+        let endpoint = bind_endpoint().await.map_err(|e| e.to_string())?;
 
         Ok(Self {
             db: db.0.clone(),
             mnemonic: mnemonic.0.clone(),
+            endpoint,
         })
     }
 
     #[frb]
     pub async fn try_load(db: &DatabaseWrapper) -> Option<Self> {
-        db.0.begin_transaction_nc()
-            .await
-            .get_value(&RootEntropyKey)
-            .await
-            .map(|entropy| picomint_bip39::Mnemonic::from_entropy(&entropy).unwrap())
-            .map(|mnemonic| Self {
-                db: db.0.clone(),
-                mnemonic,
-            })
+        let entropy = db.0.begin_read().get(&ROOT_ENTROPY, &())?;
+
+        let mnemonic = Mnemonic::from_entropy(&entropy.bytes).ok()?;
+
+        let endpoint = bind_endpoint().await.ok()?;
+
+        Some(Self {
+            db: db.0.clone(),
+            mnemonic,
+            endpoint,
+        })
     }
 
     #[frb]
@@ -146,162 +125,111 @@ impl PicoClientFactory {
         self.mnemonic.words().map(|s| s.to_string()).collect()
     }
 
-    async fn client_builder(&self) -> ClientBuilder {
-        let mut modules = ClientModuleInitRegistry::new();
-
-        modules.attach(MintClientInit);
-        modules.attach(MintV2ClientInit);
-        modules.attach(LightningClientInit::default());
-        modules.attach(WalletClientInit::default());
-        modules.attach(WalletV2ClientInit);
-        modules.attach(MetaClientInit);
-
-        let meta_source: MetaModuleMetaSourceWithFallback<LegacyMetaSource> = Default::default();
-        let meta_service = MetaService::new(meta_source);
-
-        let mut client_builder = Client::builder()
-            .await
-            .expect("Failed to create client builder");
-
-        client_builder.with_module_inits(modules);
-        client_builder.with_meta_service(meta_service);
-
-        client_builder
-    }
-
-    fn root_secret(&self) -> RootSecret {
-        RootSecret::StandardDoubleDerive(Bip39RootSecretStrategy::<12>::to_root_secret(
-            &self.mnemonic,
-        ))
-    }
-
-    fn client_database(&self, federation_id: FederationId) -> Database {
-        self.db.with_prefix(self.client_prefix(federation_id))
-    }
-
-    fn client_prefix(&self, federation_id: FederationId) -> Vec<u8> {
-        std::iter::once(DbKeyPrefix::ClientDatabase as u8)
-            .chain(federation_id.0.to_byte_array())
-            .collect::<Vec<u8>>()
-    }
-
-    async fn connectors(&self) -> ConnectorRegistry {
-        ConnectorRegistry::build_from_client_defaults()
-            .iroh_next(false)
-            .bind()
-            .await
-            .expect("Failed to bind connector registry")
-    }
-
     #[frb]
     pub async fn join(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
-        if let Some(client) = self.load(&invite.0.federation_id()).await {
+        if let Some(client) = self.load_typed(invite.0.federation_id).await {
             return Ok(client);
         }
 
-        let preview = self
-            .client_builder()
-            .await
-            .preview(self.connectors().await, &invite.0)
+        let config = download(&self.endpoint, &invite.0)
             .await
             .map_err(|e| e.to_string())?;
 
-        ensure_module(&preview.config(), &LIGHTNING_KIND)?;
-        ensure_one_of(&preview.config(), &MINT_KIND, &MINTV2_KIND)?;
-        ensure_one_of(&preview.config(), &WALLET_KIND, &WALLETV2_KIND)?;
+        let federation_id = config.calculate_federation_id();
 
-        let federation_id = invite.0.federation_id();
+        let dbtx = self.db.begin_write();
 
-        let client = preview
-            .join(self.client_database(federation_id), self.root_secret())
+        dbtx.insert(
+            &CLIENT_CONFIG,
+            &federation_id,
+            &Blob {
+                bytes: config.consensus_encode_to_vec(),
+            },
+        );
+
+        dbtx.commit();
+
+        let isolated = self.db.isolate(format!("fed-{federation_id}"));
+
+        let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
             .await
             .map_err(|e| e.to_string())?;
 
-        self.save_config(&client.config().await).await;
-
-        Ok(self.create_client(Arc::new(client), federation_id).await)
+        Ok(self.create_client(client, federation_id).await)
     }
 
     #[frb]
     pub async fn recover(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
-        if let Some(client) = self.load(&invite.0.federation_id()).await {
+        if let Some(client) = self.load_typed(invite.0.federation_id).await {
             return Ok(client);
         }
 
-        let preview = self
-            .client_builder()
-            .await
-            .preview(self.connectors().await, &invite.0)
+        let config = download(&self.endpoint, &invite.0)
             .await
             .map_err(|e| e.to_string())?;
 
-        ensure_module(&preview.config(), &LIGHTNING_KIND)?;
-        ensure_one_of(&preview.config(), &MINT_KIND, &MINTV2_KIND)?;
-        ensure_one_of(&preview.config(), &WALLET_KIND, &WALLETV2_KIND)?;
+        let federation_id = config.calculate_federation_id();
 
-        let federation_id = invite.0.federation_id();
+        // Persist the config on the root db AND seed the per-federation
+        // RECOVERY row in one atomic commit, so `Client::new` reliably
+        // picks the recovery row up via `MintClientModule::new`.
+        let dbtx = self.db.begin_write();
 
-        let client = preview
-            .recover(
-                self.client_database(federation_id),
-                self.root_secret(),
-                None,
-            )
+        dbtx.insert(
+            &CLIENT_CONFIG,
+            &federation_id,
+            &Blob {
+                bytes: config.consensus_encode_to_vec(),
+            },
+        );
+
+        Client::init_recovery(
+            &dbtx.as_ref().isolate(format!("fed-{federation_id}")),
+            federation_id,
+        );
+
+        dbtx.commit();
+
+        let isolated = self.db.isolate(format!("fed-{federation_id}"));
+
+        let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
             .await
             .map_err(|e| e.to_string())?;
 
-        self.save_config(&client.config().await).await;
-
-        Ok(self.create_client(Arc::new(client), federation_id).await)
+        Ok(self.create_client(client, federation_id).await)
     }
 
     #[frb]
-    pub async fn load(&self, federation_id: &FederationId) -> Option<PicoClient> {
-        if !Client::is_initialized(&self.client_database(*federation_id)).await {
-            return None;
-        }
+    pub async fn load(&self, federation_id: &str) -> Option<PicoClient> {
+        let id = FederationId::from_str(federation_id).ok()?;
 
-        let client = self
-            .client_builder()
-            .await
-            .open(
-                self.connectors().await,
-                self.client_database(*federation_id),
-                self.root_secret(),
-            )
-            .await
-            .expect("Failed to open client");
-
-        self.save_config(&client.config().await).await;
-
-        Some(self.create_client(Arc::new(client), *federation_id).await)
+        self.load_typed(id).await
     }
 
-    async fn save_config(&self, config: &ClientConfig) {
-        let mut dbtx = self.db.begin_transaction().await;
+    async fn load_typed(&self, federation_id: FederationId) -> Option<PicoClient> {
+        let blob = self.db.begin_read().get(&CLIENT_CONFIG, &federation_id)?;
 
-        dbtx.insert_entry(&ClientConfigKey(config.calculate_federation_id()), config)
-            .await;
+        let config = ConsensusConfig::consensus_decode(&blob.bytes)
+            .expect("config previously validated; decode should succeed");
 
-        dbtx.commit_tx().await;
+        let isolated = self.db.isolate(format!("fed-{federation_id}"));
+
+        let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
+            .await
+            .expect("config previously validated; client construction should succeed");
+
+        Some(self.create_client(client, federation_id).await)
     }
 
-    async fn create_client(
-        &self,
-        client: ClientHandleArc,
-        federation_id: FederationId,
-    ) -> PicoClient {
+    async fn create_client(&self, client: Arc<Client>, federation_id: FederationId) -> PicoClient {
         let currency_code = self
             .db
-            .begin_transaction_nc()
-            .await
-            .get_value(&SelectedCurrencyKey)
-            .await
+            .begin_read()
+            .get(&SELECTED_CURRENCY, &())
             .unwrap_or_else(|| "USD".to_string());
 
         PicoClient {
             client,
-            db: self.db.clone(),
             federation_id,
             currency_code,
             exchange_rate_cache: Arc::new(Mutex::new(None)),
@@ -310,85 +238,73 @@ impl PicoClientFactory {
 
     #[frb]
     pub async fn list_federations(&self) -> Vec<FederationInfo> {
-        self.db
-            .begin_transaction_nc()
-            .await
-            .find_by_prefix(&ClientConfigPrefix)
-            .await
-            .map(|(key, value)| FederationInfo::new(key.0, value))
+        self.db.begin_read().iter(&CLIENT_CONFIG, |it| {
+            it.filter_map(|(id, blob)| {
+                ConsensusConfig::consensus_decode(&blob.bytes)
+                    .ok()
+                    .map(|config| FederationInfo::new(id, &config))
+            })
             .collect()
-            .await
+        })
     }
 
     #[frb]
     pub async fn set_currency(&self, currency_code: &str) {
-        let mut dbtx = self.db.begin_transaction().await;
+        let dbtx = self.db.begin_write();
 
-        dbtx.insert_entry(&SelectedCurrencyKey, &currency_code.to_string())
-            .await;
+        dbtx.insert(&SELECTED_CURRENCY, &(), &currency_code.to_string());
 
-        dbtx.commit_tx().await;
+        dbtx.commit();
     }
 
     #[frb]
     pub async fn get_currency(&self) -> String {
         self.db
-            .begin_transaction_nc()
-            .await
-            .get_value(&SelectedCurrencyKey)
-            .await
+            .begin_read()
+            .get(&SELECTED_CURRENCY, &())
             .unwrap_or_else(|| "USD".to_string())
     }
 
     #[frb]
-    pub async fn leave(&self, federation_id: &FederationId) {
-        let mut dbtx = self.db.begin_transaction().await;
+    pub async fn leave(&self, federation_id: &str) {
+        let Ok(id) = FederationId::from_str(federation_id) else {
+            return;
+        };
 
-        dbtx.remove_entry(&ClientConfigKey(*federation_id)).await;
+        // Removes the federation from the top-level registry; the
+        // per-federation isolated namespace's tables remain in the file.
+        // Picomint-redb doesn't yet expose a "delete prefix" op — when it
+        // does, sweep the leftovers here too.
+        let dbtx = self.db.begin_write();
 
-        dbtx.remove_by_prefix(&EventLogEntryPrefix(*federation_id))
-            .await;
+        dbtx.remove(&CLIENT_CONFIG, &id);
 
-        dbtx.raw_remove_by_prefix(&self.client_prefix(*federation_id))
-            .await
-            .expect("unrecoverable error when removing client db");
-
-        dbtx.commit_tx().await;
+        dbtx.commit();
     }
 
     #[frb]
     pub async fn save_contact(&self, lnurl: &LnurlWrapper, name: &str) {
-        let mut dbtx = self.db.begin_transaction().await;
+        let dbtx = self.db.begin_write();
 
-        dbtx.insert_entry(&ContactKey(lnurl.0.clone()), &name.to_string())
-            .await;
+        dbtx.insert(&CONTACT, &lnurl.0, &name.to_string());
 
-        dbtx.commit_tx().await;
+        dbtx.commit();
     }
 
     #[frb]
     pub async fn get_contact_name(&self, lnurl: &LnurlWrapper) -> Option<String> {
-        self.db
-            .begin_transaction_nc()
-            .await
-            .get_value(&ContactKey(lnurl.0.clone()))
-            .await
+        self.db.begin_read().get(&CONTACT, &lnurl.0)
     }
 
     #[frb]
     pub async fn list_contacts(&self) -> Vec<PicoContact> {
-        let mut contacts: Vec<_> = self
-            .db
-            .begin_transaction_nc()
-            .await
-            .find_by_prefix(&ContactPrefix)
-            .await
-            .map(|(key, name)| PicoContact {
-                lnurl: LnurlWrapper(key.0),
+        let mut contacts: Vec<_> = self.db.begin_read().iter(&CONTACT, |it| {
+            it.map(|(lnurl, name)| PicoContact {
+                lnurl: LnurlWrapper(lnurl),
                 name,
             })
             .collect()
-            .await;
+        });
 
         contacts.sort_by_key(|c| c.name.to_lowercase());
 
@@ -397,10 +313,18 @@ impl PicoClientFactory {
 
     #[frb]
     pub async fn delete_contact(&self, lnurl: &LnurlWrapper) {
-        let mut dbtx = self.db.begin_transaction().await;
+        let dbtx = self.db.begin_write();
 
-        dbtx.remove_entry(&ContactKey(lnurl.0.clone())).await;
+        dbtx.remove(&CONTACT, &lnurl.0);
 
-        dbtx.commit_tx().await;
+        dbtx.commit();
     }
+}
+
+async fn bind_endpoint() -> anyhow::Result<Endpoint> {
+    Endpoint::builder(N0)
+        .address_lookup(MdnsAddressLookup::builder())
+        .bind()
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
 }

@@ -10,7 +10,6 @@ import 'package:pico/widgets/animated_balance_widget.dart';
 import 'package:pico/widgets/recent_payments_widget.dart';
 import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/screens/ecash_amount_screen.dart';
-import 'package:pico/screens/onchain_address_screen.dart';
 import 'package:pico/screens/wallet_v2_receive_screen.dart';
 import 'package:pico/drawers/scanner_drawer.dart';
 import 'package:pico/drawers/payment_details_drawer.dart';
@@ -153,32 +152,15 @@ class _FederationScreenState extends State<FederationScreen> {
 
   void _onReceiveBitcoin() async {
     try {
-      final v2Address = await widget.client.walletV2Receive();
+      final address = await widget.client.onchainReceiveAddress();
 
       if (!mounted) return;
 
-      if (v2Address != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => WalletV2ReceiveScreen(address: v2Address),
-          ),
-        );
-      } else {
-        // Addresses already sorted ascending by Rust (oldest first, newest last)
-        final addressesList = await widget.client.onchainListAddresses();
-
-        if (!mounted) return;
-
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder:
-                (context) => OnchainAddressScreen(
-                  client: widget.client,
-                  addressesList: addressesList,
-                ),
-          ),
-        );
-      }
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => WalletV2ReceiveScreen(address: address),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       NotificationUtils.showError(context, 'Failed to load address');

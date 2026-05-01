@@ -1,46 +1,26 @@
-use picomint_client::{ClientHandleArc, OperationId};
+use std::sync::Arc;
+
+use bitcoin::Amount as BtcAmount;
+use flutter_rust_bridge::frb;
+use futures::StreamExt;
+use picomint_client::Client;
 use picomint_core::Amount;
 use picomint_core::config::FederationId;
-use picomint_core::db::{Database, IDatabaseTransactionOpsCoreTyped};
-use picomint_core::module::AmountUnit;
-use picomint_core::module::serde_json;
-use picomint_core::util::SafeUrl;
 use picomint_eventlog::EventLogId;
-use picomint_lnv2_client::LightningClientModule;
-use picomint_lnv2_common::Bolt11InvoiceDescription;
-use picomint_mint_client::MintClientModule;
-use picomint_mintv2_client::MintClientModule as MintV2ClientModule;
-use picomint_wallet_client::client_db::TweakIdx;
-use picomint_wallet_client::{WalletClientModule, WalletOperationMeta, WalletOperationMetaVariant};
-use picomint_walletv2_client::WalletClientModule as WalletV2ClientModule;
-use flutter_rust_bridge::frb;
-use futures_util::StreamExt;
+use tokio::sync::Notify;
 
-use std::str::FromStr;
-
-use crate::db::{EventLogEntryKey, EventLogEntryPrefix};
 use crate::events::{
-    PicoPayment, ParsedEvent, PaymentNotification, RecentPaymentsUpdate, apply_update,
+    ParsedEvent, PaymentNotification, PicoPayment, RecentPaymentsUpdate, apply_update,
     parse_event_log_entry, snapshot,
 };
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
-use crate::{
-    BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, EcashToken, InviteCodeWrapper,
-};
-
-#[frb]
-pub struct PicoRecoveryProgress {
-    pub module_id: i64,
-    pub complete: i64,
-    pub total: i64,
-}
+use crate::{BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, InviteCodeWrapper};
 
 #[frb]
 #[derive(Clone)]
 pub struct PicoClient {
-    pub(crate) client: ClientHandleArc,
-    pub(crate) db: Database,
+    pub(crate) client: Arc<Client>,
     pub(crate) federation_id: FederationId,
     pub(crate) currency_code: String,
     pub(crate) exchange_rate_cache: ExchangeRateCache,
@@ -49,17 +29,12 @@ pub struct PicoClient {
 impl PicoClient {
     #[frb]
     pub async fn federation_name(&self) -> Option<String> {
-        self.client
-            .config()
-            .await
-            .global
-            .federation_name()
-            .map(|name| name.to_string())
+        Some(self.client.config().await.name)
     }
 
     #[frb(sync)]
-    pub fn federation_id(&self) -> FederationId {
-        self.federation_id
+    pub fn federation_id(&self) -> String {
+        self.federation_id.to_string()
     }
 
     #[frb(sync)]
@@ -69,13 +44,7 @@ impl PicoClient {
 
     #[frb]
     pub async fn shutdown(&self) {
-        self.client.executor().stop_executor();
-        self.client
-            .task_group()
-            .clone()
-            .shutdown_join_all(None)
-            .await
-            .expect("Client shutdown failed");
+        self.client.shutdown().await;
     }
 
     #[frb]
@@ -95,10 +64,7 @@ impl PicoClient {
 
     #[frb]
     pub async fn subscribe_balance(&self, sink: StreamSink<i64>) {
-        let mut stream = self
-            .client
-            .subscribe_balance_changes(AmountUnit::bitcoin())
-            .await;
+        let mut stream = self.client.subscribe_balance_changes().await;
 
         while let Some(amount) = stream.next().await {
             if sink.add((amount.msats / 1000) as i64).is_err() {
@@ -113,10 +79,9 @@ impl PicoClient {
             .client
             .config()
             .await
-            .global
-            .api_endpoints
-            .iter()
-            .map(|(_, peer)| peer.name.clone())
+            .peers
+            .values()
+            .map(|peer| peer.name.clone())
             .collect();
 
         let mut stream = self.client.connection_status_stream();
@@ -134,138 +99,70 @@ impl PicoClient {
         }
     }
 
-    #[frb(sync)]
-    pub fn has_pending_recoveries(&self) -> bool {
-        self.client.has_pending_recoveries()
-    }
-
+    /// Federation-expiry metadata. Picomint has no MetaService yet, so
+    /// always `None` — UI screens that key off this stay dormant.
     #[frb]
     pub async fn expiration_date(&self) -> Option<i64> {
-        self.client
-            .meta_service()
-            .get_field::<u64>(self.client.db(), "federation_expiry_timestamp")
-            .await
-            .and_then(|mv| mv.value)
-            .map(|ts| ts as i64)
+        None
     }
 
+    /// Successor-federation invite. Same story as `expiration_date` —
+    /// stubbed until picomint exposes a metadata channel.
     #[frb]
     pub async fn expiration_successor(&self) -> Option<InviteCodeWrapper> {
-        self.client
-            .meta_service()
-            .get_field::<String>(self.client.db(), "federation_successor")
-            .await
-            .and_then(|mv| mv.value)
-            .and_then(|s| picomint_core::invite_code::InviteCode::from_str(&s).ok())
-            .map(InviteCodeWrapper)
-    }
-
-    #[frb]
-    pub async fn wait_for_all_recoveries(&self) -> Result<(), String> {
-        self.client
-            .wait_for_all_recoveries()
-            .await
-            .map_err(|e| e.to_string())
-    }
-
-    #[frb]
-    pub async fn subscribe_recovery_progress(&self, sink: StreamSink<PicoRecoveryProgress>) {
-        let mut stream = self.client.subscribe_to_recovery_progress();
-
-        while let Some((module_id, progress)) = stream.next().await {
-            let pico_progress = PicoRecoveryProgress {
-                module_id: module_id as i64,
-                complete: progress.complete as i64,
-                total: progress.total as i64,
-            };
-
-            if sink.add(pico_progress).is_err() {
-                break;
-            }
-        }
+        None
     }
 
     #[frb]
     pub async fn ecash_send(&self, amount_sat: i64) -> Result<ECashWrapper, String> {
-        let amount = Amount::from_sats(amount_sat as u64);
-
-        if let Ok(module) = self.client.get_first_module::<MintV2ClientModule>() {
-            return module
-                .send(amount, serde_json::Value::Null)
-                .await
-                .map(|ecash| ECashWrapper(EcashToken::V2(ecash)))
-                .map_err(|e| e.to_string());
-        }
-
         self.client
-            .get_first_module::<MintClientModule>()
-            .unwrap()
-            .send_oob_notes(amount, ())
+            .mint()
+            .send(Amount::from_sats(amount_sat as u64))
             .await
-            .map(|notes| ECashWrapper(EcashToken::V1(notes)))
+            .map(ECashWrapper)
             .map_err(|e| e.to_string())
     }
 
     #[frb]
     pub async fn ecash_receive(&self, notes: &ECashWrapper) -> Result<(), String> {
-        match &notes.0 {
-            EcashToken::V2(ecash) => self
-                .client
-                .get_first_module::<MintV2ClientModule>()
-                .unwrap()
-                .receive(ecash.clone(), serde_json::Value::Null)
-                .await
-                .map(|_| ())
-                .map_err(|e| e.to_string()),
-            EcashToken::V1(oob) => self
-                .client
-                .get_first_module::<MintClientModule>()
-                .unwrap()
-                .reissue_external_notes(oob.clone(), ())
-                .await
-                .map(|_| ())
-                .map_err(|e| e.to_string()),
-        }
+        self.client
+            .mint()
+            .receive(&notes.0)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 
     #[frb]
     pub async fn ln_receive(&self, amount_sat: i64) -> Result<String, String> {
         let invoice = self
             .client
-            .get_first_module::<LightningClientModule>()
-            .unwrap()
+            .ln()
             .receive(
                 Amount::from_sats(amount_sat as u64),
                 60 * 60 * 24,
-                Bolt11InvoiceDescription::Direct(String::new()),
-                None,
-                ().into(),
+                picomint_core::ln::Bolt11InvoiceDescription::Direct(String::new()),
             )
             .await
-            .map_err(|e| e.to_string())?
-            .0;
+            .map_err(|e| e.to_string())?;
 
         Ok(invoice.to_string())
     }
 
     #[frb]
-    pub async fn ln_send(&self, invoice: &Bolt11InvoiceWrapper) -> Result<OperationId, String> {
+    pub async fn ln_send(&self, invoice: &Bolt11InvoiceWrapper) -> Result<String, String> {
         self.client
-            .get_first_module::<LightningClientModule>()
-            .unwrap()
-            .send(invoice.0.clone(), None, ().into())
+            .ln()
+            .send(invoice.0.clone())
             .await
+            .map(|op| op.to_string())
             .map_err(|e| e.to_string())
     }
 
     #[frb]
     pub async fn lnurl(&self) -> Result<String, String> {
-        let recurringd = SafeUrl::parse("https://recurringdv2.picomint.org").unwrap();
-
         self.client
-            .get_first_module::<LightningClientModule>()
-            .unwrap()
-            .generate_lnurl(recurringd, None)
+            .ln()
+            .generate_lnurl("https://recurringd.picomint.org/".to_string())
             .await
             .map_err(|e| e.to_string())
     }
@@ -273,36 +170,18 @@ impl PicoClient {
     #[frb]
     pub async fn onchain_calculate_fees(
         &self,
-        address: &BitcoinAddressWrapper,
-        amount_sats: i64,
+        _address: &BitcoinAddressWrapper,
+        _amount_sats: i64,
     ) -> Result<i64, String> {
-        if let Ok(module) = self.client.get_first_module::<WalletV2ClientModule>() {
-            return module
-                .send_fee()
-                .await
-                .map(|fee| fee.to_sat() as i64)
-                .map_err(|e| e.to_string());
-        }
-
-        let wallet_module = self
-            .client
-            .get_first_module::<WalletClientModule>()
-            .map_err(|e| e.to_string())?;
-
-        let address_checked = address
-            .0
-            .clone()
-            .require_network(wallet_module.get_network())
-            .map_err(|e| e.to_string())?;
-
-        let amount = bitcoin::Amount::from_sat(amount_sats as u64);
-
-        let fees = wallet_module
-            .get_withdraw_fees(&address_checked, amount)
+        // Picomint's wallet quotes a flat per-tx fee independent of
+        // address/amount. Match the existing UI signature; ignore the
+        // extra inputs.
+        self.client
+            .wallet()
+            .send_fee()
             .await
-            .map_err(|e| e.to_string())?;
-
-        Ok(fees.amount().to_sat() as i64)
+            .map(|fee| fee.to_sat() as i64)
+            .map_err(|e| e.to_string())
     }
 
     #[frb]
@@ -311,34 +190,13 @@ impl PicoClient {
         address: &BitcoinAddressWrapper,
         amount_sats: i64,
     ) -> Result<(), String> {
-        let amount = bitcoin::Amount::from_sat(amount_sats as u64);
-
-        if let Ok(module) = self.client.get_first_module::<WalletV2ClientModule>() {
-            return module
-                .send(address.0.clone(), amount, None)
-                .await
-                .map(|_| ())
-                .map_err(|e| e.to_string());
-        }
-
-        let wallet_module = self
-            .client
-            .get_first_module::<WalletClientModule>()
-            .map_err(|e| e.to_string())?;
-
-        let address_checked = address
-            .0
-            .clone()
-            .require_network(wallet_module.get_network())
-            .map_err(|e| e.to_string())?;
-
-        let fees = wallet_module
-            .get_withdraw_fees(&address_checked, amount)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        wallet_module
-            .withdraw(&address_checked, amount, fees, ())
+        self.client
+            .wallet()
+            .send(
+                address.0.clone(),
+                BtcAmount::from_sat(amount_sats as u64),
+                None,
+            )
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())
@@ -346,105 +204,26 @@ impl PicoClient {
 
     #[frb]
     pub async fn onchain_receive_address(&self) -> Result<String, String> {
-        let wallet_module = self
-            .client
-            .get_first_module::<WalletClientModule>()
-            .map_err(|e| e.to_string())?;
-
-        let (_, address, _) = wallet_module
-            .safe_allocate_deposit_address(())
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Ok(address.to_string())
-    }
-
-    #[frb]
-    pub async fn onchain_list_addresses(&self) -> Vec<(i64, String)> {
-        let operation_log = self.client.operation_log();
-        let mut addresses = Vec::new();
-        let mut next_key = None;
-
-        // Paginate through all operations
-        loop {
-            let page = operation_log.paginate_operations_rev(100, next_key).await;
-
-            if page.is_empty() {
-                break;
-            }
-
-            for (_key, op_log_entry) in &page {
-                if op_log_entry.operation_module_kind() != "wallet" {
-                    continue;
-                }
-
-                match op_log_entry.meta::<WalletOperationMeta>().variant {
-                    WalletOperationMetaVariant::Deposit {
-                        address, tweak_idx, ..
-                    } => {
-                        if let Some(tweak_idx) = tweak_idx {
-                            addresses.push((
-                                tweak_idx.0 as i64,
-                                address.clone().assume_checked().to_string(),
-                            ));
-                        }
-                    }
-                    _ => continue,
-                }
-            }
-
-            next_key = page.last().map(|entry| entry.0.clone());
-        }
-
-        addresses.into_iter().rev().collect()
-    }
-
-    #[frb]
-    pub async fn onchain_recheck_address(&self, tweak_idx: i64) -> Result<(), String> {
-        let wallet_module = self
-            .client
-            .get_first_module::<WalletClientModule>()
-            .map_err(|e| e.to_string())?;
-
-        wallet_module
-            .recheck_pegin_address(TweakIdx(tweak_idx as u64))
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Ok(())
-    }
-
-    #[frb]
-    pub async fn wallet_v2_receive(&self) -> Option<String> {
-        let address = self
-            .client
-            .get_first_module::<WalletV2ClientModule>()
-            .ok()?
-            .receive()
-            .await;
-
-        Some(address.to_string())
+        Ok(self.client.wallet().receive().await.to_string())
     }
 
     #[frb]
     pub async fn get_payment_history(&self) -> Vec<PicoPayment> {
-        let mut payments = Vec::new();
-
         let entries = self
-            .db
-            .begin_transaction_nc()
-            .await
-            .find_by_prefix(&EventLogEntryPrefix(self.federation_id))
-            .await
-            .collect::<Vec<_>>()
+            .client
+            .get_event_log(EventLogId::LOG_START, u64::MAX)
             .await;
 
-        for entry in entries {
-            if let Some(parsed) = parse_event_log_entry(&entry.1) {
+        let mut payments = Vec::new();
+
+        for (_, entry) in entries {
+            if entry.federation_id != self.federation_id {
+                continue;
+            }
+
+            if let Some(parsed) = parse_event_log_entry(&entry) {
                 match parsed {
-                    ParsedEvent::Payment(payment) => {
-                        payments.push(payment);
-                    }
+                    ParsedEvent::Payment(payment) => payments.push(payment),
                     ParsedEvent::Update {
                         operation_id,
                         success,
@@ -461,78 +240,52 @@ impl PicoClient {
         payments
     }
 
+    /// Live tail of the global event log filtered to this federation.
+    ///
+    /// Always replays from `LOG_START` on every subscription — the global
+    /// event log persists across runs at the un-prefixed redb root, so
+    /// rebuilding the in-memory payment list from it is cheap and removes
+    /// the need for a per-federation copy table in pico's own db.
     #[frb]
     pub async fn subscribe_event_log(&self, sink: StreamSink<RecentPaymentsUpdate>) {
+        let notify: Arc<Notify> = self.client.event_notify();
+
         let mut position = EventLogId::LOG_START;
-        let mut payments = Vec::new();
-
-        // Load historical events from our database
-        let entries = self
-            .db
-            .begin_transaction_nc()
-            .await
-            .find_by_prefix(&EventLogEntryPrefix(self.federation_id))
-            .await
-            .collect::<Vec<_>>()
-            .await;
-
-        for (key, entry) in entries {
-            position = key.1.saturating_add(1);
-
-            if let Some(parsed) = parse_event_log_entry(&entry) {
-                match parsed {
-                    ParsedEvent::Payment(payment) => {
-                        payments.push(payment);
-                    }
-                    ParsedEvent::Update {
-                        operation_id,
-                        success,
-                        oob,
-                    } => {
-                        apply_update(&mut payments, &operation_id, success, oob);
-                    }
-                }
-            }
-        }
-
-        let mut n_display = 3;
-
-        // Send initial snapshot without notifications
-        if sink
-            .add(RecentPaymentsUpdate {
-                payments: snapshot(&payments, n_display),
-                notification: None,
-            })
-            .is_err()
-        {
-            return;
-        }
-
-        let mut log_event_rx = self.client.log_event_added_rx();
+        let mut payments: Vec<PicoPayment> = Vec::new();
+        let mut n_display: usize = 3;
+        let mut have_seeded_initial = false;
 
         loop {
-            let changed = log_event_rx.changed();
+            let notified = notify.notified();
 
-            let batch = self.client.get_event_log(Some(position), 100).await;
+            let batch = self.client.get_event_log(position, 100).await;
 
-            for persisted_entry in &batch {
-                position = persisted_entry.id().saturating_add(1);
+            for (id, entry) in &batch {
+                position = id.saturating_add(1);
 
-                let Some(parsed) = parse_event_log_entry(persisted_entry.as_raw()) else {
+                if entry.federation_id != self.federation_id {
+                    continue;
+                }
+
+                let Some(parsed) = parse_event_log_entry(entry) else {
                     continue;
                 };
 
                 let notification = match parsed {
                     ParsedEvent::Payment(payment) => {
-                        n_display += 1;
+                        if have_seeded_initial {
+                            n_display += 1;
+                        }
 
-                        payments.push(payment.clone());
+                        let row = payment.clone();
 
-                        payment.success.map(|success| PaymentNotification {
-                            incoming: payment.incoming,
+                        payments.push(payment);
+
+                        row.success.map(|success| PaymentNotification {
+                            incoming: row.incoming,
                             success,
-                            amount_sats: payment.amount_sats,
-                            payment_type: payment.payment_type.clone(),
+                            amount_sats: row.amount_sats,
+                            payment_type: row.payment_type,
                         })
                     }
                     ParsedEvent::Update {
@@ -541,6 +294,13 @@ impl PicoClient {
                         oob,
                     } => apply_update(&mut payments, &operation_id, success, oob),
                 };
+
+                if !have_seeded_initial {
+                    // Don't emit per-event notifications while replaying
+                    // historical entries — they'd flash through the UI as
+                    // "new payment" toasts.
+                    continue;
+                }
 
                 if sink
                     .add(RecentPaymentsUpdate {
@@ -551,24 +311,24 @@ impl PicoClient {
                 {
                     return;
                 }
+            }
 
-                let mut dbtx = self.db.begin_transaction().await;
+            if !have_seeded_initial && batch.len() < 100 {
+                have_seeded_initial = true;
 
-                dbtx.insert_entry(
-                    &EventLogEntryKey(self.federation_id, persisted_entry.id()),
-                    persisted_entry.as_raw(),
-                )
-                .await;
-
-                if dbtx.commit_tx_result().await.is_err() {
+                if sink
+                    .add(RecentPaymentsUpdate {
+                        payments: snapshot(&payments, n_display),
+                        notification: None,
+                    })
+                    .is_err()
+                {
                     return;
                 }
             }
 
             if batch.len() < 100 {
-                if changed.await.is_err() {
-                    return;
-                }
+                notified.await;
             }
         }
     }

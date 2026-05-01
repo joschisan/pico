@@ -7,23 +7,30 @@ edition = "2024"
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(frb_expand)'] }
 
 [dependencies]
-# picomint workspace crates (sibling repo at github.com/joschisan/picomint)
+anyhow = "1"
+bip39 = "2"
+picomint-base32 = { git = "https://github.com/joschisan/picomint" }
 picomint-client = { git = "https://github.com/joschisan/picomint" }
 picomint-core = { git = "https://github.com/joschisan/picomint" }
+picomint-encoding = { git = "https://github.com/joschisan/picomint" }
 picomint-eventlog = { git = "https://github.com/joschisan/picomint" }
-picomint-redb = { git = "https://github.com/joschisan/picomint" }
+picomint-fountain = { git = "https://github.com/joschisan/picomint" }
 picomint-lnurl = { git = "https://github.com/joschisan/picomint" }
+picomint-redb = { git = "https://github.com/joschisan/picomint" }
 
-bip39 = "2.1"
+iroh = { version = "=0.98.0", default-features = false, features = ["tls-ring", "address-lookup-mdns"] }
+# Pin to match picomint workspace — ed25519 3.0.0-rc.5 broke ed25519-dalek-3.0.0-pre.6.
+ed25519 = "=3.0.0-rc.4"
 bitcoin = "0.32.5"
-log = "0.4"
 flutter_rust_bridge = "=2.10.0"
-futures-util = "0.3.30"
-lightning-invoice = { version = "0.33.2", features = ["std"] }
-reqwest = { version = "=0.12.22", features = ["rustls-tls", "json"], default-features = false }
-serde = { version = "1.0.219", features = ["derive"] }
-tokio = "=1.48.0"
+futures = "0.3"
+futures-util = "0.3"
+lightning-invoice = { version = "0.34", features = ["std"] }
+log = "0.4"
 regex = "1"
+reqwest = { version = "=0.12.22", features = ["rustls-tls", "json"], default-features = false }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
 url = "2"
 
 [profile.dev.package]

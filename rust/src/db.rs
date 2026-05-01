@@ -1,89 +1,42 @@
-use picomint_core::config::{ClientConfig, FederationId};
-use picomint_core::encoding::{Decodable, Encodable};
-use picomint_core::{impl_db_lookup, impl_db_record};
-use picomint_eventlog::{EventLogEntry, EventLogId};
+//! Pico's app-level redb tables, kept on the root (un-isolated) handle.
+//! Per-federation client state lives in `db.isolate(...)` namespaces below
+//! these and is owned entirely by `picomint_client::Client`.
 
-#[repr(u8)]
-#[derive(Clone, Debug)]
-pub(crate) enum DbKeyPrefix {
-    RootEntropy = 0x00,
-    ClientDatabase = 0x01,
-    ClientConfig = 0x02,
-    #[allow(dead_code)]
-    EventLogStartPosition = 0x03, // Deprecated
-    SelectedCurrency = 0x04,
-    #[allow(dead_code)]
-    SelectedFederation = 0x05, // Deprecated
-    EventLogEntry = 0x06,
-    Contact = 0x07,
+use picomint_core::config::FederationId;
+use picomint_encoding::{Decodable, Encodable};
+use picomint_redb::{consensus_value, table};
+
+/// Encoded byte blob — used as the value type for tables whose payload
+/// would otherwise reference a foreign Rust type that flutter_rust_bridge
+/// can't generate Dart bindings for. Callers consensus-encode/decode at
+/// the boundary.
+#[derive(Debug, Clone, Encodable, Decodable)]
+pub(crate) struct Blob {
+    pub(crate) bytes: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct RootEntropyKey;
+consensus_value!(Blob);
 
-impl_db_record!(
-    key = RootEntropyKey,
-    value = Vec<u8>,
-    db_prefix = DbKeyPrefix::RootEntropy,
+table!(
+    ROOT_ENTROPY,
+    () => Blob,
+    "root-entropy",
 );
 
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct ClientConfigKey(pub(crate) FederationId);
-
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct ClientConfigPrefix;
-
-impl_db_record!(
-    key = ClientConfigKey,
-    value = ClientConfig,
-    db_prefix = DbKeyPrefix::ClientConfig,
+table!(
+    CLIENT_CONFIG,
+    FederationId => Blob,
+    "client-config",
 );
 
-impl_db_lookup!(key = ClientConfigKey, query_prefix = ClientConfigPrefix);
-
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct SelectedCurrencyKey;
-
-impl_db_record!(
-    key = SelectedCurrencyKey,
-    value = String,
-    db_prefix = DbKeyPrefix::SelectedCurrency,
+table!(
+    SELECTED_CURRENCY,
+    () => String,
+    "selected-currency",
 );
 
-#[allow(dead_code)]
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct SelectedFederationKey;
-
-impl_db_record!(
-    key = SelectedFederationKey,
-    value = FederationId,
-    db_prefix = DbKeyPrefix::SelectedFederation,
+table!(
+    CONTACT,
+    String => String,
+    "contact",
 );
-
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct EventLogEntryKey(pub(crate) FederationId, pub(crate) EventLogId);
-
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct EventLogEntryPrefix(pub(crate) FederationId);
-
-impl_db_record!(
-    key = EventLogEntryKey,
-    value = EventLogEntry,
-    db_prefix = DbKeyPrefix::EventLogEntry,
-);
-
-impl_db_lookup!(key = EventLogEntryKey, query_prefix = EventLogEntryPrefix);
-
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct ContactKey(pub(crate) String);
-
-#[derive(Clone, Debug, Encodable, Decodable)]
-pub(crate) struct ContactPrefix;
-
-impl_db_record!(
-    key = ContactKey,
-    value = String,
-    db_prefix = DbKeyPrefix::Contact,
-);
-
-impl_db_lookup!(key = ContactKey, query_prefix = ContactPrefix);

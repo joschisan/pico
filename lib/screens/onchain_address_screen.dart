@@ -52,30 +52,26 @@ class _OnchainAddressScreenState extends State<OnchainAddressScreen> {
   }
 
   Future<void> _generateNewAddress({bool notify = false}) async {
+    // Picomint exposes a single derived receive address; "generate new" is
+    // a no-op but the button still refreshes from the client.
     try {
-      await widget.client.onchainReceiveAddress();
-      final newAddresses = await widget.client.onchainListAddresses();
+      final addr = await widget.client.onchainReceiveAddress();
       setState(() {
-        addresses = newAddresses;
-        currentIndex = addresses.length - 1;
+        addresses = [(0, addr)];
+        currentIndex = 0;
       });
-      _pageController.animateToPage(
-        currentIndex,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
       if (notify && mounted) {
-        NotificationUtils.showSuccess(context, 'Generated onchain address');
+        NotificationUtils.showSuccess(context, 'Refreshed onchain address');
       }
     } catch (e) {
       if (!mounted) return;
-      NotificationUtils.showError(context, 'Failed to generate address');
+      NotificationUtils.showError(context, 'Failed to load address');
     }
   }
 
   Future<void> _recheckAddress() async {
-    final tweakIdx = addresses[currentIndex].$1;
-    await widget.client.onchainRecheckAddress(tweakIdx: tweakIdx);
+    // Picomint scans for incoming pegins automatically; manual recheck is
+    // a no-op until the eventlog exposes deposit detection events.
     if (!mounted) return;
     NotificationUtils.showSuccess(context, 'Checking address for payments');
   }
