@@ -48,7 +48,7 @@ class PicoApp extends StatelessWidget {
         title: 'Pico',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF36A18B)),
           useMaterial3: true,
           fontFamily: GoogleFonts.inter().fontFamily,
           appBarTheme: const AppBarTheme(
@@ -58,7 +58,7 @@ class PicoApp extends StatelessWidget {
         ),
         darkTheme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.deepPurple,
+            seedColor: const Color(0xFF36A18B),
             brightness: Brightness.dark,
           ),
           useMaterial3: true,
