@@ -6,14 +6,13 @@ use iroh::Endpoint;
 use iroh::address_lookup::MdnsAddressLookup;
 use iroh::endpoint::presets::N0;
 use picomint_client::{Client, Mnemonic, download};
-use picomint_core::config::{ConsensusConfig, FederationId};
+use picomint_core::config::FederationId;
 use picomint_core::invite::InviteCode;
-use picomint_encoding::{Decodable, Encodable};
 use picomint_redb::Database;
 use tokio::sync::Mutex;
 
 use crate::client::PicoClient;
-use crate::db::{Blob, CLIENT_CONFIG, CONTACT, ROOT_ENTROPY, SELECTED_CURRENCY};
+use crate::db::{CLIENT_CONFIG, CONTACT, ROOT_ENTROPY, SELECTED_CURRENCY};
 use crate::lnurl::LnurlWrapper;
 use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
 
@@ -86,13 +85,7 @@ impl PicoClientFactory {
     pub async fn init(db: &DatabaseWrapper, mnemonic: &MnemonicWrapper) -> Result<Self, String> {
         let dbtx = db.0.begin_write();
 
-        dbtx.insert(
-            &ROOT_ENTROPY,
-            &(),
-            &Blob {
-                bytes: mnemonic.0.to_entropy().to_vec(),
-            },
-        );
+        dbtx.insert(&ROOT_ENTROPY, &(), &mnemonic.0.to_entropy().to_vec());
 
         dbtx.commit();
 
@@ -109,7 +102,7 @@ impl PicoClientFactory {
     pub async fn try_load(db: &DatabaseWrapper) -> Option<Self> {
         let entropy = db.0.begin_read().get(&ROOT_ENTROPY, &())?;
 
-        let mnemonic = Mnemonic::from_entropy(&entropy.bytes).ok()?;
+        let mnemonic = Mnemonic::from_entropy(&entropy).ok()?;
 
         let endpoint = bind_endpoint().await.ok()?;
 
@@ -139,17 +132,11 @@ impl PicoClientFactory {
 
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(
-            &CLIENT_CONFIG,
-            &federation_id,
-            &Blob {
-                bytes: config.consensus_encode_to_vec(),
-            },
-        );
+        dbtx.insert(&CLIENT_CONFIG, &federation_id, &config);
 
         dbtx.commit();
 
-        let isolated = self.db.isolate(format!("fed-{federation_id}"));
+        let isolated = self.db.isolate(federation_id);
 
         let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
             .await
@@ -175,22 +162,13 @@ impl PicoClientFactory {
         // picks the recovery row up via `MintClientModule::new`.
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(
-            &CLIENT_CONFIG,
-            &federation_id,
-            &Blob {
-                bytes: config.consensus_encode_to_vec(),
-            },
-        );
+        dbtx.insert(&CLIENT_CONFIG, &federation_id, &config);
 
-        Client::init_recovery(
-            &dbtx.as_ref().isolate(format!("fed-{federation_id}")),
-            federation_id,
-        );
+        Client::init_recovery(&dbtx.as_ref().isolate(federation_id), federation_id);
 
         dbtx.commit();
 
-        let isolated = self.db.isolate(format!("fed-{federation_id}"));
+        let isolated = self.db.isolate(federation_id);
 
         let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
             .await
@@ -207,12 +185,9 @@ impl PicoClientFactory {
     }
 
     async fn load_typed(&self, federation_id: FederationId) -> Option<PicoClient> {
-        let blob = self.db.begin_read().get(&CLIENT_CONFIG, &federation_id)?;
+        let config = self.db.begin_read().get(&CLIENT_CONFIG, &federation_id)?;
 
-        let config = ConsensusConfig::consensus_decode(&blob.bytes)
-            .expect("config previously validated; decode should succeed");
-
-        let isolated = self.db.isolate(format!("fed-{federation_id}"));
+        let isolated = self.db.isolate(federation_id);
 
         let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
             .await
@@ -239,12 +214,8 @@ impl PicoClientFactory {
     #[frb]
     pub async fn list_federations(&self) -> Vec<FederationInfo> {
         self.db.begin_read().iter(&CLIENT_CONFIG, |it| {
-            it.filter_map(|(id, blob)| {
-                ConsensusConfig::consensus_decode(&blob.bytes)
-                    .ok()
-                    .map(|config| FederationInfo::new(id, &config))
-            })
-            .collect()
+            it.map(|(id, config)| FederationInfo::new(id, &config))
+                .collect()
         })
     }
 
