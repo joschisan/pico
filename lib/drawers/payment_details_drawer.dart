@@ -183,7 +183,7 @@ class _Description {
   });
 }
 
-String _sats(int n) => '${NumberFormat('#,###').format(n)} sats';
+String _sats(int n) => '${NumberFormat('#,###').format(n)} sat';
 
 _Description _describe(
   PaymentEvent event,
@@ -198,8 +198,9 @@ _Description _describe(
 
   return switch (event) {
     // ── Core ────────────────────────────────────────────────────────────
-    PaymentEvent_TxAccept() => _Description(
+    PaymentEvent_TxAccept(:final inputSats, :final outputSats) => _Description(
       label: 'Transaction Accepted',
+      subtitle: 'fee ${_sats(inputSats.toInt() - outputSats.toInt())}',
       tone: neutral,
     ),
     PaymentEvent_TxReject(:final error) => _Description(
@@ -209,16 +210,14 @@ _Description _describe(
     ),
 
     // ── Lightning ───────────────────────────────────────────────────────
-    PaymentEvent_LnSend(:final amountSats, :final lnFeeSats, :final feeSats) =>
-      _Description(
-        label: 'Sending Lightning',
-        subtitle:
-            '${_sats(amountSats.toInt())} · fee ${_sats(lnFeeSats.toInt() + feeSats.toInt())}',
-        tone: neutral,
-      ),
+    PaymentEvent_LnSend(:final amountSats, :final feeSats) => _Description(
+      label: 'Sending Lightning',
+      subtitle:
+          '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
+      tone: neutral,
+    ),
     PaymentEvent_LnSendSuccess() => _Description(
       label: 'Sending Success',
-      subtitle: 'preimage received',
       tone: success,
     ),
     PaymentEvent_LnSendRefund(:final expired) => _Description(
@@ -231,9 +230,10 @@ _Description _describe(
       subtitle: 'missing preimage',
       tone: failure,
     ),
-    PaymentEvent_LnReceive(:final amountSats) => _Description(
+    PaymentEvent_LnReceive(:final amountSats, :final feeSats) => _Description(
       label: 'Receiving Lightning',
-      subtitle: _sats(amountSats.toInt()),
+      subtitle:
+          '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
 
@@ -261,8 +261,9 @@ _Description _describe(
       subtitle: _sats(amountSats.toInt()),
       tone: neutral,
     ),
-    PaymentEvent_MintSuccess() => _Description(
+    PaymentEvent_MintSuccess(:final amountSats) => _Description(
       label: 'Minting Success',
+      subtitle: _sats(amountSats.toInt()),
       tone: success,
     ),
     PaymentEvent_MintFailure() => _Description(
@@ -277,14 +278,14 @@ _Description _describe(
     ),
 
     // ── Wallet (on-chain) ───────────────────────────────────────────────
-    PaymentEvent_WalletSend(:final valueSats, :final address) => _Description(
+    PaymentEvent_WalletSend(:final amountSats, :final feeSats) => _Description(
       label: 'Sending Onchain',
-      subtitle: '${_sats(valueSats.toInt())} to $address',
+      subtitle:
+          '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
-    PaymentEvent_WalletSendSuccess(:final txid) => _Description(
+    PaymentEvent_WalletSendSuccess() => _Description(
       label: 'Sending Success',
-      subtitle: 'bitcoin tx $txid',
       tone: success,
     ),
     PaymentEvent_WalletSendFailure() => _Description(
@@ -292,10 +293,11 @@ _Description _describe(
       subtitle: 'missing txid',
       tone: failure,
     ),
-    PaymentEvent_WalletReceive(:final valueSats, :final address) =>
+    PaymentEvent_WalletReceive(:final amountSats, :final feeSats) =>
       _Description(
         label: 'Receiving Onchain',
-        subtitle: '${_sats(valueSats.toInt())} at $address',
+        subtitle:
+            '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
         tone: neutral,
       ),
 
@@ -309,7 +311,6 @@ _Description _describe(
       ),
     PaymentEvent_GwSendSuccess() => _Description(
       label: 'Sending Success',
-      subtitle: 'preimage received',
       tone: success,
     ),
     PaymentEvent_GwSendCancel() => _Description(
@@ -325,7 +326,6 @@ _Description _describe(
     ),
     PaymentEvent_GwReceiveSuccess() => _Description(
       label: 'Receiving Success',
-      subtitle: 'preimage received',
       tone: success,
     ),
     PaymentEvent_GwReceiveFailure() => _Description(

@@ -78,6 +78,8 @@ pub enum PaymentEvent {
     TxAccept {
         timestamp: i64,
         txid: String,
+        input_sats: i64,
+        output_sats: i64,
     },
     TxReject {
         timestamp: i64,
@@ -90,7 +92,6 @@ pub enum PaymentEvent {
         timestamp: i64,
         txid: String,
         amount_sats: i64,
-        ln_fee_sats: i64,
         fee_sats: i64,
     },
     LnSendSuccess {
@@ -109,6 +110,7 @@ pub enum PaymentEvent {
         timestamp: i64,
         txid: String,
         amount_sats: i64,
+        fee_sats: i64,
     },
 
     // ── Mint / ECash (`picomint_client::mint`) ───────────────────────────
@@ -129,6 +131,7 @@ pub enum PaymentEvent {
     MintSuccess {
         timestamp: i64,
         txid: String,
+        amount_sats: i64,
     },
     MintFailure {
         timestamp: i64,
@@ -143,8 +146,7 @@ pub enum PaymentEvent {
     WalletSend {
         timestamp: i64,
         txid: String,
-        address: String,
-        value_sats: i64,
+        amount_sats: i64,
         fee_sats: i64,
     },
     WalletSendSuccess {
@@ -157,8 +159,7 @@ pub enum PaymentEvent {
     WalletReceive {
         timestamp: i64,
         txid: String,
-        address: String,
-        value_sats: i64,
+        amount_sats: i64,
         fee_sats: i64,
     },
 
@@ -290,13 +291,12 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
 
     // ── Lightning ───────────────────────────────────────────────────────
     if let Some(send) = entry.to_event::<LnSend>() {
-        let total_fee = (send.ln_fee.msats + send.fee.msats) / 1000;
         return Some(ParsedEvent::Payment(PicoPayment {
             operation_id: op,
             incoming: false,
             payment_type: PaymentType::Lightning,
             amount_sats: (send.amount.msats / 1000) as i64,
-            fee_sats: Some(total_fee as i64),
+            fee_sats: Some((send.fee.msats / 1000) as i64),
             timestamp: ts,
             success: None,
             oob: None,
@@ -325,7 +325,7 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
             incoming: true,
             payment_type: PaymentType::Lightning,
             amount_sats: (receive.amount.msats / 1000) as i64,
-            fee_sats: None,
+            fee_sats: Some((receive.fee.msats / 1000) as i64),
             timestamp: ts,
             success: Some(true),
             oob: None,
@@ -338,7 +338,7 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
             operation_id: op,
             incoming: false,
             payment_type: PaymentType::Bitcoin,
-            amount_sats: send.value.to_sat() as i64,
+            amount_sats: send.amount.to_sat() as i64,
             fee_sats: Some(send.fee.to_sat() as i64),
             timestamp: ts,
             success: None,
@@ -367,7 +367,7 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
             operation_id: op,
             incoming: true,
             payment_type: PaymentType::Bitcoin,
-            amount_sats: receive.value.to_sat() as i64,
+            amount_sats: receive.amount.to_sat() as i64,
             fee_sats: Some(receive.fee.to_sat() as i64),
             timestamp: ts,
             success: Some(true),
@@ -389,6 +389,8 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::TxAccept {
             timestamp,
             txid: e.txid.to_string(),
+            input_sats: (e.input.msats / 1000) as i64,
+            output_sats: (e.output.msats / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<TxRejectEvent>() {
@@ -405,7 +407,6 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: (e.amount.msats / 1000) as i64,
-            ln_fee_sats: (e.ln_fee.msats / 1000) as i64,
             fee_sats: (e.fee.msats / 1000) as i64,
         });
     }
@@ -430,6 +431,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: (e.amount.msats / 1000) as i64,
+            fee_sats: (e.fee.msats / 1000) as i64,
         });
     }
 
@@ -458,6 +460,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::MintSuccess {
             timestamp,
             txid: e.txid.to_string(),
+            amount_sats: (e.amount.msats / 1000) as i64,
         });
     }
     if entry.to_event::<MintFailureEvent>().is_some() {
@@ -476,8 +479,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::WalletSend {
             timestamp,
             txid: e.txid.to_string(),
-            address: e.address.assume_checked().to_string(),
-            value_sats: e.value.to_sat() as i64,
+            amount_sats: e.amount.to_sat() as i64,
             fee_sats: e.fee.to_sat() as i64,
         });
     }
@@ -494,8 +496,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::WalletReceive {
             timestamp,
             txid: e.txid.to_string(),
-            address: e.address.assume_checked().to_string(),
-            value_sats: e.value.to_sat() as i64,
+            amount_sats: e.amount.to_sat() as i64,
             fee_sats: e.fee.to_sat() as i64,
         });
     }
