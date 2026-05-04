@@ -203,9 +203,8 @@ _Description _describe(
       subtitle: _sats(inputSats.toInt() - outputSats.toInt()),
       tone: neutral,
     ),
-    PaymentEvent_TxReject(:final error) => _Description(
+    PaymentEvent_TxReject() => _Description(
       label: 'Transaction Rejected',
-      subtitle: error,
       tone: failure,
     ),
 
