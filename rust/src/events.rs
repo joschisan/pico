@@ -7,16 +7,25 @@
 //! to fold into an existing one (matched by `operation_id`).
 
 use flutter_rust_bridge::frb;
+use picomint_client::gw::events::{
+    ReceiveEvent as GwReceive, ReceiveFailureEvent as GwReceiveFailure,
+    ReceiveRefundEvent as GwReceiveRefund, ReceiveSuccessEvent as GwReceiveSuccess,
+    SendCancelEvent as GwSendCancel, SendEvent as GwSend, SendSuccessEvent as GwSendSuccess,
+};
 use picomint_client::ln::events::{
-    ReceiveEvent as LnReceive, SendEvent as LnSend, SendRefundEvent, SendSuccessEvent,
+    ReceiveEvent as LnReceive, SendEvent as LnSend, SendFailureEvent as LnSendFailureEvent,
+    SendRefundEvent, SendSuccessEvent,
 };
 use picomint_client::mint::{
-    IssuanceComplete, OutputFailureEvent, ReceiveEvent as MintReceive, ReissueEvent,
+    MintFailureEvent, MintSuccessEvent, ReceiveEvent as MintReceive, RecoveryEvent, RemintEvent,
     SendEvent as MintSend,
 };
 use picomint_client::wallet::events::{
-    ReceiveEvent as WalletReceive, SendConfirmEvent, SendEvent as WalletSend, SendFailureEvent,
+    ReceiveEvent as WalletReceive, SendEvent as WalletSend, SendFailureEvent,
+    SendSuccessEvent as WalletSendSuccessEvent,
 };
+use picomint_client::{TxAcceptEvent, TxRejectEvent};
+use picomint_core::bitcoin::hex::DisplayHex;
 use picomint_eventlog::EventLogEntry;
 
 #[frb]
@@ -57,6 +66,139 @@ pub struct RecentPaymentsUpdate {
     pub notification: Option<PaymentNotification>,
 }
 
+/// One-to-one mirror of every public picomint client event, flattened for
+/// transport over the frb bridge. Variant names follow `<Module><Event>`
+/// (e.g. `LnSend`, `MintIssuanceComplete`) so the Dart side can match the
+/// picomint source on sight. All amounts are converted to sats; all hashes
+/// (txids, preimages, signatures) are rendered as lowercase hex.
+#[frb]
+#[derive(Clone)]
+pub enum PaymentEvent {
+    // ── Core (transaction-layer events shared across all modules) ────────
+    TxAccept {
+        timestamp: i64,
+        txid: String,
+    },
+    TxReject {
+        timestamp: i64,
+        txid: String,
+        error: String,
+    },
+
+    // ── Lightning (`picomint_client::ln`) ────────────────────────────────
+    LnSend {
+        timestamp: i64,
+        txid: String,
+        amount_sats: i64,
+        ln_fee_sats: i64,
+        fee_sats: i64,
+    },
+    LnSendSuccess {
+        timestamp: i64,
+        preimage: String,
+    },
+    LnSendRefund {
+        timestamp: i64,
+        txid: String,
+        expired: bool,
+    },
+    LnSendFailure {
+        timestamp: i64,
+    },
+    LnReceive {
+        timestamp: i64,
+        txid: String,
+        amount_sats: i64,
+    },
+
+    // ── Mint / ECash (`picomint_client::mint`) ───────────────────────────
+    MintSend {
+        timestamp: i64,
+        amount_sats: i64,
+        ecash: String,
+    },
+    MintRemint {
+        timestamp: i64,
+        txid: String,
+    },
+    MintReceive {
+        timestamp: i64,
+        txid: String,
+        amount_sats: i64,
+    },
+    MintSuccess {
+        timestamp: i64,
+        txid: String,
+    },
+    MintFailure {
+        timestamp: i64,
+    },
+    MintRecovery {
+        timestamp: i64,
+        index: i64,
+        total: Option<i64>,
+    },
+
+    // ── Wallet / on-chain (`picomint_client::wallet`) ────────────────────
+    WalletSend {
+        timestamp: i64,
+        txid: String,
+        address: String,
+        value_sats: i64,
+        fee_sats: i64,
+    },
+    WalletSendSuccess {
+        timestamp: i64,
+        txid: String,
+    },
+    WalletSendFailure {
+        timestamp: i64,
+    },
+    WalletReceive {
+        timestamp: i64,
+        txid: String,
+        address: String,
+        value_sats: i64,
+        fee_sats: i64,
+    },
+
+    // ── Gateway / cross-fed swaps (`picomint_client::gw`) ────────────────
+    GwSend {
+        timestamp: i64,
+        outpoint: String,
+        amount_sats: i64,
+        ln_fee_sats: i64,
+        fee_sats: i64,
+    },
+    GwSendSuccess {
+        timestamp: i64,
+        preimage: String,
+        txid: String,
+        ln_fee_sats: i64,
+    },
+    GwSendCancel {
+        timestamp: i64,
+        signature: String,
+    },
+    GwReceive {
+        timestamp: i64,
+        txid: String,
+        amount_sats: i64,
+        fee_sats: i64,
+    },
+    GwReceiveSuccess {
+        timestamp: i64,
+        preimage: String,
+    },
+    GwReceiveFailure {
+        timestamp: i64,
+    },
+    GwReceiveRefund {
+        timestamp: i64,
+        txid: String,
+    },
+}
+
 pub(crate) enum ParsedEvent {
     Payment(PicoPayment),
     Update {
@@ -94,8 +236,8 @@ pub(crate) fn snapshot(payments: &[PicoPayment], count: usize) -> Vec<PicoPaymen
 }
 
 pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent> {
-    let op = entry.operation_id.to_string();
-    let ts = (entry.ts_usecs / 1000) as i64;
+    let op = entry.operation.to_string();
+    let ts = entry.timestamp as i64;
 
     // ── Mint (ECash) ────────────────────────────────────────────────────
     if let Some(send) = entry.to_event::<MintSend>() {
@@ -124,7 +266,7 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
         }));
     }
 
-    if entry.to_event::<IssuanceComplete>().is_some() {
+    if entry.to_event::<MintSuccessEvent>().is_some() {
         return Some(ParsedEvent::Update {
             operation_id: op,
             success: true,
@@ -132,7 +274,7 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
         });
     }
 
-    if entry.to_event::<OutputFailureEvent>().is_some() {
+    if entry.to_event::<MintFailureEvent>().is_some() {
         return Some(ParsedEvent::Update {
             operation_id: op,
             success: false,
@@ -140,8 +282,8 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
         });
     }
 
-    if entry.to_event::<ReissueEvent>().is_some() {
-        // Internal reissue used to top up missing denominations before
+    if entry.to_event::<RemintEvent>().is_some() {
+        // Internal remint used to top up missing denominations before
         // a send completes. Not user-visible — skip.
         return None;
     }
@@ -204,7 +346,7 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
         }));
     }
 
-    if let Some(confirm) = entry.to_event::<SendConfirmEvent>() {
+    if let Some(confirm) = entry.to_event::<WalletSendSuccessEvent>() {
         return Some(ParsedEvent::Update {
             operation_id: op,
             success: true,
@@ -231,6 +373,179 @@ pub(crate) fn parse_event_log_entry(entry: &EventLogEntry) -> Option<ParsedEvent
             success: Some(true),
             oob: Some(receive.txid.to_string()),
         }));
+    }
+
+    None
+}
+
+/// Classify a single event log entry into a [`PaymentEvent`]. Returns
+/// `None` for entries that don't correspond to any known picomint client
+/// event type (forward-compatible with new modules added upstream).
+pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent> {
+    let timestamp = entry.timestamp as i64;
+
+    // ── Core ────────────────────────────────────────────────────────────
+    if let Some(e) = entry.to_event::<TxAcceptEvent>() {
+        return Some(PaymentEvent::TxAccept {
+            timestamp,
+            txid: e.txid.to_string(),
+        });
+    }
+    if let Some(e) = entry.to_event::<TxRejectEvent>() {
+        return Some(PaymentEvent::TxReject {
+            timestamp,
+            txid: e.txid.to_string(),
+            error: e.error,
+        });
+    }
+
+    // ── Lightning ───────────────────────────────────────────────────────
+    if let Some(e) = entry.to_event::<LnSend>() {
+        return Some(PaymentEvent::LnSend {
+            timestamp,
+            txid: e.txid.to_string(),
+            amount_sats: (e.amount.msats / 1000) as i64,
+            ln_fee_sats: (e.ln_fee.msats / 1000) as i64,
+            fee_sats: (e.fee.msats / 1000) as i64,
+        });
+    }
+    if let Some(e) = entry.to_event::<SendSuccessEvent>() {
+        return Some(PaymentEvent::LnSendSuccess {
+            timestamp,
+            preimage: e.preimage.to_lower_hex_string(),
+        });
+    }
+    if let Some(e) = entry.to_event::<SendRefundEvent>() {
+        return Some(PaymentEvent::LnSendRefund {
+            timestamp,
+            txid: e.txid.to_string(),
+            expired: e.expired,
+        });
+    }
+    if entry.to_event::<LnSendFailureEvent>().is_some() {
+        return Some(PaymentEvent::LnSendFailure { timestamp });
+    }
+    if let Some(e) = entry.to_event::<LnReceive>() {
+        return Some(PaymentEvent::LnReceive {
+            timestamp,
+            txid: e.txid.to_string(),
+            amount_sats: (e.amount.msats / 1000) as i64,
+        });
+    }
+
+    // ── Mint (ECash) ────────────────────────────────────────────────────
+    if let Some(e) = entry.to_event::<MintSend>() {
+        return Some(PaymentEvent::MintSend {
+            timestamp,
+            amount_sats: (e.amount.msats / 1000) as i64,
+            ecash: e.ecash,
+        });
+    }
+    if let Some(e) = entry.to_event::<RemintEvent>() {
+        return Some(PaymentEvent::MintRemint {
+            timestamp,
+            txid: e.txid.to_string(),
+        });
+    }
+    if let Some(e) = entry.to_event::<MintReceive>() {
+        return Some(PaymentEvent::MintReceive {
+            timestamp,
+            txid: e.txid.to_string(),
+            amount_sats: (e.amount.msats / 1000) as i64,
+        });
+    }
+    if let Some(e) = entry.to_event::<MintSuccessEvent>() {
+        return Some(PaymentEvent::MintSuccess {
+            timestamp,
+            txid: e.txid.to_string(),
+        });
+    }
+    if entry.to_event::<MintFailureEvent>().is_some() {
+        return Some(PaymentEvent::MintFailure { timestamp });
+    }
+    if let Some(e) = entry.to_event::<RecoveryEvent>() {
+        return Some(PaymentEvent::MintRecovery {
+            timestamp,
+            index: e.index as i64,
+            total: e.total.map(|t| t as i64),
+        });
+    }
+
+    // ── Wallet (on-chain) ───────────────────────────────────────────────
+    if let Some(e) = entry.to_event::<WalletSend>() {
+        return Some(PaymentEvent::WalletSend {
+            timestamp,
+            txid: e.txid.to_string(),
+            address: e.address.assume_checked().to_string(),
+            value_sats: e.value.to_sat() as i64,
+            fee_sats: e.fee.to_sat() as i64,
+        });
+    }
+    if let Some(e) = entry.to_event::<WalletSendSuccessEvent>() {
+        return Some(PaymentEvent::WalletSendSuccess {
+            timestamp,
+            txid: e.txid.to_string(),
+        });
+    }
+    if entry.to_event::<SendFailureEvent>().is_some() {
+        return Some(PaymentEvent::WalletSendFailure { timestamp });
+    }
+    if let Some(e) = entry.to_event::<WalletReceive>() {
+        return Some(PaymentEvent::WalletReceive {
+            timestamp,
+            txid: e.txid.to_string(),
+            address: e.address.assume_checked().to_string(),
+            value_sats: e.value.to_sat() as i64,
+            fee_sats: e.fee.to_sat() as i64,
+        });
+    }
+
+    // ── Gateway / cross-fed swaps ───────────────────────────────────────
+    if let Some(e) = entry.to_event::<GwSend>() {
+        return Some(PaymentEvent::GwSend {
+            timestamp,
+            outpoint: e.outpoint.to_string(),
+            amount_sats: (e.amount.msats / 1000) as i64,
+            ln_fee_sats: (e.ln_fee.msats / 1000) as i64,
+            fee_sats: (e.fee.msats / 1000) as i64,
+        });
+    }
+    if let Some(e) = entry.to_event::<GwSendSuccess>() {
+        return Some(PaymentEvent::GwSendSuccess {
+            timestamp,
+            preimage: e.preimage.to_lower_hex_string(),
+            txid: e.txid.to_string(),
+            ln_fee_sats: (e.ln_fee.msats / 1000) as i64,
+        });
+    }
+    if let Some(e) = entry.to_event::<GwSendCancel>() {
+        return Some(PaymentEvent::GwSendCancel {
+            timestamp,
+            signature: e.signature.to_string(),
+        });
+    }
+    if let Some(e) = entry.to_event::<GwReceive>() {
+        return Some(PaymentEvent::GwReceive {
+            timestamp,
+            txid: e.txid.to_string(),
+            amount_sats: (e.amount.msats / 1000) as i64,
+            fee_sats: (e.fee.msats / 1000) as i64,
+        });
+    }
+    if let Some(e) = entry.to_event::<GwReceiveSuccess>() {
+        return Some(PaymentEvent::GwReceiveSuccess {
+            timestamp,
+            preimage: e.preimage.to_lower_hex_string(),
+        });
+    }
+    if entry.to_event::<GwReceiveFailure>().is_some() {
+        return Some(PaymentEvent::GwReceiveFailure { timestamp });
+    }
+    if let Some(e) = entry.to_event::<GwReceiveRefund>() {
+        return Some(PaymentEvent::GwReceiveRefund {
+            timestamp,
+            txid: e.txid.to_string(),
+        });
     }
 
     None

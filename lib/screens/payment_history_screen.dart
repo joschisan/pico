@@ -2,6 +2,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/grouped_list_widget.dart';
@@ -9,9 +10,14 @@ import 'package:pico/widgets/payment_card_widget.dart';
 import 'package:pico/drawers/payment_details_drawer.dart';
 
 class PaymentHistoryScreen extends StatefulWidget {
+  final PicoClient client;
   final List<PicoPayment> payments;
 
-  const PaymentHistoryScreen({super.key, required this.payments});
+  const PaymentHistoryScreen({
+    super.key,
+    required this.client,
+    required this.payments,
+  });
 
   @override
   State<PaymentHistoryScreen> createState() => _PaymentHistoryScreenState();
@@ -104,7 +110,11 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
             (context, payment) => PaymentCard(
               key: ValueKey(payment.operationId),
               event: payment,
-              onTap: () => PaymentDetailsDrawer.show(context, event: payment),
+              onTap: () => PaymentDetailsDrawer.show(
+                context,
+                client: widget.client,
+                event: payment,
+              ),
             ),
       ),
     );

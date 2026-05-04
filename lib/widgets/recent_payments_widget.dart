@@ -114,7 +114,10 @@ class _RecentPaymentsState extends State<RecentPayments> {
 
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => PaymentHistoryScreen(payments: payments),
+                  builder: (_) => PaymentHistoryScreen(
+                    client: widget.client,
+                    payments: payments,
+                  ),
                 ),
               );
             },

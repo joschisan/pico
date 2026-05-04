@@ -1,17 +1,21 @@
 use std::sync::Arc;
 
+use std::str::FromStr;
+
 use bitcoin::Amount as BtcAmount;
 use flutter_rust_bridge::frb;
 use futures::StreamExt;
 use picomint_client::Client;
+use picomint_client::OperationId;
 use picomint_core::Amount;
+use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
 use picomint_eventlog::EventLogId;
 use tokio::sync::Notify;
 
 use crate::events::{
-    ParsedEvent, PaymentNotification, PicoPayment, RecentPaymentsUpdate, apply_update,
-    parse_event_log_entry, snapshot,
+    ParsedEvent, PaymentEvent, PaymentNotification, PicoPayment, RecentPaymentsUpdate,
+    apply_update, parse_event_log_entry, parse_payment_event, snapshot,
 };
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
@@ -238,6 +242,34 @@ impl PicoClient {
         payments.reverse();
 
         payments
+    }
+
+    /// Live tail of every picomint event for a single operation, parsed
+    /// into the rich [`PaymentEvent`] enum for the details drawer timeline.
+    /// Replays existing events first (oldest → newest) then yields new
+    /// ones as they're committed. Silently exits if `operation_id` doesn't
+    /// parse as a valid sha256 hash.
+    #[frb]
+    pub async fn subscribe_payment_events(
+        &self,
+        operation_id: String,
+        sink: StreamSink<PaymentEvent>,
+    ) {
+        let Ok(hash) = sha256::Hash::from_str(&operation_id) else {
+            return;
+        };
+        let op = OperationId(hash);
+
+        let mut stream = self.client.subscribe_operation_events(op);
+
+        while let Some(entry) = stream.next().await {
+            let Some(event) = parse_payment_event(&entry) else {
+                continue;
+            };
+            if sink.add(event).is_err() {
+                break;
+            }
+        }
     }
 
     /// Live tail of the global event log filtered to this federation.

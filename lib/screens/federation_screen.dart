@@ -211,7 +211,7 @@ class _FederationScreenState extends State<FederationScreen> {
   }
 
   void _showEventDetails(PicoPayment event) {
-    PaymentDetailsDrawer.show(context, event: event);
+    PaymentDetailsDrawer.show(context, client: widget.client, event: event);
   }
 
   @override
