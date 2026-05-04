@@ -186,6 +186,11 @@ class _Description {
 
 String _sats(int n) => '${NumberFormat('#,###').format(n)} sat';
 
+Widget _shareIcon(String text, Color color) => GestureDetector(
+  onTap: () => SharePlus.instance.share(ShareParams(text: text)),
+  child: Icon(PhosphorIconsRegular.copy, size: smallIconSize, color: color),
+);
+
 _Description _describe(
   PaymentEvent event,
   PicoPayment payment,
@@ -216,9 +221,10 @@ _Description _describe(
           '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
-    PaymentEvent_LnSendSuccess() => _Description(
+    PaymentEvent_LnSendSuccess(:final preimage) => _Description(
       label: 'Sending Success',
       tone: success,
+      headerAction: _shareIcon(preimage, success),
     ),
     PaymentEvent_LnSendRefund(:final expired) => _Description(
       label: 'Refunding',
@@ -242,14 +248,7 @@ _Description _describe(
       label: 'Sending eCash',
       subtitle: _sats(amountSats.toInt()),
       tone: neutral,
-      headerAction: GestureDetector(
-        onTap: () => SharePlus.instance.share(ShareParams(text: ecash)),
-        child: Icon(
-          PhosphorIconsRegular.copy,
-          size: smallIconSize,
-          color: neutral,
-        ),
-      ),
+      headerAction: _shareIcon(ecash, neutral),
     ),
     PaymentEvent_MintRemint() => _Description(
       label: 'Reminting eCash',
@@ -284,59 +283,28 @@ _Description _describe(
           '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
-    PaymentEvent_WalletSendSuccess() => _Description(
+    PaymentEvent_WalletSendSuccess(:final txid) => _Description(
       label: 'Sending Success',
       tone: success,
+      headerAction: _shareIcon(txid, success),
     ),
     PaymentEvent_WalletSendFailure() => _Description(
       label: 'Sending Failure',
       subtitle: 'missing txid',
       tone: failure,
     ),
-    PaymentEvent_WalletReceive(:final amountSats, :final feeSats) =>
+    PaymentEvent_WalletReceive(
+      :final txid,
+      :final amountSats,
+      :final feeSats,
+    ) =>
       _Description(
         label: 'Receiving Onchain',
         subtitle:
             '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
         tone: neutral,
+        headerAction: _shareIcon(txid, neutral),
       ),
 
-    // ── Gateway / cross-fed ─────────────────────────────────────────────
-    PaymentEvent_GwSend(:final amountSats, :final lnFeeSats, :final feeSats) =>
-      _Description(
-        label: 'Sending Lightning',
-        subtitle:
-            '${_sats(amountSats.toInt())} · ${_sats(lnFeeSats.toInt() + feeSats.toInt())}',
-        tone: neutral,
-      ),
-    PaymentEvent_GwSendSuccess() => _Description(
-      label: 'Sending Success',
-      tone: success,
-    ),
-    PaymentEvent_GwSendCancel() => _Description(
-      label: 'Refunding',
-      subtitle: 'gateway cancelled',
-      tone: warning,
-    ),
-    PaymentEvent_GwReceive(:final amountSats, :final feeSats) => _Description(
-      label: 'Receiving Lightning',
-      subtitle:
-          '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
-      tone: neutral,
-    ),
-    PaymentEvent_GwReceiveSuccess() => _Description(
-      label: 'Receiving Success',
-      tone: success,
-    ),
-    PaymentEvent_GwReceiveFailure() => _Description(
-      label: 'Receiving Failure',
-      subtitle: 'invalid decryption shares',
-      tone: failure,
-    ),
-    PaymentEvent_GwReceiveRefund() => _Description(
-      label: 'Refunding',
-      subtitle: 'invalid preimage',
-      tone: warning,
-    ),
   };
 }

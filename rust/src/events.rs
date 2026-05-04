@@ -7,11 +7,6 @@
 //! to fold into an existing one (matched by `operation_id`).
 
 use flutter_rust_bridge::frb;
-use picomint_client::gw::events::{
-    ReceiveEvent as GwReceive, ReceiveFailureEvent as GwReceiveFailure,
-    ReceiveRefundEvent as GwReceiveRefund, ReceiveSuccessEvent as GwReceiveSuccess,
-    SendCancelEvent as GwSendCancel, SendEvent as GwSend, SendSuccessEvent as GwSendSuccess,
-};
 use picomint_client::ln::events::{
     ReceiveEvent as LnReceive, SendEvent as LnSend, SendFailureEvent as LnSendFailureEvent,
     SendRefundEvent, SendSuccessEvent,
@@ -161,42 +156,6 @@ pub enum PaymentEvent {
         txid: String,
         amount_sats: i64,
         fee_sats: i64,
-    },
-
-    // ── Gateway / cross-fed swaps (`picomint_client::gw`) ────────────────
-    GwSend {
-        timestamp: i64,
-        outpoint: String,
-        amount_sats: i64,
-        ln_fee_sats: i64,
-        fee_sats: i64,
-    },
-    GwSendSuccess {
-        timestamp: i64,
-        preimage: String,
-        txid: String,
-        ln_fee_sats: i64,
-    },
-    GwSendCancel {
-        timestamp: i64,
-        signature: String,
-    },
-    GwReceive {
-        timestamp: i64,
-        txid: String,
-        amount_sats: i64,
-        fee_sats: i64,
-    },
-    GwReceiveSuccess {
-        timestamp: i64,
-        preimage: String,
-    },
-    GwReceiveFailure {
-        timestamp: i64,
-    },
-    GwReceiveRefund {
-        timestamp: i64,
-        txid: String,
     },
 }
 
@@ -498,54 +457,6 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
             txid: e.txid.to_string(),
             amount_sats: e.amount.to_sat() as i64,
             fee_sats: e.fee.to_sat() as i64,
-        });
-    }
-
-    // ── Gateway / cross-fed swaps ───────────────────────────────────────
-    if let Some(e) = entry.to_event::<GwSend>() {
-        return Some(PaymentEvent::GwSend {
-            timestamp,
-            outpoint: e.outpoint.to_string(),
-            amount_sats: (e.amount.msats / 1000) as i64,
-            ln_fee_sats: (e.ln_fee.msats / 1000) as i64,
-            fee_sats: (e.fee.msats / 1000) as i64,
-        });
-    }
-    if let Some(e) = entry.to_event::<GwSendSuccess>() {
-        return Some(PaymentEvent::GwSendSuccess {
-            timestamp,
-            preimage: e.preimage.to_lower_hex_string(),
-            txid: e.txid.to_string(),
-            ln_fee_sats: (e.ln_fee.msats / 1000) as i64,
-        });
-    }
-    if let Some(e) = entry.to_event::<GwSendCancel>() {
-        return Some(PaymentEvent::GwSendCancel {
-            timestamp,
-            signature: e.signature.to_string(),
-        });
-    }
-    if let Some(e) = entry.to_event::<GwReceive>() {
-        return Some(PaymentEvent::GwReceive {
-            timestamp,
-            txid: e.txid.to_string(),
-            amount_sats: (e.amount.msats / 1000) as i64,
-            fee_sats: (e.fee.msats / 1000) as i64,
-        });
-    }
-    if let Some(e) = entry.to_event::<GwReceiveSuccess>() {
-        return Some(PaymentEvent::GwReceiveSuccess {
-            timestamp,
-            preimage: e.preimage.to_lower_hex_string(),
-        });
-    }
-    if entry.to_event::<GwReceiveFailure>().is_some() {
-        return Some(PaymentEvent::GwReceiveFailure { timestamp });
-    }
-    if let Some(e) = entry.to_event::<GwReceiveRefund>() {
-        return Some(PaymentEvent::GwReceiveRefund {
-            timestamp,
-            txid: e.txid.to_string(),
         });
     }
 
