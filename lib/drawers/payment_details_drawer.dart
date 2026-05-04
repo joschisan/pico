@@ -110,13 +110,13 @@ class _TimelineRow extends StatelessWidget {
         children: [
           // Dot + connecting line column.
           SizedBox(
-            width: 24,
+            width: 28,
             child: Column(
               children: [
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Container(
-                  width: 10,
-                  height: 10,
+                  width: 12,
+                  height: 12,
                   decoration: BoxDecoration(
                     color: desc.tone,
                     shape: BoxShape.circle,
@@ -132,12 +132,12 @@ class _TimelineRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
 
           // Header (label + optional inline action) + optional subheader.
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 36),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
