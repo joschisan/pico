@@ -206,7 +206,8 @@ _Description _describe(
     // ── Core ────────────────────────────────────────────────────────────
     PaymentEvent_TxAccept(:final inputSats, :final outputSats) => _Description(
       label: 'Transaction Accepted',
-      subtitle: _sats(inputSats.toInt() - outputSats.toInt()),
+      subtitle:
+          '${_sats(inputSats.toInt())} · ${_sats(inputSats.toInt() - outputSats.toInt())}',
       tone: neutral,
     ),
     PaymentEvent_TxReject() => _Description(
