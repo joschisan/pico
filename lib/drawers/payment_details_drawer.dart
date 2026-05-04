@@ -108,9 +108,10 @@ class _TimelineRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Dot + connecting line column.
+          // Dot + connecting line column. Width matches largeIconSize so
+          // the dot's horizontal center aligns with the drawer header icon.
           SizedBox(
-            width: 28,
+            width: largeIconSize,
             child: Column(
               children: [
                 const SizedBox(height: 4),
@@ -132,7 +133,7 @@ class _TimelineRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
 
           // Header (label + optional inline action) + optional subheader.
           Expanded(
