@@ -166,7 +166,7 @@ impl PicoClient {
     pub async fn lnurl(&self) -> Result<String, String> {
         self.client
             .ln()
-            .generate_lnurl("https://recurringd.picomint.org/".to_string())
+            .generate_lnurl("http://207.154.233.120:8091/".to_string())
             .await
             .map_err(|e| e.to_string())
     }
