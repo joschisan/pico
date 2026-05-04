@@ -200,7 +200,7 @@ _Description _describe(
     // ── Core ────────────────────────────────────────────────────────────
     PaymentEvent_TxAccept(:final inputSats, :final outputSats) => _Description(
       label: 'Transaction Accepted',
-      subtitle: 'fee ${_sats(inputSats.toInt() - outputSats.toInt())}',
+      subtitle: _sats(inputSats.toInt() - outputSats.toInt()),
       tone: neutral,
     ),
     PaymentEvent_TxReject(:final error) => _Description(
@@ -213,7 +213,7 @@ _Description _describe(
     PaymentEvent_LnSend(:final amountSats, :final feeSats) => _Description(
       label: 'Sending Lightning',
       subtitle:
-          '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
+          '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
     PaymentEvent_LnSendSuccess() => _Description(
@@ -233,7 +233,7 @@ _Description _describe(
     PaymentEvent_LnReceive(:final amountSats, :final feeSats) => _Description(
       label: 'Receiving Lightning',
       subtitle:
-          '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
+          '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
 
@@ -281,7 +281,7 @@ _Description _describe(
     PaymentEvent_WalletSend(:final amountSats, :final feeSats) => _Description(
       label: 'Sending Onchain',
       subtitle:
-          '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
+          '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
     PaymentEvent_WalletSendSuccess() => _Description(
@@ -297,7 +297,7 @@ _Description _describe(
       _Description(
         label: 'Receiving Onchain',
         subtitle:
-            '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
+            '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
         tone: neutral,
       ),
 
@@ -306,7 +306,7 @@ _Description _describe(
       _Description(
         label: 'Sending Lightning',
         subtitle:
-            '${_sats(amountSats.toInt())} · fee ${_sats(lnFeeSats.toInt() + feeSats.toInt())}',
+            '${_sats(amountSats.toInt())} · ${_sats(lnFeeSats.toInt() + feeSats.toInt())}',
         tone: neutral,
       ),
     PaymentEvent_GwSendSuccess() => _Description(
@@ -321,7 +321,7 @@ _Description _describe(
     PaymentEvent_GwReceive(:final amountSats, :final feeSats) => _Description(
       label: 'Receiving Lightning',
       subtitle:
-          '${_sats(amountSats.toInt())} · fee ${_sats(feeSats.toInt())}',
+          '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
     PaymentEvent_GwReceiveSuccess() => _Description(
