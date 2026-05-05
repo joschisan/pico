@@ -269,8 +269,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pico'),
-        centerTitle: false,
+        leading: IconButton(
+          icon: const Icon(PhosphorIconsRegular.gear, size: smallIconSize),
+          onPressed: _onSettings,
+        ),
         actions: [
           if (_clients.isNotEmpty) ...[
             IconButton(
@@ -288,10 +290,6 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(PhosphorIconsRegular.qrCode, size: smallIconSize),
             onPressed: _onScan,
-          ),
-          IconButton(
-            icon: const Icon(PhosphorIconsRegular.gear, size: smallIconSize),
-            onPressed: _onSettings,
           ),
         ],
       ),
