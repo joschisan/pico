@@ -22,7 +22,7 @@ use picomint_client::wallet::events::{
     ReceiveEvent as WalletReceive, SendEvent as WalletSend, SendFailureEvent,
     SendSuccessEvent as WalletSendSuccessEvent,
 };
-use picomint_client::{TxAcceptEvent, TxRejectEvent};
+use picomint_client::{TxAcceptEvent, TxCreateEvent, TxRejectEvent};
 use picomint_core::bitcoin::hex::DisplayHex;
 use picomint_eventlog::EventLogEntry;
 
@@ -70,11 +70,15 @@ pub enum Notification {
 #[derive(Clone)]
 pub enum PaymentEvent {
     // ── Core (transaction-layer events shared across all modules) ────────
+    TxCreate {
+        timestamp: i64,
+        txid: String,
+        change_sats: i64,
+        fee_sats: i64,
+    },
     TxAccept {
         timestamp: i64,
         txid: String,
-        input_sats: i64,
-        output_sats: i64,
     },
     TxReject {
         timestamp: i64,
@@ -253,12 +257,18 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     let timestamp = entry.timestamp as i64;
 
     // ── Core ────────────────────────────────────────────────────────────
+    if let Some(e) = entry.to_event::<TxCreateEvent>() {
+        return Some(PaymentEvent::TxCreate {
+            timestamp,
+            txid: e.txid.to_string(),
+            change_sats: (e.change.msats / 1000) as i64,
+            fee_sats: (e.fee.msats / 1000) as i64,
+        });
+    }
     if let Some(e) = entry.to_event::<TxAcceptEvent>() {
         return Some(PaymentEvent::TxAccept {
             timestamp,
             txid: e.txid.to_string(),
-            input_sats: (e.input.msats / 1000) as i64,
-            output_sats: (e.output.msats / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<TxRejectEvent>() {

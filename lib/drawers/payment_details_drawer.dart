@@ -204,10 +204,13 @@ _Description _describe(
 
   return switch (event) {
     // ── Core ────────────────────────────────────────────────────────────
-    PaymentEvent_TxAccept(:final inputSats, :final outputSats) => _Description(
+    PaymentEvent_TxCreate(:final changeSats, :final feeSats) => _Description(
+      label: 'Transaction Submitted',
+      subtitle: '${_sats(changeSats.toInt())} · ${_sats(feeSats.toInt())}',
+      tone: neutral,
+    ),
+    PaymentEvent_TxAccept() => _Description(
       label: 'Transaction Accepted',
-      subtitle:
-          '${_sats(inputSats.toInt())} · ${_sats(inputSats.toInt() - outputSats.toInt())}',
       tone: neutral,
     ),
     PaymentEvent_TxReject() => _Description(

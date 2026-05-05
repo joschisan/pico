@@ -31,7 +31,7 @@ use crate::fountain::*;
 use crate::lnurl::*;
 use crate::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 // Section: boilerplate
@@ -4132,16 +4132,24 @@ impl SseDecode for crate::events::PaymentEvent {
             0 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
-                let mut var_inputSats = <i64>::sse_decode(deserializer);
-                let mut var_outputSats = <i64>::sse_decode(deserializer);
-                return crate::events::PaymentEvent::TxAccept {
+                let mut var_changeSats = <i64>::sse_decode(deserializer);
+                let mut var_feeSats = <i64>::sse_decode(deserializer);
+                return crate::events::PaymentEvent::TxCreate {
                     timestamp: var_timestamp,
                     txid: var_txid,
-                    input_sats: var_inputSats,
-                    output_sats: var_outputSats,
+                    change_sats: var_changeSats,
+                    fee_sats: var_feeSats,
                 };
             }
             1 => {
+                let mut var_timestamp = <i64>::sse_decode(deserializer);
+                let mut var_txid = <String>::sse_decode(deserializer);
+                return crate::events::PaymentEvent::TxAccept {
+                    timestamp: var_timestamp,
+                    txid: var_txid,
+                };
+            }
+            2 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_error = <String>::sse_decode(deserializer);
@@ -4151,7 +4159,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     error: var_error,
                 };
             }
-            2 => {
+            3 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4163,7 +4171,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     fee_sats: var_feeSats,
                 };
             }
-            3 => {
+            4 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_preimage = <String>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::LnSendSuccess {
@@ -4171,7 +4179,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     preimage: var_preimage,
                 };
             }
-            4 => {
+            5 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_expired = <bool>::sse_decode(deserializer);
@@ -4181,13 +4189,13 @@ impl SseDecode for crate::events::PaymentEvent {
                     expired: var_expired,
                 };
             }
-            5 => {
+            6 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::LnSendFailure {
                     timestamp: var_timestamp,
                 };
             }
-            6 => {
+            7 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4199,7 +4207,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     fee_sats: var_feeSats,
                 };
             }
-            7 => {
+            8 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
                 let mut var_ecash = <String>::sse_decode(deserializer);
@@ -4209,7 +4217,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     ecash: var_ecash,
                 };
             }
-            8 => {
+            9 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::MintRemint {
@@ -4217,7 +4225,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     txid: var_txid,
                 };
             }
-            9 => {
+            10 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4227,7 +4235,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     amount_sats: var_amountSats,
                 };
             }
-            10 => {
+            11 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4237,13 +4245,13 @@ impl SseDecode for crate::events::PaymentEvent {
                     amount_sats: var_amountSats,
                 };
             }
-            11 => {
+            12 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::MintFailure {
                     timestamp: var_timestamp,
                 };
             }
-            12 => {
+            13 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_index = <i64>::sse_decode(deserializer);
                 let mut var_total = <Option<i64>>::sse_decode(deserializer);
@@ -4253,7 +4261,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     total: var_total,
                 };
             }
-            13 => {
+            14 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4265,7 +4273,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     fee_sats: var_feeSats,
                 };
             }
-            14 => {
+            15 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::WalletSendSuccess {
@@ -4273,13 +4281,13 @@ impl SseDecode for crate::events::PaymentEvent {
                     txid: var_txid,
                 };
             }
-            15 => {
+            16 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::WalletSendFailure {
                     timestamp: var_timestamp,
                 };
             }
-            16 => {
+            17 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4820,17 +4828,23 @@ impl flutter_rust_bridge::IntoIntoDart<crate::events::OperationSummary>
 impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
-            crate::events::PaymentEvent::TxAccept {
+            crate::events::PaymentEvent::TxCreate {
                 timestamp,
                 txid,
-                input_sats,
-                output_sats,
+                change_sats,
+                fee_sats,
             } => [
                 0.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
-                input_sats.into_into_dart().into_dart(),
-                output_sats.into_into_dart().into_dart(),
+                change_sats.into_into_dart().into_dart(),
+                fee_sats.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::events::PaymentEvent::TxAccept { timestamp, txid } => [
+                1.into_dart(),
+                timestamp.into_into_dart().into_dart(),
+                txid.into_into_dart().into_dart(),
             ]
             .into_dart(),
             crate::events::PaymentEvent::TxReject {
@@ -4838,7 +4852,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 txid,
                 error,
             } => [
-                1.into_dart(),
+                2.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 error.into_into_dart().into_dart(),
@@ -4850,7 +4864,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => [
-                2.into_dart(),
+                3.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
@@ -4861,7 +4875,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 timestamp,
                 preimage,
             } => [
-                3.into_dart(),
+                4.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 preimage.into_into_dart().into_dart(),
             ]
@@ -4871,14 +4885,14 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 txid,
                 expired,
             } => [
-                4.into_dart(),
+                5.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 expired.into_into_dart().into_dart(),
             ]
             .into_dart(),
             crate::events::PaymentEvent::LnSendFailure { timestamp } => {
-                [5.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
+                [6.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
             }
             crate::events::PaymentEvent::LnReceive {
                 timestamp,
@@ -4886,7 +4900,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => [
-                6.into_dart(),
+                7.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
@@ -4898,30 +4912,19 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 amount_sats,
                 ecash,
             } => [
-                7.into_dart(),
+                8.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
                 ecash.into_into_dart().into_dart(),
             ]
             .into_dart(),
             crate::events::PaymentEvent::MintRemint { timestamp, txid } => [
-                8.into_dart(),
+                9.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
             ]
             .into_dart(),
             crate::events::PaymentEvent::MintReceive {
-                timestamp,
-                txid,
-                amount_sats,
-            } => [
-                9.into_dart(),
-                timestamp.into_into_dart().into_dart(),
-                txid.into_into_dart().into_dart(),
-                amount_sats.into_into_dart().into_dart(),
-            ]
-            .into_dart(),
-            crate::events::PaymentEvent::MintSuccess {
                 timestamp,
                 txid,
                 amount_sats,
@@ -4932,15 +4935,26 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 amount_sats.into_into_dart().into_dart(),
             ]
             .into_dart(),
+            crate::events::PaymentEvent::MintSuccess {
+                timestamp,
+                txid,
+                amount_sats,
+            } => [
+                11.into_dart(),
+                timestamp.into_into_dart().into_dart(),
+                txid.into_into_dart().into_dart(),
+                amount_sats.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
             crate::events::PaymentEvent::MintFailure { timestamp } => {
-                [11.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
+                [12.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
             }
             crate::events::PaymentEvent::MintRecovery {
                 timestamp,
                 index,
                 total,
             } => [
-                12.into_dart(),
+                13.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 index.into_into_dart().into_dart(),
                 total.into_into_dart().into_dart(),
@@ -4952,7 +4966,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => [
-                13.into_dart(),
+                14.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
@@ -4960,13 +4974,13 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
             ]
             .into_dart(),
             crate::events::PaymentEvent::WalletSendSuccess { timestamp, txid } => [
-                14.into_dart(),
+                15.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
             ]
             .into_dart(),
             crate::events::PaymentEvent::WalletSendFailure { timestamp } => {
-                [15.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
+                [16.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
             }
             crate::events::PaymentEvent::WalletReceive {
                 timestamp,
@@ -4974,7 +4988,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => [
-                16.into_dart(),
+                17.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
@@ -5561,24 +5575,29 @@ impl SseEncode for crate::events::PaymentEvent {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         match self {
-            crate::events::PaymentEvent::TxAccept {
+            crate::events::PaymentEvent::TxCreate {
                 timestamp,
                 txid,
-                input_sats,
-                output_sats,
+                change_sats,
+                fee_sats,
             } => {
                 <i32>::sse_encode(0, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
-                <i64>::sse_encode(input_sats, serializer);
-                <i64>::sse_encode(output_sats, serializer);
+                <i64>::sse_encode(change_sats, serializer);
+                <i64>::sse_encode(fee_sats, serializer);
+            }
+            crate::events::PaymentEvent::TxAccept { timestamp, txid } => {
+                <i32>::sse_encode(1, serializer);
+                <i64>::sse_encode(timestamp, serializer);
+                <String>::sse_encode(txid, serializer);
             }
             crate::events::PaymentEvent::TxReject {
                 timestamp,
                 txid,
                 error,
             } => {
-                <i32>::sse_encode(1, serializer);
+                <i32>::sse_encode(2, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <String>::sse_encode(error, serializer);
@@ -5589,7 +5608,7 @@ impl SseEncode for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => {
-                <i32>::sse_encode(2, serializer);
+                <i32>::sse_encode(3, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
@@ -5599,7 +5618,7 @@ impl SseEncode for crate::events::PaymentEvent {
                 timestamp,
                 preimage,
             } => {
-                <i32>::sse_encode(3, serializer);
+                <i32>::sse_encode(4, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(preimage, serializer);
             }
@@ -5608,13 +5627,13 @@ impl SseEncode for crate::events::PaymentEvent {
                 txid,
                 expired,
             } => {
-                <i32>::sse_encode(4, serializer);
+                <i32>::sse_encode(5, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <bool>::sse_encode(expired, serializer);
             }
             crate::events::PaymentEvent::LnSendFailure { timestamp } => {
-                <i32>::sse_encode(5, serializer);
+                <i32>::sse_encode(6, serializer);
                 <i64>::sse_encode(timestamp, serializer);
             }
             crate::events::PaymentEvent::LnReceive {
@@ -5623,7 +5642,7 @@ impl SseEncode for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => {
-                <i32>::sse_encode(6, serializer);
+                <i32>::sse_encode(7, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
@@ -5634,27 +5653,17 @@ impl SseEncode for crate::events::PaymentEvent {
                 amount_sats,
                 ecash,
             } => {
-                <i32>::sse_encode(7, serializer);
+                <i32>::sse_encode(8, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
                 <String>::sse_encode(ecash, serializer);
             }
             crate::events::PaymentEvent::MintRemint { timestamp, txid } => {
-                <i32>::sse_encode(8, serializer);
+                <i32>::sse_encode(9, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
             }
             crate::events::PaymentEvent::MintReceive {
-                timestamp,
-                txid,
-                amount_sats,
-            } => {
-                <i32>::sse_encode(9, serializer);
-                <i64>::sse_encode(timestamp, serializer);
-                <String>::sse_encode(txid, serializer);
-                <i64>::sse_encode(amount_sats, serializer);
-            }
-            crate::events::PaymentEvent::MintSuccess {
                 timestamp,
                 txid,
                 amount_sats,
@@ -5664,8 +5673,18 @@ impl SseEncode for crate::events::PaymentEvent {
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
             }
-            crate::events::PaymentEvent::MintFailure { timestamp } => {
+            crate::events::PaymentEvent::MintSuccess {
+                timestamp,
+                txid,
+                amount_sats,
+            } => {
                 <i32>::sse_encode(11, serializer);
+                <i64>::sse_encode(timestamp, serializer);
+                <String>::sse_encode(txid, serializer);
+                <i64>::sse_encode(amount_sats, serializer);
+            }
+            crate::events::PaymentEvent::MintFailure { timestamp } => {
+                <i32>::sse_encode(12, serializer);
                 <i64>::sse_encode(timestamp, serializer);
             }
             crate::events::PaymentEvent::MintRecovery {
@@ -5673,7 +5692,7 @@ impl SseEncode for crate::events::PaymentEvent {
                 index,
                 total,
             } => {
-                <i32>::sse_encode(12, serializer);
+                <i32>::sse_encode(13, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <i64>::sse_encode(index, serializer);
                 <Option<i64>>::sse_encode(total, serializer);
@@ -5684,19 +5703,19 @@ impl SseEncode for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => {
-                <i32>::sse_encode(13, serializer);
+                <i32>::sse_encode(14, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
                 <i64>::sse_encode(fee_sats, serializer);
             }
             crate::events::PaymentEvent::WalletSendSuccess { timestamp, txid } => {
-                <i32>::sse_encode(14, serializer);
+                <i32>::sse_encode(15, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
             }
             crate::events::PaymentEvent::WalletSendFailure { timestamp } => {
-                <i32>::sse_encode(15, serializer);
+                <i32>::sse_encode(16, serializer);
                 <i64>::sse_encode(timestamp, serializer);
             }
             crate::events::PaymentEvent::WalletReceive {
@@ -5705,7 +5724,7 @@ impl SseEncode for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => {
-                <i32>::sse_encode(16, serializer);
+                <i32>::sse_encode(17, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
@@ -5781,7 +5800,7 @@ mod io {
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate
@@ -5978,7 +5997,7 @@ mod web {
     };
     use flutter_rust_bridge::for_generated::wasm_bindgen;
     use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate
