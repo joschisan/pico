@@ -16,6 +16,7 @@ import 'package:pico/drawers/lnurl_drawer.dart';
 import 'package:pico/drawers/onchain_address_drawer.dart';
 import 'package:pico/drawers/payment_details_drawer.dart';
 import 'package:pico/drawers/scanner_drawer.dart';
+import 'package:pico/screens/connection_status_screen.dart';
 import 'package:pico/screens/ecash_amount_screen.dart';
 import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/screens/settings_screen.dart';
@@ -220,8 +221,19 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => SettingsScreen(clientFactory: widget.clientFactory),
       ),
     );
-    // A leave from settings drops a client; refresh the warm list so
-    // random pick doesn't reach for a dead namespace.
+  }
+
+  Future<void> _onTapFederation(PicoClient client) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ConnectionStatusScreen(
+          client: client,
+          clientFactory: widget.clientFactory,
+        ),
+      ),
+    );
+    // A leave from the connection screen drops the client; refresh
+    // the home list so the row disappears.
     _refreshClients();
   }
 
@@ -263,7 +275,11 @@ class _HomeScreenState extends State<HomeScreen> {
             else
               BorderedList.column(
                 children: [
-                  for (final client in _clients) _FederationRow(client: client),
+                  for (final client in _clients)
+                    _FederationRow(
+                      client: client,
+                      onTap: () => _onTapFederation(client),
+                    ),
                 ],
               ),
             Row(
@@ -363,14 +379,16 @@ class _OnboardingCard extends StatelessWidget {
 
 class _FederationRow extends StatelessWidget {
   final PicoClient client;
+  final VoidCallback onTap;
 
-  const _FederationRow({required this.client});
+  const _FederationRow({required this.client, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
     return ListTile(
+      onTap: onTap,
       contentPadding: listTilePadding,
       leading: StreamBuilder<List<(String, bool)>>(
         stream: client.subscribeConnectionStatus(),
