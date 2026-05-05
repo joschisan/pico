@@ -389,22 +389,32 @@ class _FederationRow extends StatelessWidget {
           );
         },
       ),
-      title: StreamBuilder<int>(
-        stream: client.subscribeBalance(),
-        builder: (_, snapshot) {
-          final sats = snapshot.data ?? 0;
-          return Text(
-            '${NumberFormat('#,###').format(sats)} sat',
-            style: mediumStyle,
-          );
-        },
-      ),
-      subtitle: FutureBuilder<String?>(
-        future: client.federationName(),
-        builder: (_, snapshot) => Text(
-          snapshot.data ?? '…',
-          style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
-        ),
+      // Both texts go in the title slot so ListTile sees a single-line
+      // tile (56dp min) instead of the 72dp two-line tile a populated
+      // `subtitle` would force. Keeps the row height consistent with
+      // the no-subheader cards used elsewhere in the app.
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          StreamBuilder<int>(
+            stream: client.subscribeBalance(),
+            builder: (_, snapshot) {
+              final sats = snapshot.data ?? 0;
+              return Text(
+                '${NumberFormat('#,###').format(sats)} sat',
+                style: mediumStyle,
+              );
+            },
+          ),
+          FutureBuilder<String?>(
+            future: client.federationName(),
+            builder: (_, snapshot) => Text(
+              snapshot.data ?? '…',
+              style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ],
       ),
     );
   }

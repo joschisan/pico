@@ -159,20 +159,31 @@ class _FederationRow extends StatelessWidget {
           );
         },
       ),
-      title: FutureBuilder<String?>(
-        future: client.federationName(),
-        builder: (_, snapshot) =>
-            Text(snapshot.data ?? '…', style: mediumStyle),
-      ),
-      subtitle: StreamBuilder<int>(
-        stream: client.subscribeBalance(),
-        builder: (_, snapshot) {
-          final sats = snapshot.data ?? 0;
-          return Text(
-            '${NumberFormat('#,###').format(sats)} sat',
-            style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
-          );
-        },
+      // Both texts in the title slot so ListTile renders as
+      // single-line (56dp) instead of the taller two-line variant
+      // a populated `subtitle` would force.
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          StreamBuilder<int>(
+            stream: client.subscribeBalance(),
+            builder: (_, snapshot) {
+              final sats = snapshot.data ?? 0;
+              return Text(
+                '${NumberFormat('#,###').format(sats)} sat',
+                style: mediumStyle,
+              );
+            },
+          ),
+          FutureBuilder<String?>(
+            future: client.federationName(),
+            builder: (_, snapshot) => Text(
+              snapshot.data ?? '…',
+              style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ],
       ),
     );
   }
