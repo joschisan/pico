@@ -1,44 +1,51 @@
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:pico/utils/styles.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
-import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
+import 'package:pico/utils/notification_utils.dart';
+import 'package:pico/utils/styles.dart';
+import 'package:pico/widgets/async_button_widget.dart';
+import 'package:pico/widgets/drawer_shell_widget.dart';
 
+/// Confirms a scanned invite — the user picks Join (fresh state) or
+/// Recover (rebuild from prior session). Calls into the factory itself
+/// rather than firing caller callbacks; the scanner that pushed this
+/// drawer has already popped, so the drawer's own context is the only
+/// reliable one for popping + toasting after the call returns.
 class InviteDrawer extends StatelessWidget {
   final InviteCodeWrapper invite;
-  final Future<void> Function(InviteCodeWrapper) onJoin;
-  final Future<void> Function(InviteCodeWrapper) onRecover;
+  final PicoClientFactory clientFactory;
 
   const InviteDrawer({
     super.key,
     required this.invite,
-    required this.onJoin,
-    required this.onRecover,
+    required this.clientFactory,
   });
 
   static Future<void> show(
     BuildContext context, {
     required InviteCodeWrapper invite,
-    required Future<void> Function(InviteCodeWrapper) onJoin,
-    required Future<void> Function(InviteCodeWrapper) onRecover,
+    required PicoClientFactory clientFactory,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: InviteDrawer(invite: invite, onJoin: onJoin, onRecover: onRecover),
+      child: InviteDrawer(invite: invite, clientFactory: clientFactory),
     );
+  }
+
+  Future<void> _handleJoin(BuildContext context) async {
+    await clientFactory.join(invite: invite);
+    if (!context.mounted) return;
+    NotificationUtils.showSuccess(context, 'Joined federation');
+    Navigator.of(context).pop();
   }
 
   void _showRecoverDrawer(BuildContext context) {
     Navigator.of(context).pop();
     DrawerUtils.show(
       context: context,
-      child: _RecoverDrawer(
-        invite: invite,
-        onJoin: onJoin,
-        onRecover: onRecover,
-      ),
+      child: _RecoverDrawer(invite: invite, clientFactory: clientFactory),
     );
   }
 
@@ -48,7 +55,7 @@ class InviteDrawer extends StatelessWidget {
       icon: PhosphorIconsRegular.wallet,
       title: 'Federation Invite',
       children: [
-        AsyncButton(text: 'Join', onPressed: () => onJoin(invite)),
+        AsyncButton(text: 'Join', onPressed: () => _handleJoin(context)),
         const SizedBox(height: 24),
         GestureDetector(
           onTap: () => _showRecoverDrawer(context),
@@ -67,23 +74,20 @@ class InviteDrawer extends StatelessWidget {
 
 class _RecoverDrawer extends StatelessWidget {
   final InviteCodeWrapper invite;
-  final Future<void> Function(InviteCodeWrapper) onJoin;
-  final Future<void> Function(InviteCodeWrapper) onRecover;
+  final PicoClientFactory clientFactory;
 
-  const _RecoverDrawer({
-    required this.invite,
-    required this.onJoin,
-    required this.onRecover,
-  });
+  const _RecoverDrawer({required this.invite, required this.clientFactory});
+
+  Future<void> _handleRecover(BuildContext context) async {
+    await clientFactory.recover(invite: invite);
+    if (!context.mounted) return;
+    NotificationUtils.showSuccess(context, 'Recovering federation');
+    Navigator.of(context).pop();
+  }
 
   void _showJoinDrawer(BuildContext context) {
     Navigator.of(context).pop();
-    InviteDrawer.show(
-      context,
-      invite: invite,
-      onJoin: onJoin,
-      onRecover: onRecover,
-    );
+    InviteDrawer.show(context, invite: invite, clientFactory: clientFactory);
   }
 
   @override
@@ -92,7 +96,7 @@ class _RecoverDrawer extends StatelessWidget {
       icon: PhosphorIconsRegular.wallet,
       title: 'Federation Invite',
       children: [
-        AsyncButton(text: 'Recover', onPressed: () => onRecover(invite)),
+        AsyncButton(text: 'Recover', onPressed: () => _handleRecover(context)),
         const SizedBox(height: 24),
         GestureDetector(
           onTap: () => _showJoinDrawer(context),

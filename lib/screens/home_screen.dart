@@ -49,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
   StreamSubscription<Notification>? _notificationSubscription;
+  StreamSubscription<List<PicoClient>>? _clientsSubscription;
 
   List<PicoClient> _clients = [];
 
@@ -59,7 +60,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _notificationSubscription = widget.clientFactory
         .subscribeNotifications()
         .listen(_handleNotification);
-    _refreshClients();
+    _clientsSubscription = widget.clientFactory.subscribeClients().listen((
+      clients,
+    ) {
+      if (!mounted) return;
+      setState(() => _clients = clients);
+    });
     _initDeepLinks();
   }
 
@@ -67,16 +73,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _linkSubscription?.cancel();
     _notificationSubscription?.cancel();
+    _clientsSubscription?.cancel();
     super.dispose();
-  }
-
-  /// Cache the warm client list for picker-style actions. Re-fetched
-  /// after a successful join from the scanner so newly-joined clients
-  /// become eligible for random selection.
-  Future<void> _refreshClients() async {
-    final clients = await widget.clientFactory.clients();
-    if (!mounted) return;
-    setState(() => _clients = clients);
   }
 
   void _handleNotification(Notification notification) {
@@ -232,15 +230,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _onScan() async {
-    await ScannerDrawer.show(
+  void _onScan() {
+    ScannerDrawer.show(
       context,
       client: _pickClient(),
       clientFactory: widget.clientFactory,
     );
-    // A successful invite scan lands a fresh client; refresh so the
-    // home rerenders with it picked up.
-    _refreshClients();
   }
 
   Future<void> _onSettings() async {
@@ -251,8 +246,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _onTapFederation(PicoClient client) async {
-    await Navigator.of(context).push(
+  void _onTapFederation(PicoClient client) {
+    Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ConnectionStatusScreen(
           client: client,
@@ -260,9 +255,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    // A leave from the connection screen drops the client; refresh
-    // the home list so the row disappears.
-    _refreshClients();
   }
 
   void _showEventDetails(OperationSummary event) {

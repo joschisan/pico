@@ -265,6 +265,23 @@ impl PicoClientFactory {
         Ok(())
     }
 
+    /// Live snapshot of every warm client; re-emits on every set change
+    /// (`join`/`leave`/`recover`). Subscribers re-render passively
+    /// instead of re-fetching `clients()` after each navigation pop.
+    #[frb]
+    pub async fn subscribe_clients(&self, sink: StreamSink<Vec<PicoClient>>) {
+        loop {
+            let snapshot: Vec<PicoClient> =
+                self.clients.read().await.values().cloned().collect();
+            let set_changed = self.set_changed.notified();
+            tokio::pin!(set_changed);
+            if sink.add(snapshot).is_err() {
+                return;
+            }
+            set_changed.await;
+        }
+    }
+
     /// Aggregated balance across every warm client, in sats. Re-emits on
     /// any per-client balance change AND on client-set changes
     /// (`join`/`leave`/`recover`). The totals map survives rebuilds so a

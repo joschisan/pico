@@ -50,7 +50,9 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
     if (!_isScanning) return;
 
     // Invite codes always win and don't need a warm client — that's
-    // how the user joins their first federation.
+    // how the user joins their first federation. InviteDrawer owns the
+    // join/recover lifecycle so its own (still-mounted) context drives
+    // the pop and toast.
     final invite = parseInviteCode(invite: input);
     if (invite != null) {
       _isScanning = false;
@@ -59,18 +61,7 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
       InviteDrawer.show(
         context,
         invite: invite,
-        onJoin: (i) async {
-          await widget.clientFactory.join(invite: i);
-          if (!mounted) return;
-          Navigator.of(context).pop();
-          NotificationUtils.showSuccess(context, 'Joined federation');
-        },
-        onRecover: (i) async {
-          await widget.clientFactory.recover(invite: i);
-          if (!mounted) return;
-          Navigator.of(context).pop();
-          NotificationUtils.showSuccess(context, 'Recovering federation');
-        },
+        clientFactory: widget.clientFactory,
       );
       return;
     }

@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.10.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1444211704;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1080437556;
 
 // Section: executor
 
@@ -1368,6 +1368,71 @@ fn wire__crate__factory__PicoClientFactory_set_currency_impl(
                             crate::factory::PicoClientFactory::set_currency(
                                 &*api_that_guard,
                                 &api_currency_code,
+                            )
+                            .await;
+                        })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__factory__PicoClientFactory_subscribe_clients_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PicoClientFactory_subscribe_clients",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClientFactory>,
+            >>::sse_decode(&mut deserializer);
+            let api_sink = <StreamSink<
+                Vec<PicoClient>,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::factory::PicoClientFactory::subscribe_clients(
+                                &*api_that_guard,
+                                api_sink,
                             )
                             .await;
                         })?;
@@ -3708,6 +3773,14 @@ impl SseDecode for StreamSink<i64, flutter_rust_bridge::for_generated::SseCodec>
     }
 }
 
+impl SseDecode for StreamSink<Vec<PicoClient>, flutter_rust_bridge::for_generated::SseCodec> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
+    }
+}
+
 impl SseDecode
     for StreamSink<
         Vec<crate::events::OperationSummary>,
@@ -4338,88 +4411,94 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        25 => wire__crate__factory__PicoClientFactory_subscribe_global_balance_impl(
+        25 => wire__crate__factory__PicoClientFactory_subscribe_clients_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        26 => wire__crate__factory__PicoClientFactory_subscribe_notifications_impl(
+        26 => wire__crate__factory__PicoClientFactory_subscribe_global_balance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        27 => wire__crate__factory__PicoClientFactory_subscribe_payment_events_impl(
+        27 => wire__crate__factory__PicoClientFactory_subscribe_notifications_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        28 => wire__crate__factory__PicoClientFactory_subscribe_recent_operations_impl(
+        28 => wire__crate__factory__PicoClientFactory_subscribe_payment_events_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        29 => {
+        29 => wire__crate__factory__PicoClientFactory_subscribe_recent_operations_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        30 => {
             wire__crate__factory__PicoClientFactory_try_load_impl(port, ptr, rust_vec_len, data_len)
         }
-        31 => wire__crate__client__PicoClient_ecash_receive_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__client__PicoClient_ecash_send_impl(port, ptr, rust_vec_len, data_len),
-        33 => {
+        32 => wire__crate__client__PicoClient_ecash_receive_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__client__PicoClient_ecash_send_impl(port, ptr, rust_vec_len, data_len),
+        34 => {
             wire__crate__client__PicoClient_expiration_date_impl(port, ptr, rust_vec_len, data_len)
         }
-        34 => wire__crate__client__PicoClient_expiration_successor_impl(
+        35 => wire__crate__client__PicoClient_expiration_successor_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        36 => {
+        37 => {
             wire__crate__client__PicoClient_federation_name_impl(port, ptr, rust_vec_len, data_len)
         }
-        37 => wire__crate__client__PicoClient_fiat_to_sats_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__client__PicoClient_ln_receive_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__client__PicoClient_ln_send_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__client__PicoClient_lnurl_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__client__PicoClient_onchain_calculate_fees_impl(
+        38 => wire__crate__client__PicoClient_fiat_to_sats_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__client__PicoClient_ln_receive_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__client__PicoClient_ln_send_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__client__PicoClient_lnurl_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__client__PicoClient_onchain_calculate_fees_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        42 => wire__crate__client__PicoClient_onchain_receive_address_impl(
+        43 => wire__crate__client__PicoClient_onchain_receive_address_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        43 => wire__crate__client__PicoClient_onchain_send_impl(port, ptr, rust_vec_len, data_len),
-        44 => wire__crate__client__PicoClient_prefetch_exchange_rates_impl(
+        44 => wire__crate__client__PicoClient_onchain_send_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__client__PicoClient_prefetch_exchange_rates_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        45 => wire__crate__client__PicoClient_shutdown_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__client__PicoClient_subscribe_balance_impl(
+        46 => wire__crate__client__PicoClient_shutdown_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__client__PicoClient_subscribe_balance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        47 => wire__crate__client__PicoClient_subscribe_connection_status_impl(
+        48 => wire__crate__client__PicoClient_subscribe_connection_status_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        52 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-        54 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
-        55 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
-        63 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        53 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        55 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
+        56 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
+        58 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
+        64 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -4444,20 +4523,20 @@ fn pde_ffi_dispatcher_sync_impl(
         }
         10 => wire__crate__lnurl__PayResponseWrapper_max_sats_impl(ptr, rust_vec_len, data_len),
         11 => wire__crate__lnurl__PayResponseWrapper_min_sats_impl(ptr, rust_vec_len, data_len),
-        30 => wire__crate__client__PicoClient_currency_code_impl(ptr, rust_vec_len, data_len),
-        35 => wire__crate__client__PicoClient_federation_id_impl(ptr, rust_vec_len, data_len),
-        48 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
-        49 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
-        50 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
-        51 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
-        53 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
-        56 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
-        58 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
-        59 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
-        60 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
-        61 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
-        62 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
-        64 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
+        31 => wire__crate__client__PicoClient_currency_code_impl(ptr, rust_vec_len, data_len),
+        36 => wire__crate__client__PicoClient_federation_id_impl(ptr, rust_vec_len, data_len),
+        49 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
+        50 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
+        51 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
+        52 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
+        54 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
+        57 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
+        59 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
+        60 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
+        61 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
+        62 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
+        63 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
+        65 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -5170,6 +5249,13 @@ impl SseEncode
 }
 
 impl SseEncode for StreamSink<i64, flutter_rust_bridge::for_generated::SseCodec> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
+    }
+}
+
+impl SseEncode for StreamSink<Vec<PicoClient>, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         unimplemented!("")
