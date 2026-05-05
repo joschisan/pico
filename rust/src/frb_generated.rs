@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.10.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1761488941;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -723712995;
 
 // Section: executor
 
@@ -1898,7 +1898,7 @@ fn wire__crate__client__PicoClient_fiat_to_sats_impl(
         },
     )
 }
-fn wire__crate__client__PicoClient_get_payment_history_impl(
+fn wire__crate__client__PicoClient_list_operations_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -1906,7 +1906,7 @@ fn wire__crate__client__PicoClient_get_payment_history_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "PicoClient_get_payment_history",
+            debug_name: "PicoClient_list_operations",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -1945,7 +1945,7 @@ fn wire__crate__client__PicoClient_get_payment_history_impl(
                         }
                         let api_that_guard = api_that_guard.unwrap();
                         let output_ok = Result::<_, ()>::Ok(
-                            crate::client::PicoClient::get_payment_history(&*api_that_guard).await,
+                            crate::client::PicoClient::list_operations(&*api_that_guard).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -2599,7 +2599,7 @@ fn wire__crate__client__PicoClient_subscribe_connection_status_impl(
         },
     )
 }
-fn wire__crate__client__PicoClient_subscribe_event_log_impl(
+fn wire__crate__client__PicoClient_subscribe_notifications_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -2607,7 +2607,7 @@ fn wire__crate__client__PicoClient_subscribe_event_log_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "PicoClient_subscribe_event_log",
+            debug_name: "PicoClient_subscribe_notifications",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -2625,7 +2625,7 @@ fn wire__crate__client__PicoClient_subscribe_event_log_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
             >>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
-                crate::events::RecentPaymentsUpdate,
+                crate::events::Notification,
                 flutter_rust_bridge::for_generated::SseCodec,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
@@ -2650,7 +2650,7 @@ fn wire__crate__client__PicoClient_subscribe_event_log_impl(
                         }
                         let api_that_guard = api_that_guard.unwrap();
                         let output_ok = Result::<_, ()>::Ok({
-                            crate::client::PicoClient::subscribe_event_log(
+                            crate::client::PicoClient::subscribe_notifications(
                                 &*api_that_guard,
                                 api_sink,
                             )
@@ -2719,6 +2719,71 @@ fn wire__crate__client__PicoClient_subscribe_payment_events_impl(
                             crate::client::PicoClient::subscribe_payment_events(
                                 &*api_that_guard,
                                 api_operation_id,
+                                api_sink,
+                            )
+                            .await;
+                        })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__client__PicoClient_subscribe_recent_operations_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PicoClient_subscribe_recent_operations",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
+            >>::sse_decode(&mut deserializer);
+            let api_sink = <StreamSink<
+                Vec<crate::events::OperationSummary>,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::client::PicoClient::subscribe_recent_operations(
+                                &*api_that_guard,
                                 api_sink,
                             )
                             .await;
@@ -3642,6 +3707,19 @@ impl SseDecode for StreamSink<i64, flutter_rust_bridge::for_generated::SseCodec>
     }
 }
 
+impl SseDecode
+    for StreamSink<
+        Vec<crate::events::OperationSummary>,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
+    }
+}
+
 impl SseDecode for StreamSink<Vec<(String, bool)>, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3651,7 +3729,7 @@ impl SseDecode for StreamSink<Vec<(String, bool)>, flutter_rust_bridge::for_gene
 }
 
 impl SseDecode
-    for StreamSink<crate::events::PaymentEvent, flutter_rust_bridge::for_generated::SseCodec>
+    for StreamSink<crate::events::Notification, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3661,10 +3739,7 @@ impl SseDecode
 }
 
 impl SseDecode
-    for StreamSink<
-        crate::events::RecentPaymentsUpdate,
-        flutter_rust_bridge::for_generated::SseCodec,
-    >
+    for StreamSink<crate::events::PaymentEvent, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3787,13 +3862,13 @@ impl SseDecode for Vec<crate::currency::FiatCurrency> {
     }
 }
 
-impl SseDecode for Vec<crate::events::PicoPayment> {
+impl SseDecode for Vec<crate::events::OperationSummary> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut len_ = <i32>::sse_decode(deserializer);
         let mut ans_ = vec![];
         for idx_ in 0..len_ {
-            ans_.push(<crate::events::PicoPayment>::sse_decode(deserializer));
+            ans_.push(<crate::events::OperationSummary>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -3828,6 +3903,54 @@ impl SseDecode for crate::lnurl::LnurlWrapper {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_field0 = <String>::sse_decode(deserializer);
         return crate::lnurl::LnurlWrapper(var_field0);
+    }
+}
+
+impl SseDecode for crate::events::Notification {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                let mut var_amountSats = <i64>::sse_decode(deserializer);
+                return crate::events::Notification::LightningReceived {
+                    amount_sats: var_amountSats,
+                };
+            }
+            1 => {
+                let mut var_amountSats = <i64>::sse_decode(deserializer);
+                return crate::events::Notification::OnchainReceived {
+                    amount_sats: var_amountSats,
+                };
+            }
+            2 => {
+                return crate::events::Notification::LightningRefunding;
+            }
+            3 => {
+                return crate::events::Notification::TransactionRejected;
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+
+impl SseDecode for crate::events::OperationSummary {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_operationId = <String>::sse_decode(deserializer);
+        let mut var_incoming = <bool>::sse_decode(deserializer);
+        let mut var_paymentType = <crate::events::PaymentType>::sse_decode(deserializer);
+        let mut var_amountSats = <i64>::sse_decode(deserializer);
+        let mut var_timestamp = <i64>::sse_decode(deserializer);
+        return crate::events::OperationSummary {
+            operation_id: var_operationId,
+            incoming: var_incoming,
+            payment_type: var_paymentType,
+            amount_sats: var_amountSats,
+            timestamp: var_timestamp,
+        };
     }
 }
 
@@ -3919,17 +4042,6 @@ impl SseDecode for Option<PicoClientFactory> {
     }
 }
 
-impl SseDecode for Option<bool> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<bool>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl SseDecode for Option<crate::currency::FiatCurrency> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3957,19 +4069,6 @@ impl SseDecode for Option<crate::lnurl::LnurlWrapper> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::lnurl::LnurlWrapper>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
-impl SseDecode for Option<crate::events::PaymentNotification> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<crate::events::PaymentNotification>::sse_decode(
-                deserializer,
-            ));
         } else {
             return None;
         }
@@ -4150,22 +4249,6 @@ impl SseDecode for crate::events::PaymentEvent {
     }
 }
 
-impl SseDecode for crate::events::PaymentNotification {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_incoming = <bool>::sse_decode(deserializer);
-        let mut var_success = <bool>::sse_decode(deserializer);
-        let mut var_amountSats = <i64>::sse_decode(deserializer);
-        let mut var_paymentType = <crate::events::PaymentType>::sse_decode(deserializer);
-        return crate::events::PaymentNotification {
-            incoming: var_incoming,
-            success: var_success,
-            amount_sats: var_amountSats,
-            payment_type: var_paymentType,
-        };
-    }
-}
-
 impl SseDecode for crate::events::PaymentType {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4175,43 +4258,6 @@ impl SseDecode for crate::events::PaymentType {
             1 => crate::events::PaymentType::Bitcoin,
             2 => crate::events::PaymentType::Ecash,
             _ => unreachable!("Invalid variant for PaymentType: {}", inner),
-        };
-    }
-}
-
-impl SseDecode for crate::events::PicoPayment {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_operationId = <String>::sse_decode(deserializer);
-        let mut var_incoming = <bool>::sse_decode(deserializer);
-        let mut var_paymentType = <crate::events::PaymentType>::sse_decode(deserializer);
-        let mut var_amountSats = <i64>::sse_decode(deserializer);
-        let mut var_feeSats = <Option<i64>>::sse_decode(deserializer);
-        let mut var_timestamp = <i64>::sse_decode(deserializer);
-        let mut var_success = <Option<bool>>::sse_decode(deserializer);
-        let mut var_oob = <Option<String>>::sse_decode(deserializer);
-        return crate::events::PicoPayment {
-            operation_id: var_operationId,
-            incoming: var_incoming,
-            payment_type: var_paymentType,
-            amount_sats: var_amountSats,
-            fee_sats: var_feeSats,
-            timestamp: var_timestamp,
-            success: var_success,
-            oob: var_oob,
-        };
-    }
-}
-
-impl SseDecode for crate::events::RecentPaymentsUpdate {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_payments = <Vec<crate::events::PicoPayment>>::sse_decode(deserializer);
-        let mut var_notification =
-            <Option<crate::events::PaymentNotification>>::sse_decode(deserializer);
-        return crate::events::RecentPaymentsUpdate {
-            payments: var_payments,
-            notification: var_notification,
         };
     }
 }
@@ -4332,12 +4378,9 @@ fn pde_ffi_dispatcher_primary_impl(
             wire__crate__client__PicoClient_federation_name_impl(port, ptr, rust_vec_len, data_len)
         }
         33 => wire__crate__client__PicoClient_fiat_to_sats_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__client__PicoClient_get_payment_history_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
+        34 => {
+            wire__crate__client__PicoClient_list_operations_impl(port, ptr, rust_vec_len, data_len)
+        }
         35 => wire__crate__client__PicoClient_ln_receive_impl(port, ptr, rust_vec_len, data_len),
         36 => wire__crate__client__PicoClient_ln_send_impl(port, ptr, rust_vec_len, data_len),
         37 => wire__crate__client__PicoClient_lnurl_impl(port, ptr, rust_vec_len, data_len),
@@ -4373,7 +4416,7 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        45 => wire__crate__client__PicoClient_subscribe_event_log_impl(
+        45 => wire__crate__client__PicoClient_subscribe_notifications_impl(
             port,
             ptr,
             rust_vec_len,
@@ -4385,11 +4428,17 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        51 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-        53 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
-        54 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
-        62 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__client__PicoClient_subscribe_recent_operations_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        52 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        54 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
+        55 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
+        63 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -4416,18 +4465,18 @@ fn pde_ffi_dispatcher_sync_impl(
         11 => wire__crate__lnurl__PayResponseWrapper_min_sats_impl(ptr, rust_vec_len, data_len),
         26 => wire__crate__client__PicoClient_currency_code_impl(ptr, rust_vec_len, data_len),
         31 => wire__crate__client__PicoClient_federation_id_impl(ptr, rust_vec_len, data_len),
-        47 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
-        48 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
-        49 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
-        50 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
-        52 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
-        55 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
-        57 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
-        58 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
-        59 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
-        60 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
-        61 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
-        63 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
+        48 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
+        49 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
+        50 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
+        51 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
+        53 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
+        56 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
+        58 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
+        59 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
+        60 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
+        61 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
+        62 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
+        64 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -4680,6 +4729,56 @@ impl flutter_rust_bridge::IntoIntoDart<crate::lnurl::LnurlWrapper> for crate::ln
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::events::Notification {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            crate::events::Notification::LightningReceived { amount_sats } => {
+                [0.into_dart(), amount_sats.into_into_dart().into_dart()].into_dart()
+            }
+            crate::events::Notification::OnchainReceived { amount_sats } => {
+                [1.into_dart(), amount_sats.into_into_dart().into_dart()].into_dart()
+            }
+            crate::events::Notification::LightningRefunding => [2.into_dart()].into_dart(),
+            crate::events::Notification::TransactionRejected => [3.into_dart()].into_dart(),
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::events::Notification {}
+impl flutter_rust_bridge::IntoIntoDart<crate::events::Notification>
+    for crate::events::Notification
+{
+    fn into_into_dart(self) -> crate::events::Notification {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::events::OperationSummary {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.operation_id.into_into_dart().into_dart(),
+            self.incoming.into_into_dart().into_dart(),
+            self.payment_type.into_into_dart().into_dart(),
+            self.amount_sats.into_into_dart().into_dart(),
+            self.timestamp.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::events::OperationSummary
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::events::OperationSummary>
+    for crate::events::OperationSummary
+{
+    fn into_into_dart(self) -> crate::events::OperationSummary {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
@@ -4859,29 +4958,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::events::PaymentEvent>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::events::PaymentNotification {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.incoming.into_into_dart().into_dart(),
-            self.success.into_into_dart().into_dart(),
-            self.amount_sats.into_into_dart().into_dart(),
-            self.payment_type.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::events::PaymentNotification
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::events::PaymentNotification>
-    for crate::events::PaymentNotification
-{
-    fn into_into_dart(self) -> crate::events::PaymentNotification {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::events::PaymentType {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
@@ -4895,49 +4971,6 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentType {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::events::PaymentType {}
 impl flutter_rust_bridge::IntoIntoDart<crate::events::PaymentType> for crate::events::PaymentType {
     fn into_into_dart(self) -> crate::events::PaymentType {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::events::PicoPayment {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.operation_id.into_into_dart().into_dart(),
-            self.incoming.into_into_dart().into_dart(),
-            self.payment_type.into_into_dart().into_dart(),
-            self.amount_sats.into_into_dart().into_dart(),
-            self.fee_sats.into_into_dart().into_dart(),
-            self.timestamp.into_into_dart().into_dart(),
-            self.success.into_into_dart().into_dart(),
-            self.oob.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::events::PicoPayment {}
-impl flutter_rust_bridge::IntoIntoDart<crate::events::PicoPayment> for crate::events::PicoPayment {
-    fn into_into_dart(self) -> crate::events::PicoPayment {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::events::RecentPaymentsUpdate {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.payments.into_into_dart().into_dart(),
-            self.notification.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::events::RecentPaymentsUpdate
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::events::RecentPaymentsUpdate>
-    for crate::events::RecentPaymentsUpdate
-{
-    fn into_into_dart(self) -> crate::events::RecentPaymentsUpdate {
         self
     }
 }
@@ -5184,6 +5217,18 @@ impl SseEncode for StreamSink<i64, flutter_rust_bridge::for_generated::SseCodec>
     }
 }
 
+impl SseEncode
+    for StreamSink<
+        Vec<crate::events::OperationSummary>,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
+    }
+}
+
 impl SseEncode for StreamSink<Vec<(String, bool)>, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5192,7 +5237,7 @@ impl SseEncode for StreamSink<Vec<(String, bool)>, flutter_rust_bridge::for_gene
 }
 
 impl SseEncode
-    for StreamSink<crate::events::PaymentEvent, flutter_rust_bridge::for_generated::SseCodec>
+    for StreamSink<crate::events::Notification, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5201,10 +5246,7 @@ impl SseEncode
 }
 
 impl SseEncode
-    for StreamSink<
-        crate::events::RecentPaymentsUpdate,
-        flutter_rust_bridge::for_generated::SseCodec,
-    >
+    for StreamSink<crate::events::PaymentEvent, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5306,12 +5348,12 @@ impl SseEncode for Vec<crate::currency::FiatCurrency> {
     }
 }
 
-impl SseEncode for Vec<crate::events::PicoPayment> {
+impl SseEncode for Vec<crate::events::OperationSummary> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
-            <crate::events::PicoPayment>::sse_encode(item, serializer);
+            <crate::events::OperationSummary>::sse_encode(item, serializer);
         }
     }
 }
@@ -5340,6 +5382,42 @@ impl SseEncode for crate::lnurl::LnurlWrapper {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.0, serializer);
+    }
+}
+
+impl SseEncode for crate::events::Notification {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::events::Notification::LightningReceived { amount_sats } => {
+                <i32>::sse_encode(0, serializer);
+                <i64>::sse_encode(amount_sats, serializer);
+            }
+            crate::events::Notification::OnchainReceived { amount_sats } => {
+                <i32>::sse_encode(1, serializer);
+                <i64>::sse_encode(amount_sats, serializer);
+            }
+            crate::events::Notification::LightningRefunding => {
+                <i32>::sse_encode(2, serializer);
+            }
+            crate::events::Notification::TransactionRejected => {
+                <i32>::sse_encode(3, serializer);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+
+impl SseEncode for crate::events::OperationSummary {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.operation_id, serializer);
+        <bool>::sse_encode(self.incoming, serializer);
+        <crate::events::PaymentType>::sse_encode(self.payment_type, serializer);
+        <i64>::sse_encode(self.amount_sats, serializer);
+        <i64>::sse_encode(self.timestamp, serializer);
     }
 }
 
@@ -5423,16 +5501,6 @@ impl SseEncode for Option<PicoClientFactory> {
     }
 }
 
-impl SseEncode for Option<bool> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <bool>::sse_encode(value, serializer);
-        }
-    }
-}
-
 impl SseEncode for Option<crate::currency::FiatCurrency> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5459,16 +5527,6 @@ impl SseEncode for Option<crate::lnurl::LnurlWrapper> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::lnurl::LnurlWrapper>::sse_encode(value, serializer);
-        }
-    }
-}
-
-impl SseEncode for Option<crate::events::PaymentNotification> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <crate::events::PaymentNotification>::sse_encode(value, serializer);
         }
     }
 }
@@ -5634,16 +5692,6 @@ impl SseEncode for crate::events::PaymentEvent {
     }
 }
 
-impl SseEncode for crate::events::PaymentNotification {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.incoming, serializer);
-        <bool>::sse_encode(self.success, serializer);
-        <i64>::sse_encode(self.amount_sats, serializer);
-        <crate::events::PaymentType>::sse_encode(self.payment_type, serializer);
-    }
-}
-
 impl SseEncode for crate::events::PaymentType {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5658,28 +5706,6 @@ impl SseEncode for crate::events::PaymentType {
             },
             serializer,
         );
-    }
-}
-
-impl SseEncode for crate::events::PicoPayment {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.operation_id, serializer);
-        <bool>::sse_encode(self.incoming, serializer);
-        <crate::events::PaymentType>::sse_encode(self.payment_type, serializer);
-        <i64>::sse_encode(self.amount_sats, serializer);
-        <Option<i64>>::sse_encode(self.fee_sats, serializer);
-        <i64>::sse_encode(self.timestamp, serializer);
-        <Option<bool>>::sse_encode(self.success, serializer);
-        <Option<String>>::sse_encode(self.oob, serializer);
-    }
-}
-
-impl SseEncode for crate::events::RecentPaymentsUpdate {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <Vec<crate::events::PicoPayment>>::sse_encode(self.payments, serializer);
-        <Option<crate::events::PaymentNotification>>::sse_encode(self.notification, serializer);
     }
 }
 

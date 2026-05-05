@@ -21,7 +21,7 @@ use picomint_redb::Database;
 
 pub use client::PicoClient;
 pub use currency::{FiatCurrency, find_fiat_currency, list_fiat_currencies};
-pub use events::{PaymentEvent, PaymentNotification, PaymentType, PicoPayment, RecentPaymentsUpdate};
+pub use events::{Notification, OperationSummary, PaymentEvent, PaymentType};
 pub use factory::{FederationInfo, PicoClientFactory, PicoContact};
 pub use fountain::{ECashDecoder, ECashEncoder};
 pub use lnurl::{LnurlWrapper, PayResponseWrapper, lnurl_fetch_limits, lnurl_resolve, parse_lnurl};

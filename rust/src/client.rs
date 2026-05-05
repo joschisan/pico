@@ -1,6 +1,5 @@
-use std::sync::Arc;
-
 use std::str::FromStr;
+use std::sync::Arc;
 
 use bitcoin::Amount as BtcAmount;
 use flutter_rust_bridge::frb;
@@ -14,8 +13,8 @@ use picomint_eventlog::EventLogId;
 use tokio::sync::Notify;
 
 use crate::events::{
-    ParsedEvent, PaymentEvent, PaymentNotification, PicoPayment, RecentPaymentsUpdate,
-    apply_update, parse_event_log_entry, parse_payment_event, snapshot,
+    Notification, OperationSummary, PaymentEvent, parse_notification, parse_payment_event,
+    parse_summary,
 };
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
@@ -211,37 +210,31 @@ impl PicoClient {
         Ok(self.client.wallet().receive().await.to_string())
     }
 
+    /// One-shot list of every operation belonging to this federation, in
+    /// reverse-chronological order. Cards rendered from this snapshot stay
+    /// static — live status is reachable only by opening the per-op drawer.
     #[frb]
-    pub async fn get_payment_history(&self) -> Vec<PicoPayment> {
+    pub async fn list_operations(&self) -> Vec<OperationSummary> {
         let entries = self
             .client
             .get_event_log(EventLogId::LOG_START, u64::MAX)
             .await;
 
-        let mut payments = Vec::new();
+        let mut summaries = Vec::new();
 
         for (_, entry) in entries {
             if entry.federation_id != self.federation_id {
                 continue;
             }
 
-            if let Some(parsed) = parse_event_log_entry(&entry) {
-                match parsed {
-                    ParsedEvent::Payment(payment) => payments.push(payment),
-                    ParsedEvent::Update {
-                        operation_id,
-                        success,
-                        oob,
-                    } => {
-                        apply_update(&mut payments, &operation_id, success, oob);
-                    }
-                }
+            if let Some(summary) = parse_summary(&entry) {
+                summaries.push(summary);
             }
         }
 
-        payments.reverse();
+        summaries.reverse();
 
-        payments
+        summaries
     }
 
     /// Live tail of every picomint event for a single operation, parsed
@@ -272,94 +265,116 @@ impl PicoClient {
         }
     }
 
-    /// Live tail of the global event log filtered to this federation.
-    ///
-    /// Always replays from `LOG_START` on every subscription — the global
-    /// event log persists across runs at the un-prefixed redb root, so
-    /// rebuilding the in-memory payment list from it is cheap and removes
-    /// the need for a per-federation copy table in pico's own db.
+    /// Live ordered list of operation summaries (newest first) for this
+    /// federation. Emits once after the historical replay completes, then
+    /// re-emits whenever a new trigger event lands. Follow-up events that
+    /// only change live status do not re-emit — those reach the UI through
+    /// `subscribe_payment_events` when the user opens the drawer.
     #[frb]
-    pub async fn subscribe_event_log(&self, sink: StreamSink<RecentPaymentsUpdate>) {
-        let notify: Arc<Notify> = self.client.event_notify();
-
+    pub async fn subscribe_recent_operations(&self, sink: StreamSink<Vec<OperationSummary>>) {
+        // Phase 1: drain history into the full summaries vector. No emits.
+        let mut summaries: Vec<OperationSummary> = Vec::new();
         let mut position = EventLogId::LOG_START;
-        let mut payments: Vec<PicoPayment> = Vec::new();
-        let mut n_display: usize = 3;
-        let mut have_seeded_initial = false;
+
+        loop {
+            let batch = self.client.get_event_log(position, 1000).await;
+
+            for entry in &batch {
+                if entry.1.federation_id != self.federation_id {
+                    continue;
+                }
+
+                if let Some(summary) = parse_summary(&entry.1) {
+                    summaries.push(summary);
+                }
+            }
+
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                break;
+            }
+        }
+
+        summaries = summaries.into_iter().rev().take(3).rev().collect();
+
+        if sink.add(summaries.clone()).is_err() {
+            return;
+        }
+
+        // Phase 2: tail live events; append on each new trigger and emit.
+        let notify: Arc<Notify> = self.client.event_notify();
 
         loop {
             let notified = notify.notified();
 
-            let batch = self.client.get_event_log(position, 100).await;
+            let batch = self.client.get_event_log(position, 1000).await;
 
-            for (id, entry) in &batch {
-                position = id.saturating_add(1);
-
-                if entry.federation_id != self.federation_id {
+            for entry in &batch {
+                if entry.1.federation_id != self.federation_id {
                     continue;
                 }
 
-                let Some(parsed) = parse_event_log_entry(entry) else {
+                if let Some(summary) = parse_summary(&entry.1) {
+                    summaries.push(summary);
+                }
+            }
+
+            if sink.add(summaries.clone()).is_err() {
+                return;
+            }
+
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                notified.await;
+            }
+        }
+    }
+
+    /// Toast/haptic stream — fires per matching event committed after the
+    /// historical replay. Only events whose own payload carries enough to
+    /// render the toast emit; other status changes are visible only via
+    /// the per-op drawer.
+    #[frb]
+    pub async fn subscribe_notifications(&self, sink: StreamSink<Notification>) {
+        // Phase 1: drain history to find the live position. No
+        // notifications fire — these are old events.
+        let mut position = EventLogId::LOG_START;
+
+        loop {
+            let batch = self.client.get_event_log(position, 1000).await;
+
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                break;
+            }
+        }
+
+        // Phase 2: tail live events; every match fires a notification.
+        let notify: Arc<Notify> = self.client.event_notify();
+
+        loop {
+            let notified = notify.notified();
+
+            let batch = self.client.get_event_log(position, 1000).await;
+
+            for entry in &batch {
+                if entry.1.federation_id != self.federation_id {
                     continue;
-                };
+                }
 
-                let notification = match parsed {
-                    ParsedEvent::Payment(payment) => {
-                        if have_seeded_initial {
-                            n_display += 1;
-                        }
-
-                        let row = payment.clone();
-
-                        payments.push(payment);
-
-                        row.success.map(|success| PaymentNotification {
-                            incoming: row.incoming,
-                            success,
-                            amount_sats: row.amount_sats,
-                            payment_type: row.payment_type,
-                        })
+                if let Some(notification) = parse_notification(&entry.1) {
+                    if sink.add(notification).is_err() {
+                        return;
                     }
-                    ParsedEvent::Update {
-                        operation_id,
-                        success,
-                        oob,
-                    } => apply_update(&mut payments, &operation_id, success, oob),
-                };
-
-                if !have_seeded_initial {
-                    // Don't emit per-event notifications while replaying
-                    // historical entries — they'd flash through the UI as
-                    // "new payment" toasts.
-                    continue;
-                }
-
-                if sink
-                    .add(RecentPaymentsUpdate {
-                        payments: snapshot(&payments, n_display),
-                        notification,
-                    })
-                    .is_err()
-                {
-                    return;
                 }
             }
 
-            if !have_seeded_initial && batch.len() < 100 {
-                have_seeded_initial = true;
+            position = position.saturating_add(batch.len() as u64);
 
-                if sink
-                    .add(RecentPaymentsUpdate {
-                        payments: snapshot(&payments, n_display),
-                        notification: None,
-                    })
-                    .is_err()
-                {
-                    return;
-                }
-            }
-
-            if batch.len() < 100 {
+            if batch.len() < 1000 {
                 notified.await;
             }
         }
