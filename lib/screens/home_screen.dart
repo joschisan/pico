@@ -23,9 +23,9 @@ import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/screens/lightning_address_entry_screen.dart';
 import 'package:pico/screens/settings_screen.dart';
 import 'package:pico/screens/wallet_v2_receive_screen.dart';
-import 'package:intl/intl.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
+import 'package:pico/widgets/animated_balance_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/recent_payments_widget.dart';
 
@@ -444,13 +444,8 @@ class _FederationRow extends StatelessWidget {
         children: [
           StreamBuilder<int>(
             stream: client.subscribeBalance(),
-            builder: (_, snapshot) {
-              final sats = snapshot.data ?? 0;
-              return Text(
-                '${NumberFormat('#,###').format(sats)} sat',
-                style: mediumStyle,
-              );
-            },
+            builder: (_, snapshot) =>
+                AnimatedBalance(sats: snapshot.data ?? 0, style: mediumStyle),
           ),
           FutureBuilder<String?>(
             future: client.federationName(),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/styles.dart';
+import 'package:pico/widgets/animated_balance_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 
@@ -83,13 +83,8 @@ class _FederationRow extends StatelessWidget {
         children: [
           StreamBuilder<int>(
             stream: client.subscribeBalance(),
-            builder: (_, snapshot) {
-              final sats = snapshot.data ?? 0;
-              return Text(
-                '${NumberFormat('#,###').format(sats)} sat',
-                style: mediumStyle,
-              );
-            },
+            builder: (_, snapshot) =>
+                AnimatedBalance(sats: snapshot.data ?? 0, style: mediumStyle),
           ),
           FutureBuilder<String?>(
             future: client.federationName(),
