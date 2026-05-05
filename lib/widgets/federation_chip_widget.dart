@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/drawers/federation_picker_drawer.dart';
@@ -48,18 +48,44 @@ class FederationChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              PhosphorIconsRegular.wallet,
-              size: smallIconSize,
-              color: scheme.onSurfaceVariant,
+            StreamBuilder<List<(String, bool)>>(
+              stream: client.subscribeConnectionStatus(),
+              builder: (_, snapshot) {
+                final online = snapshot.data?.any((s) => s.$2) ?? false;
+                return Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: online
+                        ? scheme.primary
+                        : scheme.primary.withValues(alpha: 0.3),
+                  ),
+                );
+              },
             ),
             const SizedBox(width: 8),
-            FutureBuilder<String?>(
-              future: client.federationName(),
-              builder: (_, snapshot) => Text(
-                snapshot.data ?? '…',
-                style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+            Flexible(
+              child: FutureBuilder<String?>(
+                future: client.federationName(),
+                builder: (_, snapshot) => Text(
+                  snapshot.data ?? '…',
+                  style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+            ),
+            const SizedBox(width: 8),
+            StreamBuilder<int>(
+              stream: client.subscribeBalance(),
+              builder: (_, snapshot) {
+                final sats = snapshot.data ?? 0;
+                return Text(
+                  '· ${NumberFormat('#,###').format(sats)} sat',
+                  style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+                );
+              },
             ),
           ],
         ),
