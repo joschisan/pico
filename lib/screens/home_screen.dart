@@ -172,10 +172,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => InvoiceAmountScreen(
-          client: client,
-          clientFactory: widget.clientFactory,
-        ),
+        builder:
+            (_) => InvoiceAmountScreen(
+              client: client,
+              clientFactory: widget.clientFactory,
+            ),
       ),
     );
   }
@@ -185,10 +186,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => EcashAmountScreen(
-          client: client,
-          clientFactory: widget.clientFactory,
-        ),
+        builder:
+            (_) => EcashAmountScreen(
+              client: client,
+              clientFactory: widget.clientFactory,
+            ),
       ),
     );
   }
@@ -198,10 +200,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => WalletV2ReceiveScreen(
-          client: client,
-          clientFactory: widget.clientFactory,
-        ),
+        builder:
+            (_) => WalletV2ReceiveScreen(
+              client: client,
+              clientFactory: widget.clientFactory,
+            ),
       ),
     );
   }
@@ -211,10 +214,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LightningAddressEntryScreen(
-          client: client,
-          clientFactory: widget.clientFactory,
-        ),
+        builder:
+            (_) => LightningAddressEntryScreen(
+              client: client,
+              clientFactory: widget.clientFactory,
+            ),
       ),
     );
   }
@@ -224,10 +228,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => DisplayContactsScreen(
-          client: client,
-          clientFactory: widget.clientFactory,
-        ),
+        builder:
+            (_) => DisplayContactsScreen(
+              client: client,
+              clientFactory: widget.clientFactory,
+            ),
       ),
     );
   }
@@ -277,10 +282,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onTapFederation(PicoClient client) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ConnectionStatusScreen(
-          client: client,
-          clientFactory: widget.clientFactory,
-        ),
+        builder:
+            (_) => ConnectionStatusScreen(
+              client: client,
+              clientFactory: widget.clientFactory,
+            ),
       ),
     );
   }
@@ -321,10 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: _onLightningAddress,
             ),
             IconButton(
-              icon: const Icon(
-                PhosphorIconsRegular.users,
-                size: smallIconSize,
-              ),
+              icon: const Icon(PhosphorIconsRegular.users, size: smallIconSize),
               onPressed: _onContacts,
             ),
           ],
@@ -334,51 +337,52 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _clients.isEmpty
-          ? const Center(child: _OnboardingCard())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  BorderedList.column(
-                    children: [
-                      for (final client in _clients)
-                        _FederationRow(
-                          client: client,
-                          onTap: () => _onTapFederation(client),
+      body:
+          _clients.isEmpty
+              ? const Center(child: _OnboardingCard())
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    BorderedList.column(
+                      children: [
+                        for (final client in _clients)
+                          _FederationRow(
+                            client: client,
+                            onTap: () => _onTapFederation(client),
+                          ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _CircularActionButton(
+                          icon: PhosphorIconsRegular.lightning,
+                          label: 'Lightning',
+                          onTap: _onCreateInvoice,
                         ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _CircularActionButton(
-                        icon: PhosphorIconsRegular.lightning,
-                        label: 'Lightning',
-                        onTap: _onCreateInvoice,
-                      ),
-                      _CircularActionButton(
-                        icon: PhosphorIconsRegular.link,
-                        label: 'Onchain',
-                        onTap: _onReceiveBitcoin,
-                      ),
-                      _CircularActionButton(
-                        icon: PhosphorIconsRegular.coinVertical,
-                        label: 'eCash',
-                        onTap: _onSendEcash,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  RecentPayments(
-                    clientFactory: widget.clientFactory,
-                    stream: _recentStream,
-                    onTransactionTap: _showEventDetails,
-                  ),
-                ],
+                        _CircularActionButton(
+                          icon: PhosphorIconsRegular.link,
+                          label: 'Onchain',
+                          onTap: _onReceiveBitcoin,
+                        ),
+                        _CircularActionButton(
+                          icon: PhosphorIconsRegular.coinVertical,
+                          label: 'eCash',
+                          onTap: _onSendEcash,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    RecentPayments(
+                      clientFactory: widget.clientFactory,
+                      stream: _recentStream,
+                      onTransactionTap: _showEventDetails,
+                    ),
+                  ],
+                ),
               ),
-            ),
     );
   }
 }
@@ -466,9 +470,10 @@ class _FederationRow extends StatelessWidget {
             height: 14,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: online
-                  ? scheme.primary
-                  : scheme.primary.withValues(alpha: 0.3),
+              color:
+                  online
+                      ? scheme.primary
+                      : scheme.primary.withValues(alpha: 0.3),
             ),
           );
         },
@@ -483,15 +488,19 @@ class _FederationRow extends StatelessWidget {
         children: [
           StreamBuilder<int>(
             stream: client.subscribeBalance(),
-            builder: (_, snapshot) =>
-                AnimatedBalance(sats: snapshot.data ?? 0, style: mediumStyle),
+            builder:
+                (_, snapshot) => AnimatedBalance(
+                  sats: snapshot.data ?? 0,
+                  style: mediumStyle,
+                ),
           ),
           FutureBuilder<String?>(
             future: client.federationName(),
-            builder: (_, snapshot) => Text(
-              snapshot.data ?? '…',
-              style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
-            ),
+            builder:
+                (_, snapshot) => Text(
+                  snapshot.data ?? '…',
+                  style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+                ),
           ),
         ],
       ),

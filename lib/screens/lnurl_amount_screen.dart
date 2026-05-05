@@ -54,10 +54,11 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   Future<void> _handleSaveContact() async {
     final name = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder: (_) => ContactNameEntryScreen(
-          clientFactory: widget.clientFactory,
-          lnurl: widget.lnurl,
-        ),
+        builder:
+            (_) => ContactNameEntryScreen(
+              clientFactory: widget.clientFactory,
+              lnurl: widget.lnurl,
+            ),
       ),
     );
 

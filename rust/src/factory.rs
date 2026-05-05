@@ -122,7 +122,10 @@ impl PicoClientFactory {
                 .await
                 .map_err(|e| e.to_string())?;
 
-            warmed.insert(fed_id, build_pico_client(client, fed_id, currency_code.clone()));
+            warmed.insert(
+                fed_id,
+                build_pico_client(client, fed_id, currency_code.clone()),
+            );
         }
 
         Ok(Self {
@@ -271,8 +274,7 @@ impl PicoClientFactory {
     #[frb]
     pub async fn subscribe_clients(&self, sink: StreamSink<Vec<PicoClient>>) {
         loop {
-            let snapshot: Vec<PicoClient> =
-                self.clients.read().await.values().cloned().collect();
+            let snapshot: Vec<PicoClient> = self.clients.read().await.values().cloned().collect();
             let set_changed = self.set_changed.notified();
             tokio::pin!(set_changed);
             if sink.add(snapshot).is_err() {

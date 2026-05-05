@@ -90,15 +90,19 @@ class _FederationRow extends StatelessWidget {
         children: [
           StreamBuilder<int>(
             stream: client.subscribeBalance(),
-            builder: (_, snapshot) =>
-                AnimatedBalance(sats: snapshot.data ?? 0, style: mediumStyle),
+            builder:
+                (_, snapshot) => AnimatedBalance(
+                  sats: snapshot.data ?? 0,
+                  style: mediumStyle,
+                ),
           ),
           FutureBuilder<String?>(
             future: client.federationName(),
-            builder: (_, snapshot) => Text(
-              snapshot.data ?? '…',
-              style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
-            ),
+            builder:
+                (_, snapshot) => Text(
+                  snapshot.data ?? '…',
+                  style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+                ),
           ),
         ],
       ),

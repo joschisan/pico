@@ -59,12 +59,13 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => ConfirmOnchainSendScreen(
-          client: widget.source,
-          address: address,
-          amountSats: amountSats,
-          feeSats: feeSats,
-        ),
+        builder:
+            (_) => ConfirmOnchainSendScreen(
+              client: widget.source,
+              address: address,
+              amountSats: amountSats,
+              feeSats: feeSats,
+            ),
       ),
     );
   }

@@ -53,10 +53,11 @@ class _AnimatedBalanceState extends State<AnimatedBalance>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _animation,
-      builder: (_, _) => Text(
-        '${NumberFormat('#,###').format(_animation.value)} sat',
-        style: widget.style,
-      ),
+      builder:
+          (_, _) => Text(
+            '${NumberFormat('#,###').format(_animation.value)} sat',
+            style: widget.style,
+          ),
     );
   }
 }

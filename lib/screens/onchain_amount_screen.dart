@@ -35,12 +35,13 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => ConfirmOnchainSendScreen(
-          client: _client,
-          address: widget.address,
-          amountSats: amountSats,
-          feeSats: feeSats,
-        ),
+        builder:
+            (_) => ConfirmOnchainSendScreen(
+              client: _client,
+              address: widget.address,
+              amountSats: amountSats,
+              feeSats: feeSats,
+            ),
       ),
     );
   }

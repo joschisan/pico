@@ -33,11 +33,12 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => DisplayEcashScreen(
-          client: _client,
-          notes: notes,
-          encoder: ECashEncoder(notes: notes),
-        ),
+        builder:
+            (_) => DisplayEcashScreen(
+              client: _client,
+              notes: notes,
+              encoder: ECashEncoder(notes: notes),
+            ),
       ),
     );
   }

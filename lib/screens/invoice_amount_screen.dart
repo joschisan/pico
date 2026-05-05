@@ -42,8 +42,8 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) =>
-            DisplayInvoiceScreen(invoice: invoice, amount: amountSats),
+        builder:
+            (_) => DisplayInvoiceScreen(invoice: invoice, amount: amountSats),
       ),
     );
   }

@@ -45,14 +45,15 @@ class OnchainAddressDrawer extends StatelessWidget {
         const SizedBox(height: 8),
         AsyncButton(
           text: 'Continue',
-          onPressed: () async => DrawerUtils.popAndPush(
-            context,
-            OnchainAmountScreen(
-              client: client,
-              clientFactory: clientFactory,
-              address: address,
-            ),
-          ),
+          onPressed:
+              () async => DrawerUtils.popAndPush(
+                context,
+                OnchainAmountScreen(
+                  client: client,
+                  clientFactory: clientFactory,
+                  address: address,
+                ),
+              ),
         ),
       ],
     );

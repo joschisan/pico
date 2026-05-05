@@ -44,10 +44,7 @@ class ConnectionStatusScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(
-              PhosphorIconsRegular.signOut,
-              size: smallIconSize,
-            ),
+            icon: const Icon(PhosphorIconsRegular.signOut, size: smallIconSize),
             onPressed: () => _onLeave(context),
           ),
         ],

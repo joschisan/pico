@@ -57,9 +57,10 @@ class FederationChip extends StatelessWidget {
                   height: 10,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: online
-                        ? scheme.primary
-                        : scheme.primary.withValues(alpha: 0.3),
+                    color:
+                        online
+                            ? scheme.primary
+                            : scheme.primary.withValues(alpha: 0.3),
                   ),
                 );
               },
@@ -68,12 +69,15 @@ class FederationChip extends StatelessWidget {
             Flexible(
               child: FutureBuilder<String?>(
                 future: client.federationName(),
-                builder: (_, snapshot) => Text(
-                  snapshot.data ?? '…',
-                  style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                builder:
+                    (_, snapshot) => Text(
+                      snapshot.data ?? '…',
+                      style: smallStyle.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
               ),
             ),
             const SizedBox(width: 8),
