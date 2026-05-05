@@ -3,7 +3,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/screens/confirm_onchain_send_screen.dart';
-import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 
@@ -43,7 +42,6 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
 
     if (!mounted) return;
 
-    NotificationUtils.showSuccess(context, 'Transfer sent');
     Navigator.of(context).pop();
   }
 
