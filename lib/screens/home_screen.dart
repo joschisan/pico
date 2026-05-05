@@ -132,8 +132,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       (
         parseBitcoinAddress(address: input),
-        (dynamic result) =>
-            OnchainAddressDrawer.show(context, client: client, address: result),
+        (dynamic result) => OnchainAddressDrawer.show(
+          context,
+          client: client,
+          clientFactory: widget.clientFactory,
+          address: result,
+        ),
       ),
       (
         parseLnurl(request: input),
@@ -167,7 +171,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final client = _pickClient();
     if (client == null) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => InvoiceAmountScreen(client: client)),
+      MaterialPageRoute(
+        builder: (_) => InvoiceAmountScreen(
+          client: client,
+          clientFactory: widget.clientFactory,
+        ),
+      ),
     );
   }
 
@@ -175,7 +184,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final client = _pickClient();
     if (client == null) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => EcashAmountScreen(client: client)),
+      MaterialPageRoute(
+        builder: (_) => EcashAmountScreen(
+          client: client,
+          clientFactory: widget.clientFactory,
+        ),
+      ),
     );
   }
 

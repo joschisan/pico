@@ -1,30 +1,38 @@
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/async_button_widget.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/screens/onchain_amount_screen.dart';
 import 'package:pico/utils/drawer_utils.dart';
+import 'package:pico/widgets/async_button_widget.dart';
+import 'package:pico/widgets/drawer_shell_widget.dart';
 
 class OnchainAddressDrawer extends StatelessWidget {
   final PicoClient client;
+  final PicoClientFactory clientFactory;
   final BitcoinAddressWrapper address;
 
   const OnchainAddressDrawer({
     super.key,
     required this.client,
+    required this.clientFactory,
     required this.address,
   });
 
   static Future<void> show(
     BuildContext context, {
     required PicoClient client,
+    required PicoClientFactory clientFactory,
     required BitcoinAddressWrapper address,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: OnchainAddressDrawer(client: client, address: address),
+      child: OnchainAddressDrawer(
+        client: client,
+        clientFactory: clientFactory,
+        address: address,
+      ),
     );
   }
 
@@ -37,11 +45,14 @@ class OnchainAddressDrawer extends StatelessWidget {
         const SizedBox(height: 8),
         AsyncButton(
           text: 'Continue',
-          onPressed:
-              () async => DrawerUtils.popAndPush(
-                context,
-                OnchainAmountScreen(client: client, address: address),
-              ),
+          onPressed: () async => DrawerUtils.popAndPush(
+            context,
+            OnchainAmountScreen(
+              client: client,
+              clientFactory: clientFactory,
+              address: address,
+            ),
+          ),
         ),
       ],
     );

@@ -1,13 +1,14 @@
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:pico/utils/styles.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
-import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/screens/contact_name_entry_screen.dart';
 import 'package:pico/utils/auth_utils.dart';
+import 'package:pico/utils/styles.dart';
+import 'package:pico/widgets/amount_entry_widget.dart';
+import 'package:pico/widgets/federation_chip_widget.dart';
+import 'package:share_plus/share_plus.dart';
 
 class LnurlAmountScreen extends StatefulWidget {
   final PicoClient client;
@@ -30,6 +31,7 @@ class LnurlAmountScreen extends StatefulWidget {
 }
 
 class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
+  late PicoClient _client = widget.client;
   late String? _contactName = widget.contactName;
 
   Future<void> _handleConfirm(int amountSats) async {
@@ -42,7 +44,7 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
 
     await requireBiometricAuth(context);
 
-    await widget.client.lnSend(invoice: invoice);
+    await _client.lnSend(invoice: invoice);
 
     if (!mounted) return;
 
@@ -52,11 +54,10 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   Future<void> _handleSaveContact() async {
     final name = await Navigator.of(context).push<String>(
       MaterialPageRoute(
-        builder:
-            (_) => ContactNameEntryScreen(
-              clientFactory: widget.clientFactory,
-              lnurl: widget.lnurl,
-            ),
+        builder: (_) => ContactNameEntryScreen(
+          clientFactory: widget.clientFactory,
+          lnurl: widget.lnurl,
+        ),
       ),
     );
 
@@ -93,9 +94,24 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
       ),
       body: SafeArea(
         maintainBottomViewPadding: true,
-        child: AmountEntryWidget(
-          client: widget.client,
-          onConfirm: _handleConfirm,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: FederationChip(
+                clientFactory: widget.clientFactory,
+                client: _client,
+                onChanged: (next) => setState(() => _client = next),
+              ),
+            ),
+            Expanded(
+              child: AmountEntryWidget(
+                key: ValueKey(_client.namespace()),
+                client: _client,
+                onConfirm: _handleConfirm,
+              ),
+            ),
+          ],
         ),
       ),
     );

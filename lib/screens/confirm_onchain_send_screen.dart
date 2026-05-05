@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/widgets/amount_display_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/widgets/shareable_data_widget.dart';
-import 'package:pico/utils/auth_utils.dart';
 
 class ConfirmOnchainSendScreen extends StatefulWidget {
   final PicoClient client;

@@ -64,6 +64,7 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
         (dynamic result) => OnchainAddressDrawer.show(
           context,
           client: widget.client,
+          clientFactory: widget.clientFactory,
           address: result,
         ),
       ),
