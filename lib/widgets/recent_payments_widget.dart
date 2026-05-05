@@ -69,6 +69,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
               context: context,
               child: _AnimatedEntry(
                 child: PaymentCard(
+                  client: widget.client,
                   event: _payments[i],
                   onTap: () => widget.onTransactionTap(_payments[i]),
                 ),
