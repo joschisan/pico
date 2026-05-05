@@ -210,29 +210,34 @@ impl PicoClient {
         Ok(self.client.wallet().receive().await.to_string())
     }
 
-    /// One-shot list of every operation belonging to this federation, in
-    /// reverse-chronological order. Cards rendered from this snapshot stay
-    /// static — live status is reachable only by opening the per-op drawer.
+    /// One-shot list of every operation belonging to this federation in
+    /// chronological order (oldest first — Dart reverses for display).
+    /// Cards rendered from this snapshot stay static; live status is
+    /// reachable only by opening the per-op drawer.
     #[frb]
     pub async fn list_operations(&self) -> Vec<OperationSummary> {
-        let entries = self
-            .client
-            .get_event_log(EventLogId::LOG_START, u64::MAX)
-            .await;
+        let mut position = EventLogId::LOG_START;
+        let mut summaries: Vec<OperationSummary> = Vec::new();
 
-        let mut summaries = Vec::new();
+        loop {
+            let batch = self.client.get_event_log(position, 1000).await;
 
-        for (_, entry) in entries {
-            if entry.federation_id != self.federation_id {
-                continue;
+            for entry in &batch {
+                if entry.1.federation_id != self.federation_id {
+                    continue;
+                }
+
+                if let Some(summary) = parse_summary(&entry.1) {
+                    summaries.push(summary);
+                }
             }
 
-            if let Some(summary) = parse_summary(&entry) {
-                summaries.push(summary);
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                break;
             }
         }
-
-        summaries.reverse();
 
         summaries
     }

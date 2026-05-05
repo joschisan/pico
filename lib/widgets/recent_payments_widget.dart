@@ -33,7 +33,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
     super.initState();
     _subscription = widget.stream.listen((snapshot) {
       if (!mounted) return;
-      setState(() => _payments = snapshot);
+      setState(() => _payments = snapshot.reversed.toList());
     });
   }
 
@@ -88,7 +88,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
                 MaterialPageRoute(
                   builder: (_) => PaymentHistoryScreen(
                     client: widget.client,
-                    operations: operations,
+                    operations: operations.reversed.toList(),
                   ),
                 ),
               );
