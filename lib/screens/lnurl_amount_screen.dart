@@ -106,7 +106,7 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
             ),
             Expanded(
               child: AmountEntryWidget(
-                key: ValueKey(_client.namespace()),
+                key: ValueKey(_client.federationId()),
                 client: _client,
                 onConfirm: _handleConfirm,
               ),

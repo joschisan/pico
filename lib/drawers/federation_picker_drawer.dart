@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -50,7 +49,7 @@ class FederationPickerDrawer extends StatelessWidget {
             for (final client in clients)
               _FederationRow(
                 client: client,
-                isSelected: listEquals(client.namespace(), selected.namespace()),
+                isSelected: client.federationId() == selected.federationId(),
                 onTap: () {
                   Navigator.of(context).pop();
                   onSelected(client);

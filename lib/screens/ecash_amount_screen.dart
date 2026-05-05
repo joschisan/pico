@@ -59,7 +59,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
             ),
             Expanded(
               child: AmountEntryWidget(
-                key: ValueKey(_client.namespace()),
+                key: ValueKey(_client.federationId()),
                 client: _client,
                 onConfirm: _handleConfirm,
               ),

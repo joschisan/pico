@@ -40,7 +40,9 @@ class LeaveFederationDrawer extends StatefulWidget {
 
 class _LeaveFederationDrawerState extends State<LeaveFederationDrawer> {
   Future<void> _handleLeaveFederation() async {
-    await widget.clientFactory.leave(namespace: widget.client.namespace());
+    await widget.clientFactory.leave(
+      federationId: widget.client.federationId(),
+    );
 
     if (!mounted) return;
 

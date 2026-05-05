@@ -27,7 +27,6 @@ futures = "0.3"
 futures-util = "0.3"
 lightning-invoice = { version = "0.34", features = ["std"] }
 log = "0.4"
-rand = "0.8"
 regex = "1"
 reqwest = { version = "=0.12.22", features = ["rustls-tls", "json"], default-features = false }
 serde = { version = "1", features = ["derive"] }
