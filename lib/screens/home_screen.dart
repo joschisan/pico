@@ -20,9 +20,10 @@ import 'package:pico/screens/ecash_amount_screen.dart';
 import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/screens/settings_screen.dart';
 import 'package:pico/screens/wallet_v2_receive_screen.dart';
+import 'package:intl/intl.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
-import 'package:pico/widgets/animated_balance_widget.dart';
+import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/recent_payments_widget.dart';
 
 /// Multimint home: aggregated balance + global recent activity + three
@@ -41,19 +42,16 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _random = Random();
 
-  late final Stream<int> _balanceStream;
   late final Stream<List<OperationSummary>> _recentStream;
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
   StreamSubscription<Notification>? _notificationSubscription;
 
   List<PicoClient> _clients = [];
-  bool _balanceHidden = true;
 
   @override
   void initState() {
     super.initState();
-    _balanceStream = widget.clientFactory.subscribeGlobalBalance();
     _recentStream = widget.clientFactory.subscribeRecentOperations();
     _notificationSubscription = widget.clientFactory
         .subscribeNotifications()
@@ -255,56 +253,47 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 64),
-            GestureDetector(
-              onTap: () => setState(() => _balanceHidden = !_balanceHidden),
-              child: StreamBuilder<int>(
-                stream: _balanceStream,
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const CircularProgressIndicator();
-                  }
-                  if (_balanceHidden) {
-                    return Text.rich(
-                      TextSpan(text: '* * * *', style: heroStyle),
-                    );
-                  }
-                  return AnimatedBalanceDisplay(snapshot.data!);
-                },
-              ),
-            ),
-            const SizedBox(height: 64),
             if (_clients.isEmpty)
-              const _OnboardingCard()
-            else ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: _OnboardingCard(),
+              )
+            else
+              BorderedList.column(
                 children: [
-                  _CircularActionButton(
-                    icon: PhosphorIconsRegular.lightning,
-                    label: 'Lightning',
-                    onTap: _onCreateInvoice,
-                  ),
-                  _CircularActionButton(
-                    icon: PhosphorIconsRegular.link,
-                    label: 'Onchain',
-                    onTap: _onReceiveBitcoin,
-                  ),
-                  _CircularActionButton(
-                    icon: PhosphorIconsRegular.coinVertical,
-                    label: 'eCash',
-                    onTap: _onSendEcash,
-                  ),
+                  for (final client in _clients) _FederationRow(client: client),
                 ],
               ),
-              const SizedBox(height: 16),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _CircularActionButton(
+                  icon: PhosphorIconsRegular.lightning,
+                  label: 'Lightning',
+                  onTap: _onCreateInvoice,
+                ),
+                _CircularActionButton(
+                  icon: PhosphorIconsRegular.link,
+                  label: 'Onchain',
+                  onTap: _onReceiveBitcoin,
+                ),
+                _CircularActionButton(
+                  icon: PhosphorIconsRegular.coinVertical,
+                  label: 'eCash',
+                  onTap: _onSendEcash,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_clients.isNotEmpty)
               RecentPayments(
                 clientFactory: widget.clientFactory,
                 stream: _recentStream,
                 onTransactionTap: _showEventDetails,
               ),
-            ],
           ],
         ),
       ),
@@ -367,6 +356,54 @@ class _OnboardingCard extends StatelessWidget {
         textAlign: TextAlign.center,
         style: smallStyle.copyWith(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _FederationRow extends StatelessWidget {
+  final PicoClient client;
+
+  const _FederationRow({required this.client});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return ListTile(
+      contentPadding: listTilePadding,
+      leading: StreamBuilder<List<(String, bool)>>(
+        stream: client.subscribeConnectionStatus(),
+        builder: (_, snapshot) {
+          final online = snapshot.data?.any((s) => s.$2) ?? false;
+          return Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: online
+                  ? scheme.primary
+                  : scheme.primary.withValues(alpha: 0.3),
+            ),
+          );
+        },
+      ),
+      title: StreamBuilder<int>(
+        stream: client.subscribeBalance(),
+        builder: (_, snapshot) {
+          final sats = snapshot.data ?? 0;
+          return Text(
+            '${NumberFormat('#,###').format(sats)} sat',
+            style: mediumStyle,
+          );
+        },
+      ),
+      subtitle: FutureBuilder<String?>(
+        future: client.federationName(),
+        builder: (_, snapshot) => Text(
+          snapshot.data ?? '…',
+          style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
         ),
       ),
     );
