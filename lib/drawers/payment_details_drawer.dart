@@ -205,7 +205,7 @@ _Description _describe(
   return switch (event) {
     // ── Core ────────────────────────────────────────────────────────────
     PaymentEvent_TxCreate(:final changeSats, :final feeSats) => _Description(
-      label: 'Transaction Submitted',
+      label: 'Transaction Created',
       subtitle: '${_sats(changeSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
