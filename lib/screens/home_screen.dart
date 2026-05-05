@@ -20,6 +20,7 @@ import 'package:pico/screens/display_contacts_screen.dart';
 import 'package:pico/screens/ecash_amount_screen.dart';
 import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/screens/lightning_address_entry_screen.dart';
+import 'package:pico/screens/settings_screen.dart';
 import 'package:pico/screens/wallet_v2_receive_screen.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
@@ -246,6 +247,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _onSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(clientFactory: widget.clientFactory),
+      ),
+    );
+    // A leave from settings drops a client; refresh the warm list so
+    // random pick doesn't reach for a dead namespace.
+    _refreshClients();
+  }
+
   void _showEventDetails(OperationSummary event) {
     // Operation ids are global sha256s, so any client can serve as a
     // host for the per-op subscription. Step 6 will replace this once
@@ -273,6 +285,10 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(PhosphorIconsRegular.qrCode, size: smallIconSize),
             onPressed: _onScan,
+          ),
+          IconButton(
+            icon: const Icon(PhosphorIconsRegular.gear, size: smallIconSize),
+            onPressed: _onSettings,
           ),
         ],
       ),

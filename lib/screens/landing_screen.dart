@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/screens/input_recovery_phrase_screen.dart';
-import 'package:pico/screens/base_screen.dart';
+import 'package:pico/screens/home_screen.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/async_button_widget.dart';
@@ -104,7 +104,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
                       builder:
-                          (context) => BaseScreen(clientFactory: clientFactory),
+                          (context) => HomeScreen(clientFactory: clientFactory),
                     ),
                   );
                 },

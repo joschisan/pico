@@ -8,8 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:pico/bridge_generated.dart/frb_generated.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/screens/home_screen.dart';
 import 'package:pico/screens/landing_screen.dart';
-import 'package:pico/screens/base_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +30,7 @@ void main() async {
   final clientFactory = await PicoClientFactory.tryLoad(db: db);
 
   if (clientFactory != null) {
-    runApp(PicoApp(home: BaseScreen(clientFactory: clientFactory)));
+    runApp(PicoApp(home: HomeScreen(clientFactory: clientFactory)));
   } else {
     runApp(PicoApp(home: LandingScreen(db: db)));
   }

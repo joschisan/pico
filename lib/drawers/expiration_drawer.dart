@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
-import 'package:pico/screens/federation_screen.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
@@ -44,21 +43,11 @@ class ExpirationDrawer extends StatelessWidget {
   }
 
   Future<void> _joinSuccessor(BuildContext context) async {
-    final client = await clientFactory.join(invite: successor!);
+    await clientFactory.join(invite: successor!);
 
     if (!context.mounted) return;
 
     Navigator.of(context).pop();
-
-    if (!context.mounted) return;
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder:
-            (_) =>
-                FederationScreen(client: client, clientFactory: clientFactory),
-      ),
-    );
   }
 
   @override

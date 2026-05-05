@@ -2,7 +2,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
-import 'package:pico/screens/base_screen.dart';
+import 'package:pico/screens/home_screen.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
@@ -36,7 +36,7 @@ class ConfirmRecoveryPhraseScreen extends StatelessWidget {
     if (context.mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (context) => BaseScreen(clientFactory: clientFactory),
+          builder: (context) => HomeScreen(clientFactory: clientFactory),
         ),
         (route) => false,
       );
