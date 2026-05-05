@@ -13,7 +13,7 @@ import 'package:share_plus/share_plus.dart';
 
 class PaymentDetailsDrawer extends StatefulWidget {
   final PicoClient client;
-  final PicoPayment event;
+  final OperationSummary event;
 
   const PaymentDetailsDrawer({
     super.key,
@@ -24,7 +24,7 @@ class PaymentDetailsDrawer extends StatefulWidget {
   static Future<void> show(
     BuildContext context, {
     required PicoClient client,
-    required PicoPayment event,
+    required OperationSummary event,
   }) {
     return DrawerUtils.show(
       context: context,
@@ -91,7 +91,7 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
 
 class _TimelineRow extends StatelessWidget {
   final PaymentEvent event;
-  final PicoPayment payment;
+  final OperationSummary payment;
   final bool isLast;
 
   const _TimelineRow({
@@ -193,7 +193,7 @@ Widget _shareIcon(String text, Color color) => GestureDetector(
 
 _Description _describe(
   PaymentEvent event,
-  PicoPayment payment,
+  OperationSummary payment,
   BuildContext context,
 ) {
   final scheme = Theme.of(context).colorScheme;

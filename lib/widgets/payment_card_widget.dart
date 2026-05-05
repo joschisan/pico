@@ -1,10 +1,8 @@
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/utils/payment_utils.dart';
-import 'package:pico/widgets/loading_icon_widget.dart';
 
 String _formatTime(DateTime dateTime) {
   final difference = DateTime.now().difference(dateTime);
@@ -18,7 +16,7 @@ String _formatTime(DateTime dateTime) {
 }
 
 class PaymentCard extends StatelessWidget {
-  final PicoPayment event;
+  final OperationSummary event;
   final VoidCallback onTap;
 
   const PaymentCard({super.key, required this.event, required this.onTap});
@@ -29,41 +27,19 @@ class PaymentCard extends StatelessWidget {
     final formattedAmount = NumberFormat('#,###').format(event.amountSats);
     final sign = event.incoming ? '+' : '-';
 
-    final icon = Icon(
-      PaymentTypeUtils.getIcon(event.paymentType),
-      size: mediumIconSize,
-      color: Theme.of(context).colorScheme.primary,
-    );
-
-    Color? titleColor;
-    if (event.success == false) {
-      titleColor = Colors.red;
-    } else if (event.incoming) {
-      titleColor = Theme.of(context).colorScheme.primary;
-    }
-
-    Widget leading = switch (event.success) {
-      null => LoadingIcon(key: const ValueKey('loading'), icon: icon),
-      true => KeyedSubtree(key: const ValueKey('success'), child: icon),
-      false => const Icon(
-        PhosphorIconsRegular.warningCircle,
-        size: mediumIconSize,
-        color: Colors.red,
-      ),
-    };
-
     return ListTile(
       onTap: onTap,
       contentPadding: listTilePadding,
-      leading: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 500),
-        switchInCurve: Curves.easeIn,
-        switchOutCurve: Curves.easeOut,
-        child: leading,
+      leading: Icon(
+        PaymentTypeUtils.getIcon(event.paymentType),
+        size: mediumIconSize,
+        color: Theme.of(context).colorScheme.primary,
       ),
       title: Text(
         '$sign $formattedAmount sat',
-        style: mediumStyle.copyWith(color: titleColor),
+        style: mediumStyle.copyWith(
+          color: event.incoming ? Theme.of(context).colorScheme.primary : null,
+        ),
       ),
       trailing: Text(
         _formatTime(date),

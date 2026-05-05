@@ -1,19 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/payment_card_widget.dart';
-import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/screens/payment_history_screen.dart';
 
 class RecentPayments extends StatefulWidget {
   final PicoClient client;
-  final Stream<RecentPaymentsUpdate> stream;
-  final void Function(PicoPayment) onTransactionTap;
+  final Stream<List<OperationSummary>> stream;
+  final void Function(OperationSummary) onTransactionTap;
 
   const RecentPayments({
     super.key,
@@ -27,42 +25,16 @@ class RecentPayments extends StatefulWidget {
 }
 
 class _RecentPaymentsState extends State<RecentPayments> {
-  List<PicoPayment> _payments = [];
-  StreamSubscription<RecentPaymentsUpdate>? _subscription;
+  List<OperationSummary> _payments = [];
+  StreamSubscription<List<OperationSummary>>? _subscription;
 
   @override
   void initState() {
     super.initState();
-    _subscription = widget.stream.listen(_onSnapshot);
-  }
-
-  void _onSnapshot(RecentPaymentsUpdate update) {
-    if (!mounted) return;
-    setState(() => _payments = update.payments);
-    if (update.notification case final notification?) {
-      _showNotification(notification);
-    }
-  }
-
-  void _showNotification(PaymentNotification notification) {
-    if (notification.success) {
-      if (notification.incoming) {
-        NotificationUtils.showReceive(
-          context,
-          notification.amountSats,
-          notification.paymentType,
-        );
-      } else {
-        HapticFeedback.heavyImpact();
-      }
-    } else {
-      HapticFeedback.heavyImpact();
-      if (notification.incoming) {
-        NotificationUtils.showError(context, 'Failed to receive payment');
-      } else {
-        NotificationUtils.showError(context, 'Failed to send payment');
-      }
-    }
+    _subscription = widget.stream.listen((snapshot) {
+      if (!mounted) return;
+      setState(() => _payments = snapshot);
+    });
   }
 
   @override
@@ -108,7 +80,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
         Center(
           child: TextButton(
             onPressed: () async {
-              final payments = await widget.client.getPaymentHistory();
+              final operations = await widget.client.listOperations();
 
               if (!context.mounted) return;
 
@@ -116,7 +88,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
                 MaterialPageRoute(
                   builder: (_) => PaymentHistoryScreen(
                     client: widget.client,
-                    payments: payments,
+                    operations: operations,
                   ),
                 ),
               );

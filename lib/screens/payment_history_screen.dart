@@ -11,12 +11,12 @@ import 'package:pico/drawers/payment_details_drawer.dart';
 
 class PaymentHistoryScreen extends StatefulWidget {
   final PicoClient client;
-  final List<PicoPayment> payments;
+  final List<OperationSummary> operations;
 
   const PaymentHistoryScreen({
     super.key,
     required this.client,
-    required this.payments,
+    required this.operations,
   });
 
   @override
@@ -46,8 +46,8 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   bool get _anyType => _lightning || _bitcoin || _ecash;
   bool get _anyDirection => _incoming || _outgoing;
 
-  List<PicoPayment> get _filteredPayments {
-    return widget.payments.where((p) {
+  List<OperationSummary> get _filteredOperations {
+    return widget.operations.where((p) {
       if (_anyType) {
         final matchesType = switch (p.paymentType) {
           PaymentType.lightning => _lightning,
@@ -67,11 +67,11 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Payment History')),
-      body: GroupedList<PicoPayment>(
-        items: _filteredPayments,
+      body: GroupedList<OperationSummary>(
+        items: _filteredOperations,
         groupKey:
-            (payment) => _formatDateHeader(
-              DateTime.fromMillisecondsSinceEpoch(payment.timestamp),
+            (operation) => _formatDateHeader(
+              DateTime.fromMillisecondsSinceEpoch(operation.timestamp),
             ),
         header: Padding(
           padding: const EdgeInsets.only(bottom: 16),

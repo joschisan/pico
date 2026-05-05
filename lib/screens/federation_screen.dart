@@ -1,6 +1,6 @@
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Notification;
 import 'package:app_links/app_links.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
@@ -41,22 +41,50 @@ class FederationScreen extends StatefulWidget {
 }
 
 class _FederationScreenState extends State<FederationScreen> {
-  late final Stream<RecentPaymentsUpdate> _eventStream;
+  late final Stream<List<OperationSummary>> _eventStream;
   late final Stream<int> _balanceStream;
   late final Stream<List<(String, bool)>> _connectionStream;
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
+  StreamSubscription<Notification>? _notificationSubscription;
   bool _balanceHidden = true;
   int? _expirationDate;
   InviteCodeWrapper? _expirationSuccessor;
   @override
   void initState() {
     super.initState();
-    _eventStream = widget.client.subscribeEventLog();
+    _eventStream = widget.client.subscribeRecentOperations();
     _balanceStream = widget.client.subscribeBalance();
     _connectionStream = widget.client.subscribeConnectionStatus();
+    _notificationSubscription = widget.client
+        .subscribeNotifications()
+        .listen(_handleNotification);
     _initDeepLinks();
     _fetchExpirationStatus();
+  }
+
+  void _handleNotification(Notification notification) {
+    if (!mounted) return;
+    switch (notification) {
+      case Notification_LightningReceived(:final amountSats):
+        NotificationUtils.showReceive(
+          context,
+          amountSats.toInt(),
+          PaymentType.lightning,
+        );
+      case Notification_OnchainReceived(:final amountSats):
+        NotificationUtils.showReceive(
+          context,
+          amountSats.toInt(),
+          PaymentType.bitcoin,
+        );
+      case Notification_LightningRefunding():
+        HapticFeedback.heavyImpact();
+        NotificationUtils.showError(context, 'Lightning payment refunded');
+      case Notification_TransactionRejected():
+        HapticFeedback.heavyImpact();
+        NotificationUtils.showError(context, 'Transaction rejected');
+    }
   }
 
   Future<void> _fetchExpirationStatus() async {
@@ -76,6 +104,7 @@ class _FederationScreenState extends State<FederationScreen> {
   @override
   void dispose() {
     _linkSubscription?.cancel();
+    _notificationSubscription?.cancel();
     widget.client.shutdown();
     super.dispose();
   }
@@ -210,7 +239,7 @@ class _FederationScreenState extends State<FederationScreen> {
     );
   }
 
-  void _showEventDetails(PicoPayment event) {
+  void _showEventDetails(OperationSummary event) {
     PaymentDetailsDrawer.show(context, client: widget.client, event: event);
   }
 
