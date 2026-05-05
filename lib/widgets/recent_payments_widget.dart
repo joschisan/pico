@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
@@ -11,14 +10,12 @@ import 'package:pico/screens/payment_history_screen.dart';
 
 class RecentPayments extends StatefulWidget {
   final PicoClientFactory clientFactory;
-  final PicoClient client;
   final Stream<List<OperationSummary>> stream;
   final void Function(OperationSummary) onTransactionTap;
 
   const RecentPayments({
     super.key,
     required this.clientFactory,
-    required this.client,
     required this.stream,
     required this.onTransactionTap,
   });
@@ -72,7 +69,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
               context: context,
               child: _AnimatedEntry(
                 child: PaymentCard(
-                  client: widget.client,
+                  clientFactory: widget.clientFactory,
                   event: _payments[i],
                   onTap: () => widget.onTransactionTap(_payments[i]),
                 ),
@@ -92,7 +89,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
                 MaterialPageRoute(
                   builder:
                       (_) => PaymentHistoryScreen(
-                        client: widget.client,
+                        clientFactory: widget.clientFactory,
                         operations: operations.reversed.toList(),
                       ),
                 ),

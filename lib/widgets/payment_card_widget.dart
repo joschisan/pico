@@ -4,8 +4,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:intl/intl.dart';
-import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/utils/payment_utils.dart';
 
 String _formatTime(DateTime dateTime) {
@@ -31,13 +31,13 @@ _Status? _classify(PaymentEvent event) => switch (event) {
 };
 
 class PaymentCard extends StatefulWidget {
-  final PicoClient client;
+  final PicoClientFactory clientFactory;
   final OperationSummary event;
   final VoidCallback onTap;
 
   const PaymentCard({
     super.key,
-    required this.client,
+    required this.clientFactory,
     required this.event,
     required this.onTap,
   });
@@ -53,7 +53,7 @@ class _PaymentCardState extends State<PaymentCard> {
   @override
   void initState() {
     super.initState();
-    _subscription = widget.client
+    _subscription = widget.clientFactory
         .subscribePaymentEvents(operationId: widget.event.operationId)
         .listen((e) {
           if (!mounted) return;

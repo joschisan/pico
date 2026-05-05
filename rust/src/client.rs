@@ -1,16 +1,12 @@
-use std::str::FromStr;
 use std::sync::Arc;
 
 use bitcoin::Amount as BtcAmount;
 use flutter_rust_bridge::frb;
 use futures::StreamExt;
 use picomint_client::Client;
-use picomint_client::OperationId;
 use picomint_core::Amount;
-use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
 
-use crate::events::{PaymentEvent, parse_payment_event};
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
 use crate::{BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, InviteCodeWrapper};
@@ -203,34 +199,5 @@ impl PicoClient {
     #[frb]
     pub async fn onchain_receive_address(&self) -> Result<String, String> {
         Ok(self.client.wallet().receive().await.to_string())
-    }
-
-    /// Live tail of every picomint event for a single operation, parsed
-    /// into the rich [`PaymentEvent`] enum for the details drawer timeline.
-    /// Replays existing events first (oldest → newest) then yields new
-    /// ones as they're committed. Silently exits if `operation_id` doesn't
-    /// parse as a valid sha256 hash. Operation ids are globally unique
-    /// sha256s so any client can serve any op — no fed_id scoping needed.
-    #[frb]
-    pub async fn subscribe_payment_events(
-        &self,
-        operation_id: String,
-        sink: StreamSink<PaymentEvent>,
-    ) {
-        let Ok(hash) = sha256::Hash::from_str(&operation_id) else {
-            return;
-        };
-        let op = OperationId(hash);
-
-        let mut stream = self.client.subscribe_operation_events(op);
-
-        while let Some(entry) = stream.next().await {
-            let Some(event) = parse_payment_event(&entry) else {
-                continue;
-            };
-            if sink.add(event).is_err() {
-                break;
-            }
-        }
     }
 }

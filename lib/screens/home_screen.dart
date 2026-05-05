@@ -255,12 +255,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showEventDetails(OperationSummary event) {
-    // Operation ids are global sha256s, so any client can serve as a
-    // host for the per-op subscription. Step 6 will replace this once
-    // the empty-state join flow is consolidated.
-    final client = _pickClient();
-    if (client == null) return;
-    PaymentDetailsDrawer.show(context, client: client, event: event);
+    PaymentDetailsDrawer.show(
+      context,
+      clientFactory: widget.clientFactory,
+      event: event,
+    );
   }
 
   @override
@@ -337,7 +336,6 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 16),
               RecentPayments(
                 clientFactory: widget.clientFactory,
-                client: _clients.first,
                 stream: _recentStream,
                 onTransactionTap: _showEventDetails,
               ),

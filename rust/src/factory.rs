@@ -8,7 +8,8 @@ use futures::stream::{self, BoxStream};
 use iroh::Endpoint;
 use iroh::address_lookup::MdnsAddressLookup;
 use iroh::endpoint::presets::N0;
-use picomint_client::{Client, Mnemonic, download};
+use picomint_client::{Client, Mnemonic, OperationId, download};
+use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
 use picomint_eventlog::EventLogId;
 use picomint_redb::Database;
@@ -16,7 +17,10 @@ use tokio::sync::{Mutex, Notify, RwLock};
 
 use crate::client::PicoClient;
 use crate::db::{CLIENT_CONFIG, CONTACT, ROOT_ENTROPY, SELECTED_CURRENCY};
-use crate::events::{Notification, OperationSummary, parse_notification, parse_summary};
+use crate::events::{
+    Notification, OperationSummary, PaymentEvent, parse_notification, parse_payment_event,
+    parse_summary,
+};
 use crate::frb_generated::StreamSink;
 use crate::lnurl::LnurlWrapper;
 use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
@@ -404,6 +408,38 @@ impl PicoClientFactory {
 
             if batch.len() < 1000 {
                 notified.await;
+            }
+        }
+    }
+
+    /// Live tail of every picomint event for a single operation, parsed
+    /// into the rich [`PaymentEvent`] enum for the details drawer timeline.
+    /// Replays existing events first (oldest → newest) then yields new
+    /// ones as they're committed. Silently exits if `operation_id` doesn't
+    /// parse as a valid sha256 hash. Operation ids are globally unique so
+    /// no federation context is required — reads the daemon-wide eventlog
+    /// directly.
+    #[frb]
+    pub async fn subscribe_payment_events(
+        &self,
+        operation_id: String,
+        sink: StreamSink<PaymentEvent>,
+    ) {
+        let Ok(hash) = sha256::Hash::from_str(&operation_id) else {
+            return;
+        };
+        let op = OperationId(hash);
+
+        let notify = picomint_eventlog::event_notify(&self.db);
+        let mut stream =
+            picomint_eventlog::subscribe_operation_events(self.db.clone(), notify, op).boxed();
+
+        while let Some(entry) = stream.next().await {
+            let Some(event) = parse_payment_event(&entry) else {
+                continue;
+            };
+            if sink.add(event).is_err() {
+                break;
             }
         }
     }

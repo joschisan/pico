@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/payment_utils.dart';
 import 'package:pico/utils/styles.dart';
@@ -12,23 +12,23 @@ import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:share_plus/share_plus.dart';
 
 class PaymentDetailsDrawer extends StatefulWidget {
-  final PicoClient client;
+  final PicoClientFactory clientFactory;
   final OperationSummary event;
 
   const PaymentDetailsDrawer({
     super.key,
-    required this.client,
+    required this.clientFactory,
     required this.event,
   });
 
   static Future<void> show(
     BuildContext context, {
-    required PicoClient client,
+    required PicoClientFactory clientFactory,
     required OperationSummary event,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: PaymentDetailsDrawer(client: client, event: event),
+      child: PaymentDetailsDrawer(clientFactory: clientFactory, event: event),
     );
   }
 
@@ -43,7 +43,7 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
   @override
   void initState() {
     super.initState();
-    _subscription = widget.client
+    _subscription = widget.clientFactory
         .subscribePaymentEvents(operationId: widget.event.operationId)
         .listen((e) {
           if (!mounted) return;
