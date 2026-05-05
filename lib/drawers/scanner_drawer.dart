@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/fountain.dart';
+import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
-import 'package:pico/utils/drawer_utils.dart';
-import 'package:pico/widgets/qr_scanner_widget.dart';
-import 'package:pico/drawers/lightning_invoice_drawer.dart';
 import 'package:pico/drawers/ecash_drawer.dart';
+import 'package:pico/drawers/invite_drawer.dart';
+import 'package:pico/drawers/lightning_invoice_drawer.dart';
 import 'package:pico/drawers/lnurl_drawer.dart';
 import 'package:pico/drawers/onchain_address_drawer.dart';
+import 'package:pico/utils/drawer_utils.dart';
+import 'package:pico/utils/notification_utils.dart';
+import 'package:pico/widgets/qr_scanner_widget.dart';
 
+/// One scanner for everything: invite codes (always allowed),
+/// payment-method inputs (only when a federation is warm). With no
+/// federations joined the user can still scan an invite to onboard.
 class ScannerDrawer extends StatefulWidget {
-  final PicoClient client;
+  final PicoClient? client;
   final PicoClientFactory clientFactory;
 
   const ScannerDrawer({
@@ -24,7 +29,7 @@ class ScannerDrawer extends StatefulWidget {
 
   static Future<void> show(
     BuildContext context, {
-    required PicoClient client,
+    required PicoClient? client,
     required PicoClientFactory clientFactory,
   }) {
     return DrawerUtils.show(
@@ -44,26 +49,60 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
   void _processInput(String input) {
     if (!_isScanning) return;
 
-    // Try each parser in order - first match wins
+    // Invite codes always win and don't need a warm client — that's
+    // how the user joins their first federation.
+    final invite = parseInviteCode(invite: input);
+    if (invite != null) {
+      _isScanning = false;
+      HapticFeedback.mediumImpact();
+      Navigator.of(context).pop();
+      InviteDrawer.show(
+        context,
+        invite: invite,
+        onJoin: (i) async {
+          await widget.clientFactory.join(invite: i);
+          if (!mounted) return;
+          Navigator.of(context).pop();
+          NotificationUtils.showSuccess(context, 'Joined federation');
+        },
+        onRecover: (i) async {
+          await widget.clientFactory.recover(invite: i);
+          if (!mounted) return;
+          Navigator.of(context).pop();
+          NotificationUtils.showSuccess(context, 'Recovering federation');
+        },
+      );
+      return;
+    }
+
+    final client = widget.client;
+    if (client == null) {
+      _isScanning = false;
+      HapticFeedback.mediumImpact();
+      Navigator.of(context).pop();
+      NotificationUtils.showError(context, 'Join a federation first');
+      return;
+    }
+
     final parsers = [
       (
         parseBolt11Invoice(invoice: input),
         (dynamic result) => LightningInvoiceDrawer.show(
           context,
-          client: widget.client,
+          client: client,
           invoice: result,
         ),
       ),
       (
         parseEcash(notes: input),
         (dynamic result) =>
-            EcashDrawer.show(context, client: widget.client, notes: result),
+            EcashDrawer.show(context, client: client, notes: result),
       ),
       (
         parseBitcoinAddress(address: input),
         (dynamic result) => OnchainAddressDrawer.show(
           context,
-          client: widget.client,
+          client: client,
           clientFactory: widget.clientFactory,
           address: result,
         ),
@@ -72,7 +111,7 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
         parseLnurl(request: input),
         (dynamic result) => LnurlDrawer.show(
           context,
-          client: widget.client,
+          client: client,
           clientFactory: widget.clientFactory,
           lnurl: result,
         ),
@@ -80,7 +119,7 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
       (
         _decoder.addFragment(fragment: input),
         (dynamic result) =>
-            EcashDrawer.show(context, client: widget.client, notes: result),
+            EcashDrawer.show(context, client: client, notes: result),
       ),
     ];
 

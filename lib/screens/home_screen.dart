@@ -16,10 +16,8 @@ import 'package:pico/drawers/lnurl_drawer.dart';
 import 'package:pico/drawers/onchain_address_drawer.dart';
 import 'package:pico/drawers/payment_details_drawer.dart';
 import 'package:pico/drawers/scanner_drawer.dart';
-import 'package:pico/screens/display_contacts_screen.dart';
 import 'package:pico/screens/ecash_amount_screen.dart';
 import 'package:pico/screens/invoice_amount_screen.dart';
-import 'package:pico/screens/lightning_address_entry_screen.dart';
 import 'package:pico/screens/settings_screen.dart';
 import 'package:pico/screens/wallet_v2_receive_screen.dart';
 import 'package:pico/utils/notification_utils.dart';
@@ -207,40 +205,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _onLightningAddress() {
-    final client = _pickClient();
-    if (client == null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LightningAddressEntryScreen(
-          client: client,
-          clientFactory: widget.clientFactory,
-        ),
-      ),
-    );
-  }
-
-  void _onContacts() {
-    final client = _pickClient();
-    if (client == null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => DisplayContactsScreen(
-          client: client,
-          clientFactory: widget.clientFactory,
-        ),
-      ),
-    );
-  }
-
-  void _onScan() {
-    final client = _pickClient();
-    if (client == null) return;
-    ScannerDrawer.show(
+  Future<void> _onScan() async {
+    await ScannerDrawer.show(
       context,
-      client: client,
+      client: _pickClient(),
       clientFactory: widget.clientFactory,
     );
+    // A successful invite scan lands a fresh client; refresh so the
+    // home rerenders with it picked up.
+    _refreshClients();
   }
 
   Future<void> _onSettings() async {
@@ -269,14 +242,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Pico'),
         centerTitle: false,
         actions: [
-          IconButton(
-            icon: const Icon(PhosphorIconsRegular.at, size: smallIconSize),
-            onPressed: _onLightningAddress,
-          ),
-          IconButton(
-            icon: const Icon(PhosphorIconsRegular.users, size: smallIconSize),
-            onPressed: _onContacts,
-          ),
           IconButton(
             icon: const Icon(PhosphorIconsRegular.qrCode, size: smallIconSize),
             onPressed: _onScan,
