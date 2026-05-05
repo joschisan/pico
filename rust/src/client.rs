@@ -12,6 +12,7 @@ use picomint_core::config::FederationId;
 use picomint_eventlog::EventLogId;
 use tokio::sync::Notify;
 
+use crate::db::NamespaceId;
 use crate::events::{
     Notification, OperationSummary, PaymentEvent, parse_notification, parse_payment_event,
     parse_summary,
@@ -20,10 +21,16 @@ use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
 use crate::{BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, InviteCodeWrapper};
 
-#[frb]
+#[frb(opaque)]
 #[derive(Clone)]
 pub struct PicoClient {
     pub(crate) client: Arc<Client>,
+    /// Stable handle for this client in the factory map; survives
+    /// rejoins since each rejoin draws a fresh random namespace.
+    pub(crate) namespace: NamespaceId,
+    /// Cached from the config so eventlog filtering doesn't have to
+    /// `.await client.config()` on every entry. The daemon-wide eventlog
+    /// tags each entry with this; we drop entries from other federations.
     pub(crate) federation_id: FederationId,
     pub(crate) currency_code: String,
     pub(crate) exchange_rate_cache: ExchangeRateCache,
@@ -38,6 +45,11 @@ impl PicoClient {
     #[frb(sync)]
     pub fn federation_id(&self) -> String {
         self.federation_id.to_string()
+    }
+
+    #[frb(sync)]
+    pub fn namespace(&self) -> [u8; 16] {
+        self.namespace.0
     }
 
     #[frb(sync)]

@@ -1,22 +1,23 @@
-use std::str::FromStr;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use flutter_rust_bridge::frb;
+use futures::StreamExt;
+use futures::stream::{self, BoxStream};
 use iroh::Endpoint;
 use iroh::address_lookup::MdnsAddressLookup;
 use iroh::endpoint::presets::N0;
 use picomint_client::{Client, Mnemonic, download};
-use picomint_core::config::FederationId;
-use picomint_core::invite::InviteCode;
 use picomint_redb::Database;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Notify, RwLock};
 
 use crate::client::PicoClient;
-use crate::db::{CLIENT_CONFIG, CONTACT, ROOT_ENTROPY, SELECTED_CURRENCY};
+use crate::db::{CLIENT_CONFIG, CONTACT, NamespaceId, ROOT_ENTROPY, SELECTED_CURRENCY};
+use crate::frb_generated::StreamSink;
 use crate::lnurl::LnurlWrapper;
 use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
 
-#[frb]
+#[frb(opaque)]
 pub struct PicoClientFactory {
     db: Database,
     mnemonic: Mnemonic,
@@ -24,33 +25,15 @@ pub struct PicoClientFactory {
     /// Address grinding is the slowest part of bringup so we bind once
     /// at factory construction and reuse for every `Client::new`.
     endpoint: Endpoint,
-}
-
-#[frb]
-pub struct FederationInfo {
-    pub id: String,
-    pub name: String,
-    pub invite: String,
-}
-
-impl FederationInfo {
-    pub(crate) fn new(id: FederationId, config: &picomint_core::config::ConsensusConfig) -> Self {
-        let name = config.name.clone();
-
-        let (_, peer_endpoint) = config
-            .peers
-            .iter()
-            .next()
-            .expect("federation has at least one peer");
-
-        let invite = picomint_base32::encode(&InviteCode::new(peer_endpoint.iroh_pk, id));
-
-        Self {
-            id: id.to_string(),
-            name,
-            invite,
-        }
-    }
+    /// All warm clients, keyed by their persistent namespace. The factory
+    /// constructs every entry from `CLIENT_CONFIG` at startup; `join` /
+    /// `recover` insert, `leave` removes. `subscribe_global_balance` and
+    /// any future cross-client iteration read from this map.
+    clients: Arc<RwLock<HashMap<NamespaceId, PicoClient>>>,
+    /// Wakes anyone iterating the client set when membership changes.
+    /// `notify_waiters` is fire-and-forget; subscribers re-snapshot the
+    /// map after waking.
+    set_changed: Arc<Notify>,
 }
 
 #[frb(opaque)]
@@ -91,11 +74,7 @@ impl PicoClientFactory {
 
         let endpoint = bind_endpoint().await.map_err(|e| e.to_string())?;
 
-        Ok(Self {
-            db: db.0.clone(),
-            mnemonic: mnemonic.0.clone(),
-            endpoint,
-        })
+        Self::assemble(db.0.clone(), mnemonic.0.clone(), endpoint).await
     }
 
     #[frb]
@@ -106,10 +85,43 @@ impl PicoClientFactory {
 
         let endpoint = bind_endpoint().await.ok()?;
 
-        Some(Self {
-            db: db.0.clone(),
+        Self::assemble(db.0.clone(), mnemonic, endpoint).await.ok()
+    }
+
+    /// Build the factory and warm every persisted namespace into a
+    /// ready-to-use `PicoClient`. Each `Client::new` here re-runs the
+    /// per-federation handshake; doing them in parallel keeps cold
+    /// startup time bounded by the slowest peer rather than their sum.
+    async fn assemble(db: Database, mnemonic: Mnemonic, endpoint: Endpoint) -> Result<Self, String> {
+        let entries: Vec<(NamespaceId, picomint_core::config::ConsensusConfig)> =
+            db.begin_read().iter(&CLIENT_CONFIG, |it| it.collect());
+
+        let currency_code = db
+            .begin_read()
+            .get(&SELECTED_CURRENCY, &())
+            .unwrap_or_else(|| "USD".to_string());
+
+        let mut warmed: HashMap<NamespaceId, PicoClient> = HashMap::new();
+        for (ns, config) in entries {
+            let federation_id = config.calculate_federation_id();
+            let isolated = db.isolate(ns);
+
+            let client = Client::new(endpoint.clone(), isolated, &mnemonic, config)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            warmed.insert(
+                ns,
+                build_pico_client(client, ns, federation_id, currency_code.clone()),
+            );
+        }
+
+        Ok(Self {
+            db,
             mnemonic,
             endpoint,
+            clients: Arc::new(RwLock::new(warmed)),
+            set_changed: Arc::new(Notify::new()),
         })
     }
 
@@ -118,105 +130,73 @@ impl PicoClientFactory {
         self.mnemonic.words().map(|s| s.to_string()).collect()
     }
 
+    /// Snapshot of every warm client. Cheap (`PicoClient: Clone`) — the
+    /// inner `Arc<Client>` is shared, so callers all see the same
+    /// connection state.
+    #[frb]
+    pub async fn clients(&self) -> Vec<PicoClient> {
+        self.clients.read().await.values().cloned().collect()
+    }
+
     #[frb]
     pub async fn join(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
-        if let Some(client) = self.load_typed(invite.0.federation_id).await {
-            return Ok(client);
-        }
-
         let config = download(&self.endpoint, &invite.0)
             .await
             .map_err(|e| e.to_string())?;
 
         let federation_id = config.calculate_federation_id();
+        let namespace = NamespaceId::random();
 
         let dbtx = self.db.begin_write();
-
-        dbtx.insert(&CLIENT_CONFIG, &federation_id, &config);
-
+        dbtx.insert(&CLIENT_CONFIG, &namespace, &config);
         dbtx.commit();
 
-        let isolated = self.db.isolate(federation_id);
+        let isolated = self.db.isolate(namespace);
 
         let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
             .await
             .map_err(|e| e.to_string())?;
 
-        Ok(self.create_client(client, federation_id).await)
+        let pico = build_pico_client(client, namespace, federation_id, self.currency().await);
+
+        self.clients.write().await.insert(namespace, pico.clone());
+        self.set_changed.notify_waiters();
+
+        Ok(pico)
     }
 
     #[frb]
     pub async fn recover(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
-        if let Some(client) = self.load_typed(invite.0.federation_id).await {
-            return Ok(client);
-        }
-
         let config = download(&self.endpoint, &invite.0)
             .await
             .map_err(|e| e.to_string())?;
 
         let federation_id = config.calculate_federation_id();
+        let namespace = NamespaceId::random();
 
-        // Persist the config on the root db AND seed the per-federation
-        // RECOVERY row in one atomic commit, so `Client::new` reliably
-        // picks the recovery row up via `MintClientModule::new`.
+        // Persist the config AND seed the per-namespace RECOVERY row in
+        // one atomic commit so `Client::new` reliably picks the recovery
+        // row up via `MintClientModule::new`.
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(&CLIENT_CONFIG, &federation_id, &config);
+        dbtx.insert(&CLIENT_CONFIG, &namespace, &config);
 
-        Client::init_recovery(&dbtx.as_ref().isolate(federation_id), federation_id);
+        Client::init_recovery(&dbtx.as_ref().isolate(namespace), federation_id);
 
         dbtx.commit();
 
-        let isolated = self.db.isolate(federation_id);
+        let isolated = self.db.isolate(namespace);
 
         let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
             .await
             .map_err(|e| e.to_string())?;
 
-        Ok(self.create_client(client, federation_id).await)
-    }
+        let pico = build_pico_client(client, namespace, federation_id, self.currency().await);
 
-    #[frb]
-    pub async fn load(&self, federation_id: &str) -> Option<PicoClient> {
-        let id = FederationId::from_str(federation_id).ok()?;
+        self.clients.write().await.insert(namespace, pico.clone());
+        self.set_changed.notify_waiters();
 
-        self.load_typed(id).await
-    }
-
-    async fn load_typed(&self, federation_id: FederationId) -> Option<PicoClient> {
-        let config = self.db.begin_read().get(&CLIENT_CONFIG, &federation_id)?;
-
-        let isolated = self.db.isolate(federation_id);
-
-        let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
-            .await
-            .expect("config previously validated; client construction should succeed");
-
-        Some(self.create_client(client, federation_id).await)
-    }
-
-    async fn create_client(&self, client: Arc<Client>, federation_id: FederationId) -> PicoClient {
-        let currency_code = self
-            .db
-            .begin_read()
-            .get(&SELECTED_CURRENCY, &())
-            .unwrap_or_else(|| "USD".to_string());
-
-        PicoClient {
-            client,
-            federation_id,
-            currency_code,
-            exchange_rate_cache: Arc::new(Mutex::new(None)),
-        }
-    }
-
-    #[frb]
-    pub async fn list_federations(&self) -> Vec<FederationInfo> {
-        self.db.begin_read().iter(&CLIENT_CONFIG, |it| {
-            it.map(|(id, config)| FederationInfo::new(id, &config))
-                .collect()
-        })
+        Ok(pico)
     }
 
     #[frb]
@@ -230,27 +210,93 @@ impl PicoClientFactory {
 
     #[frb]
     pub async fn get_currency(&self) -> String {
+        self.currency().await
+    }
+
+    async fn currency(&self) -> String {
         self.db
             .begin_read()
             .get(&SELECTED_CURRENCY, &())
             .unwrap_or_else(|| "USD".to_string())
     }
 
+    /// Drop a federation: shuts down its client, removes it from the
+    /// in-memory map, and deletes the config row. The per-namespace
+    /// isolated tables remain in the file (picomint-redb has no
+    /// "delete prefix" yet) but are unreferenced; a future re-join
+    /// uses a fresh random namespace, so leftovers can't bleed in.
     #[frb]
-    pub async fn leave(&self, federation_id: &str) {
-        let Ok(id) = FederationId::from_str(federation_id) else {
-            return;
-        };
+    pub async fn leave(&self, namespace: [u8; 16]) {
+        let ns = NamespaceId(namespace);
 
-        // Removes the federation from the top-level registry; the
-        // per-federation isolated namespace's tables remain in the file.
-        // Picomint-redb doesn't yet expose a "delete prefix" op — when it
-        // does, sweep the leftovers here too.
+        if let Some(client) = self.clients.write().await.remove(&ns) {
+            client.client.shutdown().await;
+        }
+
         let dbtx = self.db.begin_write();
-
-        dbtx.remove(&CLIENT_CONFIG, &id);
-
+        dbtx.remove(&CLIENT_CONFIG, &ns);
         dbtx.commit();
+
+        self.set_changed.notify_waiters();
+    }
+
+    /// Aggregated balance across every warm client, in sats. Re-emits on
+    /// any per-client balance change AND on client-set changes
+    /// (`join`/`leave`/`recover`). The totals map survives rebuilds so a
+    /// join/leave doesn't reset the running sum to zero.
+    #[frb]
+    pub async fn subscribe_global_balance(&self, sink: StreamSink<i64>) {
+        let mut totals: HashMap<NamespaceId, i64> = HashMap::new();
+
+        loop {
+            // Snapshot the live client set; build a tagged stream per
+            // client so we can attribute incoming balances back to a
+            // namespace and discard departed clients on the next rebuild.
+            let snapshot: Vec<(NamespaceId, PicoClient)> = self
+                .clients
+                .read()
+                .await
+                .iter()
+                .map(|(k, v)| (*k, v.clone()))
+                .collect();
+
+            let alive: HashSet<NamespaceId> = snapshot.iter().map(|(k, _)| *k).collect();
+            totals.retain(|ns, _| alive.contains(ns));
+
+            let mut tagged: Vec<BoxStream<'static, (NamespaceId, i64)>> =
+                Vec::with_capacity(snapshot.len());
+            for (ns, client) in snapshot {
+                let stream = client
+                    .client
+                    .subscribe_balance_changes()
+                    .await
+                    .map(move |amt| (ns, (amt.msats / 1000) as i64));
+                tagged.push(stream.boxed());
+            }
+            let mut merged = stream::select_all(tagged);
+
+            // Re-arm the set-change notifier *before* emitting the
+            // initial sum, so a join/leave landing between the snapshot
+            // and the await still wakes us.
+            let set_changed = self.set_changed.notified();
+            tokio::pin!(set_changed);
+
+            if sink.add(totals.values().sum()).is_err() {
+                return;
+            }
+
+            loop {
+                tokio::select! {
+                    Some((ns, balance)) = merged.next() => {
+                        totals.insert(ns, balance);
+                        if sink.add(totals.values().sum()).is_err() {
+                            return;
+                        }
+                    }
+                    _ = &mut set_changed => break,
+                }
+            }
+        }
     }
 
     #[frb]
@@ -289,6 +335,21 @@ impl PicoClientFactory {
         dbtx.remove(&CONTACT, &lnurl.0);
 
         dbtx.commit();
+    }
+}
+
+fn build_pico_client(
+    client: Arc<Client>,
+    namespace: NamespaceId,
+    federation_id: picomint_core::config::FederationId,
+    currency_code: String,
+) -> PicoClient {
+    PicoClient {
+        client,
+        namespace,
+        federation_id,
+        currency_code,
+        exchange_rate_cache: Arc::new(Mutex::new(None)),
     }
 }
 
