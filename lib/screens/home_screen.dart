@@ -303,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leadingWidth: 96,
+        leadingWidth: _clients.isNotEmpty ? 96 : 56,
         leading: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -311,13 +311,14 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(PhosphorIconsRegular.gear, size: smallIconSize),
               onPressed: _onSettings,
             ),
-            IconButton(
-              icon: const Icon(
-                PhosphorIconsRegular.arrowsLeftRight,
-                size: smallIconSize,
+            if (_clients.isNotEmpty)
+              IconButton(
+                icon: const Icon(
+                  PhosphorIconsRegular.arrowsLeftRight,
+                  size: smallIconSize,
+                ),
+                onPressed: _onTransfer,
               ),
-              onPressed: _onTransfer,
-            ),
           ],
         ),
         actions: [
