@@ -72,7 +72,9 @@ class _PaymentCardState extends State<PaymentCard> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final date = DateTime.fromMillisecondsSinceEpoch(widget.event.timestamp);
-    final formattedAmount = NumberFormat('#,###').format(widget.event.amountSats);
+    final formattedAmount = NumberFormat(
+      '#,###',
+    ).format(widget.event.amountSats);
     final sign = widget.event.incoming ? '+' : '-';
 
     final (iconData, iconColor, titleColor) = switch (_status) {

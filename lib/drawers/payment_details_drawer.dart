@@ -218,8 +218,7 @@ _Description _describe(
     // ── Lightning ───────────────────────────────────────────────────────
     PaymentEvent_LnSend(:final amountSats, :final feeSats) => _Description(
       label: 'Sending Lightning',
-      subtitle:
-          '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
+      subtitle: '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
     PaymentEvent_LnSendSuccess(:final preimage) => _Description(
@@ -239,8 +238,7 @@ _Description _describe(
     ),
     PaymentEvent_LnReceive(:final amountSats, :final feeSats) => _Description(
       label: 'Receiving Lightning',
-      subtitle:
-          '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
+      subtitle: '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
 
@@ -273,15 +271,15 @@ _Description _describe(
     ),
     PaymentEvent_MintRecovery(:final index, :final total) => _Description(
       label: 'Recovering eCash',
-      subtitle: '${total == null ? 0 : (index.toInt() * 100) ~/ total.toInt()}%',
+      subtitle:
+          '${total == null ? 0 : (index.toInt() * 100) ~/ total.toInt()}%',
       tone: neutral,
     ),
 
     // ── Wallet (on-chain) ───────────────────────────────────────────────
     PaymentEvent_WalletSend(:final amountSats, :final feeSats) => _Description(
       label: 'Sending Onchain',
-      subtitle:
-          '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
+      subtitle: '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
     PaymentEvent_WalletSendSuccess(:final txid) => _Description(
@@ -301,11 +299,9 @@ _Description _describe(
     ) =>
       _Description(
         label: 'Receiving Onchain',
-        subtitle:
-            '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
+        subtitle: '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
         tone: neutral,
         headerAction: _shareIcon(txid, neutral),
       ),
-
   };
 }

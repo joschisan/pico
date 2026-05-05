@@ -87,10 +87,11 @@ class _RecentPaymentsState extends State<RecentPayments> {
 
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => PaymentHistoryScreen(
-                    client: widget.client,
-                    operations: operations.reversed.toList(),
-                  ),
+                  builder:
+                      (_) => PaymentHistoryScreen(
+                        client: widget.client,
+                        operations: operations.reversed.toList(),
+                      ),
                 ),
               );
             },

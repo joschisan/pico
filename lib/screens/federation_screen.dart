@@ -56,9 +56,9 @@ class _FederationScreenState extends State<FederationScreen> {
     _eventStream = widget.client.subscribeRecentOperations();
     _balanceStream = widget.client.subscribeBalance();
     _connectionStream = widget.client.subscribeConnectionStatus();
-    _notificationSubscription = widget.client
-        .subscribeNotifications()
-        .listen(_handleNotification);
+    _notificationSubscription = widget.client.subscribeNotifications().listen(
+      _handleNotification,
+    );
     _initDeepLinks();
     _fetchExpirationStatus();
   }

@@ -111,11 +111,12 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
               key: ValueKey(payment.operationId),
               client: widget.client,
               event: payment,
-              onTap: () => PaymentDetailsDrawer.show(
-                context,
-                client: widget.client,
-                event: payment,
-              ),
+              onTap:
+                  () => PaymentDetailsDrawer.show(
+                    context,
+                    client: widget.client,
+                    event: payment,
+                  ),
             ),
       ),
     );
