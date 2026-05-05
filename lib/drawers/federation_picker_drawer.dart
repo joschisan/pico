@@ -13,21 +13,28 @@ import 'package:pico/widgets/drawer_shell_widget.dart';
 class FederationPickerDrawer extends StatelessWidget {
   final List<PicoClient> clients;
   final ValueChanged<PicoClient> onSelected;
+  final String title;
 
   const FederationPickerDrawer({
     super.key,
     required this.clients,
     required this.onSelected,
+    this.title = 'Select Federation',
   });
 
   static Future<void> show(
     BuildContext context, {
     required List<PicoClient> clients,
     required ValueChanged<PicoClient> onSelected,
+    String title = 'Select Federation',
   }) {
     return DrawerUtils.show(
       context: context,
-      child: FederationPickerDrawer(clients: clients, onSelected: onSelected),
+      child: FederationPickerDrawer(
+        clients: clients,
+        onSelected: onSelected,
+        title: title,
+      ),
     );
   }
 
@@ -35,7 +42,7 @@ class FederationPickerDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return DrawerShell(
       icon: PhosphorIconsRegular.wallet,
-      title: 'Select Federation',
+      title: title,
       children: [
         BorderedList.column(
           children: [

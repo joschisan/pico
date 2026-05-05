@@ -11,6 +11,7 @@ import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/drawers/ecash_drawer.dart';
+import 'package:pico/drawers/federation_picker_drawer.dart';
 import 'package:pico/drawers/lightning_invoice_drawer.dart';
 import 'package:pico/drawers/lnurl_drawer.dart';
 import 'package:pico/drawers/onchain_address_drawer.dart';
@@ -22,6 +23,7 @@ import 'package:pico/screens/ecash_amount_screen.dart';
 import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/screens/lightning_address_entry_screen.dart';
 import 'package:pico/screens/settings_screen.dart';
+import 'package:pico/screens/transfer_amount_screen.dart';
 import 'package:pico/screens/wallet_v2_receive_screen.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
@@ -246,6 +248,32 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _onTransfer() {
+    FederationPickerDrawer.show(
+      context,
+      title: 'Transfer from',
+      clients: _clients,
+      onSelected: _onTransferSourcePicked,
+    );
+  }
+
+  void _onTransferSourcePicked(PicoClient source) {
+    FederationPickerDrawer.show(
+      context,
+      title: 'Transfer to',
+      clients: _clients,
+      onSelected: (dest) => _onTransferDestPicked(source, dest),
+    );
+  }
+
+  void _onTransferDestPicked(PicoClient source, PicoClient dest) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TransferAmountScreen(source: source, dest: dest),
+      ),
+    );
+  }
+
   void _onTapFederation(PicoClient client) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -269,9 +297,22 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(PhosphorIconsRegular.gear, size: smallIconSize),
-          onPressed: _onSettings,
+        leadingWidth: 96,
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(PhosphorIconsRegular.gear, size: smallIconSize),
+              onPressed: _onSettings,
+            ),
+            IconButton(
+              icon: const Icon(
+                PhosphorIconsRegular.arrowsLeftRight,
+                size: smallIconSize,
+              ),
+              onPressed: _onTransfer,
+            ),
+          ],
         ),
         actions: [
           if (_clients.isNotEmpty) ...[
