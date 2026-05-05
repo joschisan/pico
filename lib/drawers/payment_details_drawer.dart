@@ -292,16 +292,11 @@ _Description _describe(
       subtitle: 'missing txid',
       tone: failure,
     ),
-    PaymentEvent_WalletReceive(
-      :final txid,
-      :final amountSats,
-      :final feeSats,
-    ) =>
+    PaymentEvent_WalletReceive(:final amountSats, :final feeSats) =>
       _Description(
         label: 'Receiving Onchain',
         subtitle: '${_sats(amountSats.toInt())} · ${_sats(feeSats.toInt())}',
         tone: neutral,
-        headerAction: _shareIcon(txid, neutral),
       ),
   };
 }
