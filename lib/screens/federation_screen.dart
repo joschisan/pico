@@ -80,7 +80,7 @@ class _FederationScreenState extends State<FederationScreen> {
         );
       case Notification_LightningRefunding():
         HapticFeedback.heavyImpact();
-        NotificationUtils.showError(context, 'Lightning payment refunded');
+        NotificationUtils.showWarning(context, 'Refunding...');
       case Notification_TransactionRejected():
         HapticFeedback.heavyImpact();
         NotificationUtils.showError(context, 'Transaction rejected');

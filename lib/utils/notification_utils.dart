@@ -77,6 +77,16 @@ class NotificationUtils {
     );
   }
 
+  static void showWarning(BuildContext context, String message) {
+    _showNotification(
+      context,
+      message,
+      PhosphorIconsRegular.warning,
+      Colors.amber.shade700,
+      _defaultNotificationDuration,
+    );
+  }
+
   static void showReceive(
     BuildContext context,
     int amountSat,
