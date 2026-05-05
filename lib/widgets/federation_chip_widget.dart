@@ -25,12 +25,9 @@ class FederationChip extends StatelessWidget {
 
     if (!context.mounted) return;
 
-    if (clients.length <= 1) return;
-
     FederationPickerDrawer.show(
       context,
       clients: clients,
-      selected: client,
       onSelected: onChanged,
     );
   }
@@ -52,7 +49,7 @@ class FederationChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              PhosphorIconsRegular.stack,
+              PhosphorIconsRegular.wallet,
               size: smallIconSize,
               color: scheme.onSurfaceVariant,
             ),

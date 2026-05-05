@@ -12,36 +12,29 @@ import 'package:pico/widgets/drawer_shell_widget.dart';
 /// glancing at availability and funds rather than memorising names.
 class FederationPickerDrawer extends StatelessWidget {
   final List<PicoClient> clients;
-  final PicoClient selected;
   final ValueChanged<PicoClient> onSelected;
 
   const FederationPickerDrawer({
     super.key,
     required this.clients,
-    required this.selected,
     required this.onSelected,
   });
 
   static Future<void> show(
     BuildContext context, {
     required List<PicoClient> clients,
-    required PicoClient selected,
     required ValueChanged<PicoClient> onSelected,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: FederationPickerDrawer(
-        clients: clients,
-        selected: selected,
-        onSelected: onSelected,
-      ),
+      child: FederationPickerDrawer(clients: clients, onSelected: onSelected),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return DrawerShell(
-      icon: PhosphorIconsRegular.stack,
+      icon: PhosphorIconsRegular.wallet,
       title: 'Select Federation',
       children: [
         BorderedList.column(
@@ -49,7 +42,6 @@ class FederationPickerDrawer extends StatelessWidget {
             for (final client in clients)
               _FederationRow(
                 client: client,
-                isSelected: client.federationId() == selected.federationId(),
                 onTap: () {
                   Navigator.of(context).pop();
                   onSelected(client);
@@ -64,14 +56,9 @@ class FederationPickerDrawer extends StatelessWidget {
 
 class _FederationRow extends StatelessWidget {
   final PicoClient client;
-  final bool isSelected;
   final VoidCallback onTap;
 
-  const _FederationRow({
-    required this.client,
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _FederationRow({required this.client, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -92,15 +79,13 @@ class _FederationRow extends StatelessWidget {
         builder: (_, snapshot) =>
             Text(snapshot.data ?? '…', style: mediumStyle),
       ),
-      trailing: StreamBuilder<int>(
+      subtitle: StreamBuilder<int>(
         stream: client.subscribeBalance(),
         builder: (_, snapshot) {
           final sats = snapshot.data ?? 0;
           return Text(
             '${NumberFormat('#,###').format(sats)} sat',
-            style: smallStyle.copyWith(
-              color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
-            ),
+            style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
           );
         },
       ),
