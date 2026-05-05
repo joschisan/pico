@@ -303,56 +303,51 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_clients.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: _OnboardingCard(),
-              )
-            else
-              BorderedList.column(
+      body: _clients.isEmpty
+          ? const Center(child: _OnboardingCard())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final client in _clients)
-                    _FederationRow(
-                      client: client,
-                      onTap: () => _onTapFederation(client),
-                    ),
+                  BorderedList.column(
+                    children: [
+                      for (final client in _clients)
+                        _FederationRow(
+                          client: client,
+                          onTap: () => _onTapFederation(client),
+                        ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _CircularActionButton(
+                        icon: PhosphorIconsRegular.lightning,
+                        label: 'Lightning',
+                        onTap: _onCreateInvoice,
+                      ),
+                      _CircularActionButton(
+                        icon: PhosphorIconsRegular.link,
+                        label: 'Onchain',
+                        onTap: _onReceiveBitcoin,
+                      ),
+                      _CircularActionButton(
+                        icon: PhosphorIconsRegular.coinVertical,
+                        label: 'eCash',
+                        onTap: _onSendEcash,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  RecentPayments(
+                    clientFactory: widget.clientFactory,
+                    stream: _recentStream,
+                    onTransactionTap: _showEventDetails,
+                  ),
                 ],
               ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _CircularActionButton(
-                  icon: PhosphorIconsRegular.lightning,
-                  label: 'Lightning',
-                  onTap: _onCreateInvoice,
-                ),
-                _CircularActionButton(
-                  icon: PhosphorIconsRegular.link,
-                  label: 'Onchain',
-                  onTap: _onReceiveBitcoin,
-                ),
-                _CircularActionButton(
-                  icon: PhosphorIconsRegular.coinVertical,
-                  label: 'eCash',
-                  onTap: _onSendEcash,
-                ),
-              ],
             ),
-            const SizedBox(height: 16),
-            if (_clients.isNotEmpty)
-              RecentPayments(
-                clientFactory: widget.clientFactory,
-                stream: _recentStream,
-                onTransactionTap: _showEventDetails,
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
