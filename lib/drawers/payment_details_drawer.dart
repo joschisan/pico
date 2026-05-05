@@ -199,7 +199,7 @@ _Description _describe(
   final scheme = Theme.of(context).colorScheme;
   final neutral = scheme.onSurfaceVariant;
   final success = scheme.primary;
-  final failure = scheme.error;
+  final failure = Colors.red;
   final warning = Colors.amber.shade700;
 
   return switch (event) {
