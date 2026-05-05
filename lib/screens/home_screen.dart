@@ -194,21 +194,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _onReceiveBitcoin() async {
+  void _onReceiveBitcoin() {
     final client = _pickClient();
     if (client == null) return;
-    try {
-      final address = await client.onchainReceiveAddress();
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => WalletV2ReceiveScreen(address: address),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WalletV2ReceiveScreen(
+          client: client,
+          clientFactory: widget.clientFactory,
         ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      NotificationUtils.showError(context, 'Failed to load address');
-    }
+      ),
+    );
   }
 
   void _onLightningAddress() {
