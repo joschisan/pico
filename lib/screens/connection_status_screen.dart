@@ -1,12 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/drawers/leave_federation_drawer.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 
 class ConnectionStatusScreen extends StatelessWidget {
   final PicoClient client;
+  final PicoClientFactory clientFactory;
 
-  const ConnectionStatusScreen({super.key, required this.client});
+  const ConnectionStatusScreen({
+    super.key,
+    required this.client,
+    required this.clientFactory,
+  });
+
+  Future<void> _onLeave(BuildContext context) async {
+    LeaveFederationDrawer.show(
+      context,
+      client: client,
+      clientFactory: clientFactory,
+      onSuccess: () {
+        // The leave drawer pops itself; once it's gone, pop the
+        // connection-status screen too so the user lands back on
+        // settings (which re-fetches via subscribe_global_balance et al).
+        if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +42,15 @@ class ConnectionStatusScreen extends StatelessWidget {
             return Text(snapshot.data ?? 'Federation');
           },
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              PhosphorIconsRegular.signOut,
+              size: smallIconSize,
+            ),
+            onPressed: () => _onLeave(context),
+          ),
+        ],
       ),
       body: StreamBuilder<List<(String, bool)>>(
         stream: client.subscribeConnectionStatus(),
