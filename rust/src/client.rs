@@ -8,15 +8,9 @@ use picomint_client::Client;
 use picomint_client::OperationId;
 use picomint_core::Amount;
 use picomint_core::bitcoin::hashes::sha256;
-use picomint_core::config::FederationId;
-use picomint_eventlog::EventLogId;
-use tokio::sync::Notify;
 
 use crate::db::NamespaceId;
-use crate::events::{
-    Notification, OperationSummary, PaymentEvent, parse_notification, parse_payment_event,
-    parse_summary,
-};
+use crate::events::{PaymentEvent, parse_payment_event};
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
 use crate::{BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, InviteCodeWrapper};
@@ -28,10 +22,6 @@ pub struct PicoClient {
     /// Stable handle for this client in the factory map; survives
     /// rejoins since each rejoin draws a fresh random namespace.
     pub(crate) namespace: NamespaceId,
-    /// Cached from the config so eventlog filtering doesn't have to
-    /// `.await client.config()` on every entry. The daemon-wide eventlog
-    /// tags each entry with this; we drop entries from other federations.
-    pub(crate) federation_id: FederationId,
     pub(crate) currency_code: String,
     pub(crate) exchange_rate_cache: ExchangeRateCache,
 }
@@ -40,11 +30,6 @@ impl PicoClient {
     #[frb]
     pub async fn federation_name(&self) -> Option<String> {
         Some(self.client.config().await.name)
-    }
-
-    #[frb(sync)]
-    pub fn federation_id(&self) -> String {
-        self.federation_id.to_string()
     }
 
     #[frb(sync)]
@@ -222,43 +207,12 @@ impl PicoClient {
         Ok(self.client.wallet().receive().await.to_string())
     }
 
-    /// One-shot list of every operation belonging to this federation in
-    /// chronological order (oldest first — Dart reverses for display).
-    /// Cards rendered from this snapshot stay static; live status is
-    /// reachable only by opening the per-op drawer.
-    #[frb]
-    pub async fn list_operations(&self) -> Vec<OperationSummary> {
-        let mut position = EventLogId::LOG_START;
-        let mut summaries: Vec<OperationSummary> = Vec::new();
-
-        loop {
-            let batch = self.client.get_event_log(position, 1000).await;
-
-            for entry in &batch {
-                if entry.1.federation_id != self.federation_id {
-                    continue;
-                }
-
-                if let Some(summary) = parse_summary(&entry.1) {
-                    summaries.push(summary);
-                }
-            }
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                break;
-            }
-        }
-
-        summaries
-    }
-
     /// Live tail of every picomint event for a single operation, parsed
     /// into the rich [`PaymentEvent`] enum for the details drawer timeline.
     /// Replays existing events first (oldest → newest) then yields new
     /// ones as they're committed. Silently exits if `operation_id` doesn't
-    /// parse as a valid sha256 hash.
+    /// parse as a valid sha256 hash. Operation ids are globally unique
+    /// sha256s so any client can serve any op — no fed_id scoping needed.
     #[frb]
     pub async fn subscribe_payment_events(
         &self,
@@ -278,121 +232,6 @@ impl PicoClient {
             };
             if sink.add(event).is_err() {
                 break;
-            }
-        }
-    }
-
-    /// Live ordered list of operation summaries (newest first) for this
-    /// federation. Emits once after the historical replay completes, then
-    /// re-emits whenever a new trigger event lands. Follow-up events that
-    /// only change live status do not re-emit — those reach the UI through
-    /// `subscribe_payment_events` when the user opens the drawer.
-    #[frb]
-    pub async fn subscribe_recent_operations(&self, sink: StreamSink<Vec<OperationSummary>>) {
-        // Phase 1: drain history into the full summaries vector. No emits.
-        let mut summaries: Vec<OperationSummary> = Vec::new();
-        let mut position = EventLogId::LOG_START;
-
-        loop {
-            let batch = self.client.get_event_log(position, 1000).await;
-
-            for entry in &batch {
-                if entry.1.federation_id != self.federation_id {
-                    continue;
-                }
-
-                if let Some(summary) = parse_summary(&entry.1) {
-                    summaries.push(summary);
-                }
-            }
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                break;
-            }
-        }
-
-        summaries = summaries.into_iter().rev().take(3).rev().collect();
-
-        if sink.add(summaries.clone()).is_err() {
-            return;
-        }
-
-        // Phase 2: tail live events; append on each new trigger and emit.
-        let notify: Arc<Notify> = self.client.event_notify();
-
-        loop {
-            let notified = notify.notified();
-
-            let batch = self.client.get_event_log(position, 1000).await;
-
-            for entry in &batch {
-                if entry.1.federation_id != self.federation_id {
-                    continue;
-                }
-
-                if let Some(summary) = parse_summary(&entry.1) {
-                    summaries.push(summary);
-                }
-            }
-
-            if sink.add(summaries.clone()).is_err() {
-                return;
-            }
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                notified.await;
-            }
-        }
-    }
-
-    /// Toast/haptic stream — fires per matching event committed after the
-    /// historical replay. Only events whose own payload carries enough to
-    /// render the toast emit; other status changes are visible only via
-    /// the per-op drawer.
-    #[frb]
-    pub async fn subscribe_notifications(&self, sink: StreamSink<Notification>) {
-        // Phase 1: drain history to find the live position. No
-        // notifications fire — these are old events.
-        let mut position = EventLogId::LOG_START;
-
-        loop {
-            let batch = self.client.get_event_log(position, 1000).await;
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                break;
-            }
-        }
-
-        // Phase 2: tail live events; every match fires a notification.
-        let notify: Arc<Notify> = self.client.event_notify();
-
-        loop {
-            let notified = notify.notified();
-
-            let batch = self.client.get_event_log(position, 1000).await;
-
-            for entry in &batch {
-                if entry.1.federation_id != self.federation_id {
-                    continue;
-                }
-
-                if let Some(notification) = parse_notification(&entry.1) {
-                    if sink.add(notification).is_err() {
-                        return;
-                    }
-                }
-            }
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                notified.await;
             }
         }
     }

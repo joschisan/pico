@@ -3,18 +3,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/payment_card_widget.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/screens/payment_history_screen.dart';
 
 class RecentPayments extends StatefulWidget {
+  final PicoClientFactory clientFactory;
   final PicoClient client;
   final Stream<List<OperationSummary>> stream;
   final void Function(OperationSummary) onTransactionTap;
 
   const RecentPayments({
     super.key,
+    required this.clientFactory,
     required this.client,
     required this.stream,
     required this.onTransactionTap,
@@ -81,7 +84,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
         Center(
           child: TextButton(
             onPressed: () async {
-              final operations = await widget.client.listOperations();
+              final operations = await widget.clientFactory.listOperations();
 
               if (!context.mounted) return;
 

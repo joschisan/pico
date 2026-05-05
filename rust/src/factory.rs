@@ -8,11 +8,15 @@ use iroh::Endpoint;
 use iroh::address_lookup::MdnsAddressLookup;
 use iroh::endpoint::presets::N0;
 use picomint_client::{Client, Mnemonic, download};
+use picomint_eventlog::EventLogId;
 use picomint_redb::Database;
 use tokio::sync::{Mutex, Notify, RwLock};
 
 use crate::client::PicoClient;
 use crate::db::{CLIENT_CONFIG, CONTACT, NamespaceId, ROOT_ENTROPY, SELECTED_CURRENCY};
+use crate::events::{
+    Notification, OperationSummary, parse_notification, parse_summary,
+};
 use crate::frb_generated::StreamSink;
 use crate::lnurl::LnurlWrapper;
 use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
@@ -103,17 +107,13 @@ impl PicoClientFactory {
 
         let mut warmed: HashMap<NamespaceId, PicoClient> = HashMap::new();
         for (ns, config) in entries {
-            let federation_id = config.calculate_federation_id();
             let isolated = db.isolate(ns);
 
             let client = Client::new(endpoint.clone(), isolated, &mnemonic, config)
                 .await
                 .map_err(|e| e.to_string())?;
 
-            warmed.insert(
-                ns,
-                build_pico_client(client, ns, federation_id, currency_code.clone()),
-            );
+            warmed.insert(ns, build_pico_client(client, ns, currency_code.clone()));
         }
 
         Ok(Self {
@@ -144,7 +144,6 @@ impl PicoClientFactory {
             .await
             .map_err(|e| e.to_string())?;
 
-        let federation_id = config.calculate_federation_id();
         let namespace = NamespaceId::random();
 
         let dbtx = self.db.begin_write();
@@ -157,7 +156,7 @@ impl PicoClientFactory {
             .await
             .map_err(|e| e.to_string())?;
 
-        let pico = build_pico_client(client, namespace, federation_id, self.currency().await);
+        let pico = build_pico_client(client, namespace, self.currency().await);
 
         self.clients.write().await.insert(namespace, pico.clone());
         self.set_changed.notify_waiters();
@@ -191,7 +190,7 @@ impl PicoClientFactory {
             .await
             .map_err(|e| e.to_string())?;
 
-        let pico = build_pico_client(client, namespace, federation_id, self.currency().await);
+        let pico = build_pico_client(client, namespace, self.currency().await);
 
         self.clients.write().await.insert(namespace, pico.clone());
         self.set_changed.notify_waiters();
@@ -299,6 +298,137 @@ impl PicoClientFactory {
         }
     }
 
+    /// One-shot list of every operation across every federation in
+    /// chronological order (oldest first — Dart reverses for display).
+    /// Cards rendered from this snapshot stay static; live status is
+    /// reachable only by opening the per-op drawer.
+    #[frb]
+    pub async fn list_operations(&self) -> Vec<OperationSummary> {
+        let mut position = EventLogId::LOG_START;
+        let mut summaries: Vec<OperationSummary> = Vec::new();
+
+        loop {
+            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+
+            for entry in &batch {
+                if let Some(summary) = parse_summary(&entry.1) {
+                    summaries.push(summary);
+                }
+            }
+
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                break;
+            }
+        }
+
+        summaries
+    }
+
+    /// Live ordered list of operation summaries (newest first) across
+    /// every federation. Emits once after the historical replay
+    /// completes, then re-emits whenever a new trigger event lands.
+    /// Follow-up events that only change live status do not re-emit —
+    /// those reach the UI through `subscribe_payment_events` when the
+    /// user opens the drawer.
+    #[frb]
+    pub async fn subscribe_recent_operations(&self, sink: StreamSink<Vec<OperationSummary>>) {
+        // Phase 1: drain history into the full summaries vector. No emits.
+        let mut summaries: Vec<OperationSummary> = Vec::new();
+        let mut position = EventLogId::LOG_START;
+
+        loop {
+            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+
+            for entry in &batch {
+                if let Some(summary) = parse_summary(&entry.1) {
+                    summaries.push(summary);
+                }
+            }
+
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                break;
+            }
+        }
+
+        summaries = summaries.into_iter().rev().take(3).rev().collect();
+
+        if sink.add(summaries.clone()).is_err() {
+            return;
+        }
+
+        // Phase 2: tail live events; append on each new trigger and emit.
+        let notify: Arc<Notify> = picomint_eventlog::event_notify(&self.db);
+
+        loop {
+            let notified = notify.notified();
+
+            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+
+            for entry in &batch {
+                if let Some(summary) = parse_summary(&entry.1) {
+                    summaries.push(summary);
+                }
+            }
+
+            if sink.add(summaries.clone()).is_err() {
+                return;
+            }
+
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                notified.await;
+            }
+        }
+    }
+
+    /// Toast/haptic stream — fires per matching event committed after
+    /// the historical replay. Spans every federation, since the picomint
+    /// eventlog is daemon-wide.
+    #[frb]
+    pub async fn subscribe_notifications(&self, sink: StreamSink<Notification>) {
+        // Phase 1: drain history to find the live position. No
+        // notifications fire — these are old events.
+        let mut position = EventLogId::LOG_START;
+
+        loop {
+            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                break;
+            }
+        }
+
+        // Phase 2: tail live events; every match fires a notification.
+        let notify: Arc<Notify> = picomint_eventlog::event_notify(&self.db);
+
+        loop {
+            let notified = notify.notified();
+
+            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+
+            for entry in &batch {
+                if let Some(notification) = parse_notification(&entry.1) {
+                    if sink.add(notification).is_err() {
+                        return;
+                    }
+                }
+            }
+
+            position = position.saturating_add(batch.len() as u64);
+
+            if batch.len() < 1000 {
+                notified.await;
+            }
+        }
+    }
+
     #[frb]
     pub async fn save_contact(&self, lnurl: &LnurlWrapper, name: &str) {
         let dbtx = self.db.begin_write();
@@ -341,13 +471,11 @@ impl PicoClientFactory {
 fn build_pico_client(
     client: Arc<Client>,
     namespace: NamespaceId,
-    federation_id: picomint_core::config::FederationId,
     currency_code: String,
 ) -> PicoClient {
     PicoClient {
         client,
         namespace,
-        federation_id,
         currency_code,
         exchange_rate_cache: Arc::new(Mutex::new(None)),
     }
