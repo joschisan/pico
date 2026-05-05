@@ -266,7 +266,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   for (final client in _clients) _FederationRow(client: client),
                 ],
               ),
-            const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
