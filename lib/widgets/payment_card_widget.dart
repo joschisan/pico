@@ -107,7 +107,7 @@ class _PaymentCardState extends State<PaymentCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '$sign $formattedAmount sat',
+            '$sign$formattedAmount sat',
             style: mediumStyle.copyWith(color: titleColor),
           ),
           Text(
