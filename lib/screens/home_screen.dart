@@ -28,6 +28,7 @@ import 'package:pico/screens/wallet_v2_receive_screen.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/animated_balance_widget.dart';
+import 'package:pico/widgets/animated_entry_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/recent_payments_widget.dart';
 
@@ -54,6 +55,9 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<List<PicoClient>>? _clientsSubscription;
 
   List<PicoClient> _clients = [];
+  // Off until after the first frame paints — federations rendered
+  // before the flip snap in; joins after the flip animate on entry.
+  bool _initialBuildDone = false;
 
   @override
   void initState() {
@@ -66,7 +70,17 @@ class _HomeScreenState extends State<HomeScreen> {
       clients,
     ) {
       if (!mounted) return;
+      final wasFirst = !_initialBuildDone;
       setState(() => _clients = clients);
+      // Wait for the first emission to actually paint, then flip the
+      // flag so subsequent joins animate. Scheduling in initState was
+      // too eager — the stream emits after the first frame, so by the
+      // time clients arrived, animations were already enabled.
+      if (wasFirst) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _initialBuildDone = true);
+        });
+      }
     });
     _initDeepLinks();
   }
@@ -355,9 +369,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     BorderedList.column(
                       children: [
                         for (final client in _clients)
-                          _FederationRow(
-                            client: client,
-                            onTap: () => _onTapFederation(client),
+                          KeyedSubtree(
+                            key: ValueKey(client.federationId()),
+                            child: AnimatedEntry(
+                              animate: _initialBuildDone,
+                              child: _FederationRow(
+                                client: client,
+                                onTap: () => _onTapFederation(client),
+                              ),
+                            ),
                           ),
                       ],
                     ),

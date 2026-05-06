@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/widgets/animated_entry_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/payment_card_widget.dart';
 import 'package:pico/utils/styles.dart';
@@ -27,13 +28,25 @@ class RecentPayments extends StatefulWidget {
 class _RecentPaymentsState extends State<RecentPayments> {
   List<OperationSummary> _payments = [];
   StreamSubscription<List<OperationSummary>>? _subscription;
+  // Off until after the first frame paints — children built before the
+  // flip render statically; later insertions get the entry animation.
+  bool _initialBuildDone = false;
 
   @override
   void initState() {
     super.initState();
     _subscription = widget.stream.listen((snapshot) {
       if (!mounted) return;
+      final wasFirst = !_initialBuildDone;
       setState(() => _payments = snapshot.reversed.toList());
+      // Wait for the first emission to actually paint before flipping
+      // the flag — otherwise the initial batch lands after animations
+      // are already enabled and every payment animates on app launch.
+      if (wasFirst) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _initialBuildDone = true);
+        });
+      }
     });
   }
 
@@ -67,7 +80,8 @@ class _RecentPaymentsState extends State<RecentPayments> {
             key: ValueKey(_payments[i].operationId),
             child: BorderedList.decorateItem(
               context: context,
-              child: _AnimatedEntry(
+              child: AnimatedEntry(
+                animate: _initialBuildDone,
                 child: PaymentCard(
                   clientFactory: widget.clientFactory,
                   event: _payments[i],
@@ -108,34 +122,3 @@ class _RecentPaymentsState extends State<RecentPayments> {
   }
 }
 
-class _AnimatedEntry extends StatefulWidget {
-  final Widget child;
-  const _AnimatedEntry({required this.child});
-
-  @override
-  State<_AnimatedEntry> createState() => _AnimatedEntryState();
-}
-
-class _AnimatedEntryState extends State<_AnimatedEntry>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    duration: const Duration(milliseconds: 500),
-    vsync: this,
-  )..forward();
-
-  late final Animation<double> _animation = CurvedAnimation(
-    parent: _controller,
-    curve: Curves.easeInOut,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizeTransition(sizeFactor: _animation, child: widget.child);
-  }
-}
