@@ -62,6 +62,9 @@ ios/Frameworks/
 # Flutter Rust Bridge generated files
 lib/bridge_generated.dart/
 
+# Claude Code runtime state
+.claude/
+
 # Built library files
 *.dylib
 *.so
