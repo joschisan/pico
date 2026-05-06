@@ -29,7 +29,7 @@ class FeePreview extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text('querying fee…', style: tinted),
+              Text('querying network fee…', style: tinted),
             ],
           );
         }
