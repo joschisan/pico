@@ -40,7 +40,7 @@ class FeePreview extends StatelessWidget {
 
         final sats = snapshot.data ?? 0;
         return Text(
-          'fee ${NumberFormat('#,###').format(sats)} sat',
+          '${NumberFormat('#,###').format(sats)} sat',
           style: tinted,
         );
       },
