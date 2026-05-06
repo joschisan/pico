@@ -24,6 +24,10 @@ class _AnimatedBalanceState extends State<AnimatedBalance>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late Animation<int> _animation;
+  // Hosting screens often mount this widget with a placeholder `sats: 0`
+  // while the balance stream resolves. Snap on the first update so the
+  // tween only kicks in for genuine balance changes after that.
+  bool _initialised = false;
 
   @override
   void initState() {
@@ -36,10 +40,18 @@ class _AnimatedBalanceState extends State<AnimatedBalance>
   void didUpdateWidget(AnimatedBalance oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.sats != widget.sats) {
-      _animation = IntTween(begin: _animation.value, end: widget.sats).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
-      );
-      _controller.forward(from: 0);
+      if (!_initialised) {
+        _initialised = true;
+        _animation = AlwaysStoppedAnimation(widget.sats);
+      } else {
+        _animation = IntTween(
+          begin: _animation.value,
+          end: widget.sats,
+        ).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+        );
+        _controller.forward(from: 0);
+      }
     }
   }
 
