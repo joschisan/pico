@@ -5,22 +5,26 @@ import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/drawers/federation_picker_drawer.dart';
 import 'package:pico/utils/styles.dart';
 
-/// Inline pill that names the federation a payment will route through and
-/// opens the picker on tap. The hosting screen owns the selected client
-/// and updates it via `onChanged`; the chip itself is stateless.
+/// Inline tile that names the federation a payment will route through.
+/// When `onChanged` is provided the tile is tappable and opens the
+/// picker; when null it's a read-only display (e.g. ecash receive,
+/// where the federation is fixed by the bundle).
 class FederationChip extends StatelessWidget {
   final PicoClientFactory clientFactory;
   final PicoClient client;
-  final ValueChanged<PicoClient> onChanged;
+  final ValueChanged<PicoClient>? onChanged;
 
   const FederationChip({
     super.key,
     required this.clientFactory,
     required this.client,
-    required this.onChanged,
+    this.onChanged,
   });
 
   Future<void> _openPicker(BuildContext context) async {
+    final onChanged = this.onChanged;
+    if (onChanged == null) return;
+
     final clients = await clientFactory.clients();
 
     if (!context.mounted) return;
@@ -48,7 +52,7 @@ class FederationChip extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        onTap: () => _openPicker(context),
+        onTap: onChanged == null ? null : () => _openPicker(context),
         contentPadding: listTilePadding,
         leading: StreamBuilder<List<(String, bool)>>(
           stream: client.subscribeConnectionStatus(),

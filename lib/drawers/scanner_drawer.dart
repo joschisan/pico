@@ -87,8 +87,12 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
       ),
       (
         parseEcash(ecash: input),
-        (dynamic result) =>
-            EcashDrawer.show(context, client: client, ecash: result),
+        (dynamic result) => EcashDrawer.show(
+          context,
+          clientFactory: widget.clientFactory,
+          client: client,
+          ecash: result,
+        ),
       ),
       (
         parseBitcoinAddress(address: input),
@@ -110,8 +114,12 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
       ),
       (
         _decoder.addFragment(fragment: input),
-        (dynamic result) =>
-            EcashDrawer.show(context, client: client, ecash: result),
+        (dynamic result) => EcashDrawer.show(
+          context,
+          clientFactory: widget.clientFactory,
+          client: client,
+          ecash: result,
+        ),
       ),
     ];
 
