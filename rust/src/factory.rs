@@ -124,7 +124,7 @@ impl PicoClientFactory {
 
             warmed.insert(
                 fed_id,
-                build_pico_client(client, fed_id, currency_code.clone()),
+                build_pico_client(client, fed_id, currency_code.clone()).await,
             );
         }
 
@@ -172,7 +172,7 @@ impl PicoClientFactory {
             .await
             .map_err(|e| e.to_string())?;
 
-        let pico = build_pico_client(client, federation_id, self.currency().await);
+        let pico = build_pico_client(client, federation_id, self.currency().await).await;
 
         self.clients
             .write()
@@ -212,7 +212,7 @@ impl PicoClientFactory {
             .await
             .map_err(|e| e.to_string())?;
 
-        let pico = build_pico_client(client, federation_id, self.currency().await);
+        let pico = build_pico_client(client, federation_id, self.currency().await).await;
 
         self.clients
             .write()
@@ -349,6 +349,7 @@ impl PicoClientFactory {
     /// reachable only by opening the per-op drawer.
     #[frb]
     pub async fn list_operations(&self) -> Vec<OperationSummary> {
+        let names = self.federation_names_snapshot().await;
         let mut position = EventLogId::LOG_START;
         let mut summaries: Vec<OperationSummary> = Vec::new();
 
@@ -356,7 +357,7 @@ impl PicoClientFactory {
             let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
 
             for entry in &batch {
-                if let Some(summary) = parse_summary(&entry.1) {
+                if let Some(summary) = parse_summary(&entry.1, &names) {
                     summaries.push(summary);
                 }
             }
@@ -382,12 +383,13 @@ impl PicoClientFactory {
         // Phase 1: drain history into the full summaries vector. No emits.
         let mut summaries: Vec<OperationSummary> = Vec::new();
         let mut position = EventLogId::LOG_START;
+        let names = self.federation_names_snapshot().await;
 
         loop {
             let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
 
             for entry in &batch {
-                if let Some(summary) = parse_summary(&entry.1) {
+                if let Some(summary) = parse_summary(&entry.1, &names) {
                     summaries.push(summary);
                 }
             }
@@ -405,16 +407,18 @@ impl PicoClientFactory {
             return;
         }
 
-        // Phase 2: tail live events; append on each new trigger and emit.
+        // Phase 2: tail live events. Re-snapshot names per batch so a
+        // newly-joined federation's name lands on its own first event.
         let notify: Arc<Notify> = picomint_eventlog::event_notify(&self.db);
 
         loop {
             let notified = notify.notified();
 
             let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+            let names = self.federation_names_snapshot().await;
 
             for entry in &batch {
-                if let Some(summary) = parse_summary(&entry.1) {
+                if let Some(summary) = parse_summary(&entry.1, &names) {
                     summaries.push(summary);
                 }
             }
@@ -429,6 +433,17 @@ impl PicoClientFactory {
                 notified.await;
             }
         }
+    }
+
+    /// Snapshot of currently-warm federation ids → names. Used to
+    /// resolve `OperationSummary.federation_name` at parse time.
+    async fn federation_names_snapshot(&self) -> BTreeMap<FederationId, String> {
+        self.clients
+            .read()
+            .await
+            .iter()
+            .map(|(id, c)| (*id, c.federation_name.clone()))
+            .collect()
     }
 
     /// Live tail of every picomint event for a single operation, parsed
@@ -545,14 +560,16 @@ impl PicoClientFactory {
     }
 }
 
-fn build_pico_client(
+async fn build_pico_client(
     client: Arc<Client>,
     federation_id: FederationId,
     currency_code: String,
 ) -> PicoClient {
+    let federation_name = client.config().await.name;
     PicoClient {
         client,
         federation_id,
+        federation_name,
         currency_code,
         exchange_rate_cache: Arc::new(Mutex::new(None)),
     }

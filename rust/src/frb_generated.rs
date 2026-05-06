@@ -4083,12 +4083,14 @@ impl SseDecode for crate::events::OperationSummary {
         let mut var_paymentType = <crate::events::PaymentType>::sse_decode(deserializer);
         let mut var_amountSats = <i64>::sse_decode(deserializer);
         let mut var_timestamp = <i64>::sse_decode(deserializer);
+        let mut var_federationName = <Option<String>>::sse_decode(deserializer);
         return crate::events::OperationSummary {
             operation_id: var_operationId,
             incoming: var_incoming,
             payment_type: var_paymentType,
             amount_sats: var_amountSats,
             timestamp: var_timestamp,
+            federation_name: var_federationName,
         };
     }
 }
@@ -4897,6 +4899,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::OperationSummary {
             self.payment_type.into_into_dart().into_dart(),
             self.amount_sats.into_into_dart().into_dart(),
             self.timestamp.into_into_dart().into_dart(),
+            self.federation_name.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -5567,6 +5570,7 @@ impl SseEncode for crate::events::OperationSummary {
         <crate::events::PaymentType>::sse_encode(self.payment_type, serializer);
         <i64>::sse_encode(self.amount_sats, serializer);
         <i64>::sse_encode(self.timestamp, serializer);
+        <Option<String>>::sse_encode(self.federation_name, serializer);
     }
 }
 

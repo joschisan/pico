@@ -16,6 +16,9 @@ use crate::{BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, InviteCod
 pub struct PicoClient {
     pub(crate) client: Arc<Client>,
     pub(crate) federation_id: FederationId,
+    /// Cached at construction so the factory can resolve names for
+    /// `OperationSummary` synchronously while iterating the event log.
+    pub(crate) federation_name: String,
     pub(crate) currency_code: String,
     pub(crate) exchange_rate_cache: ExchangeRateCache,
 }
@@ -23,7 +26,7 @@ pub struct PicoClient {
 impl PicoClient {
     #[frb]
     pub async fn federation_name(&self) -> Option<String> {
-        Some(self.client.config().await.name)
+        Some(self.federation_name.clone())
     }
 
     #[frb(sync)]

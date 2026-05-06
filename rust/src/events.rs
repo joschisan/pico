@@ -9,6 +9,8 @@
 //! - [`parse_payment_event`] — every public picomint event → rich
 //!   [`PaymentEvent`] for the per-op timeline drawer.
 
+use std::collections::BTreeMap;
+
 use flutter_rust_bridge::frb;
 use picomint_client::ln::events::{
     ReceiveEvent as LnReceive, SendEvent as LnSend, SendFailureEvent as LnSendFailureEvent,
@@ -23,6 +25,7 @@ use picomint_client::wallet::events::{
     SendSuccessEvent as WalletSendSuccessEvent,
 };
 use picomint_client::{TxAcceptEvent, TxCreateEvent, TxRejectEvent};
+use picomint_core::config::FederationId;
 use picomint_core::bitcoin::hex::DisplayHex;
 use picomint_eventlog::EventLogEntry;
 
@@ -45,6 +48,11 @@ pub struct OperationSummary {
     pub payment_type: PaymentType,
     pub amount_sats: i64,
     pub timestamp: i64,
+    /// `Some(name)` if the federation is still warm at parse time;
+    /// `None` if the user has since left, in which case the Dart side
+    /// renders "Unknown Federation". Resolved against a snapshot of
+    /// the client set — past summaries don't get re-resolved on leave.
+    pub federation_name: Option<String>,
 }
 
 /// One-shot toast/haptic events fired by `subscribe_notifications`. Each
@@ -165,10 +173,16 @@ pub enum PaymentEvent {
 }
 
 /// Parse the six trigger events that materialize a new operation in the
-/// list. Every other event type returns `None`.
-pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
+/// list. Every other event type returns `None`. `names` is a snapshot
+/// of currently-warm federation ids → names; entries from federations
+/// the user has since left resolve to `federation_name: None`.
+pub(crate) fn parse_summary(
+    entry: &EventLogEntry,
+    names: &BTreeMap<FederationId, String>,
+) -> Option<OperationSummary> {
     let operation_id = entry.operation.to_string();
     let timestamp = entry.timestamp as i64;
+    let federation_name = names.get(&entry.federation_id).cloned();
 
     if let Some(e) = entry.to_event::<MintSend>() {
         return Some(OperationSummary {
@@ -177,6 +191,7 @@ pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
             payment_type: PaymentType::Ecash,
             amount_sats: (e.amount.msats / 1000) as i64,
             timestamp,
+            federation_name,
         });
     }
     if let Some(e) = entry.to_event::<MintReceive>() {
@@ -186,6 +201,7 @@ pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
             payment_type: PaymentType::Ecash,
             amount_sats: (e.amount.msats / 1000) as i64,
             timestamp,
+            federation_name,
         });
     }
     if let Some(e) = entry.to_event::<LnSend>() {
@@ -195,6 +211,7 @@ pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
             payment_type: PaymentType::Lightning,
             amount_sats: (e.amount.msats / 1000) as i64,
             timestamp,
+            federation_name,
         });
     }
     if let Some(e) = entry.to_event::<LnReceive>() {
@@ -204,6 +221,7 @@ pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
             payment_type: PaymentType::Lightning,
             amount_sats: (e.amount.msats / 1000) as i64,
             timestamp,
+            federation_name,
         });
     }
     if let Some(e) = entry.to_event::<WalletSend>() {
@@ -213,6 +231,7 @@ pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
             payment_type: PaymentType::Bitcoin,
             amount_sats: e.amount.to_sat() as i64,
             timestamp,
+            federation_name,
         });
     }
     if let Some(e) = entry.to_event::<WalletReceive>() {
@@ -222,6 +241,7 @@ pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
             payment_type: PaymentType::Bitcoin,
             amount_sats: e.amount.to_sat() as i64,
             timestamp,
+            federation_name,
         });
     }
     // Recovery is now terminal-only — `RecoveryEvent` fires once with
@@ -234,6 +254,7 @@ pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
             payment_type: PaymentType::Ecash,
             amount_sats: (e.amount.msats / 1000) as i64,
             timestamp,
+            federation_name,
         });
     }
     None
