@@ -36,13 +36,16 @@ class FederationChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // Matches the rounded-rect border styling of `BorderedList` items
+    // so the chip reads as a single-row tile in the same visual family
+    // as the federation list on the home screen.
     return InkWell(
       onTap: () => _openPicker(context),
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: listTilePadding,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: scheme.outlineVariant),
         ),
         child: Row(
