@@ -98,11 +98,12 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   }
 
   Widget _buildFeePreview() {
-    if (_gatewayFailed) return const FeePreview.error();
+    if (_gatewayFailed) return const FeePreview.error(label: 'gateway fee');
     final gateway = _gateway;
-    if (gateway == null) return const FeePreview.loading();
+    if (gateway == null) return const FeePreview.loading(label: 'gateway fee');
     return FeePreview.value(
       gateway.gatewayFeeForAmount(amountSats: _amountSats),
+      label: 'gateway fee',
     );
   }
 

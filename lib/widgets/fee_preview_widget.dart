@@ -7,23 +7,40 @@ class FeePreview extends StatelessWidget {
   // `failed` true → error; otherwise → loading.
   final int? feeSats;
   final bool failed;
+  // What the fee is — onchain shows "network fee", LN shows "gateway
+  // fee". Used in all three states for consistency.
+  final String label;
 
-  const FeePreview.value(int this.feeSats, {super.key}) : failed = false;
-  const FeePreview.loading({super.key}) : feeSats = null, failed = false;
-  const FeePreview.error({super.key}) : feeSats = null, failed = true;
+  const FeePreview.value(
+    int this.feeSats, {
+    this.label = 'network fee',
+    super.key,
+  }) : failed = false;
+
+  const FeePreview.loading({this.label = 'network fee', super.key})
+    : feeSats = null,
+      failed = false;
+
+  const FeePreview.error({this.label = 'network fee', super.key})
+    : feeSats = null,
+      failed = true;
 
   /// Convenience for one-shot fetches (onchain, invoice drawer): drives
   /// the three states off a `Future<int>`.
-  static Widget fromFuture(Future<int> fee, {Key? key}) {
+  static Widget fromFuture(
+    Future<int> fee, {
+    String label = 'network fee',
+    Key? key,
+  }) {
     return FutureBuilder<int>(
       key: key,
       future: fee,
       builder: (_, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const FeePreview.loading();
+          return FeePreview.loading(label: label);
         }
-        if (snapshot.hasError) return const FeePreview.error();
-        return FeePreview.value(snapshot.data ?? 0);
+        if (snapshot.hasError) return FeePreview.error(label: label);
+        return FeePreview.value(snapshot.data ?? 0, label: label);
       },
     );
   }
@@ -33,7 +50,7 @@ class FeePreview extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final tinted = mediumStyle.copyWith(color: scheme.primary);
 
-    if (failed) return Text('network fee not available', style: tinted);
+    if (failed) return Text('$label not available', style: tinted);
 
     final sats = feeSats;
     if (sats == null) {
@@ -50,13 +67,13 @@ class FeePreview extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text('querying network fee…', style: tinted),
+          Text('querying $label…', style: tinted),
         ],
       );
     }
 
     return Text(
-      '${NumberFormat('#,###').format(sats)} sat network fee',
+      '${NumberFormat('#,###').format(sats)} sat $label',
       style: tinted,
     );
   }

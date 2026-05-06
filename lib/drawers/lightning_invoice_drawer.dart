@@ -81,11 +81,12 @@ class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
   }
 
   Widget _buildFeePreview() {
-    if (_gatewayFailed) return const FeePreview.error();
+    if (_gatewayFailed) return const FeePreview.error(label: 'gateway fee');
     final gateway = _gateway;
-    if (gateway == null) return const FeePreview.loading();
+    if (gateway == null) return const FeePreview.loading(label: 'gateway fee');
     return FeePreview.value(
       gateway.gatewayFeeForInvoice(invoice: widget.invoice),
+      label: 'gateway fee',
     );
   }
 
@@ -105,10 +106,10 @@ class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
             });
           },
         ),
-        const SizedBox(height: 64),
-        AmountDisplay(widget.invoice.amountSats()),
         const SizedBox(height: 16),
         _buildFeePreview(),
+        const SizedBox(height: 64),
+        AmountDisplay(widget.invoice.amountSats()),
         const SizedBox(height: 64),
         AsyncButton(text: 'Confirm', onPressed: _handleConfirm),
       ],
