@@ -80,6 +80,7 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
         parseBolt11Invoice(invoice: input),
         (dynamic result) => LightningInvoiceDrawer.show(
           context,
+          clientFactory: widget.clientFactory,
           client: client,
           invoice: result,
         ),

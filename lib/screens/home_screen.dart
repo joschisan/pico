@@ -141,6 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
         parseBolt11Invoice(invoice: input),
         (dynamic result) => LightningInvoiceDrawer.show(
           context,
+          clientFactory: widget.clientFactory,
           client: client,
           invoice: result,
         ),

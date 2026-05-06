@@ -58,6 +58,7 @@ class _LnurlDrawerState extends State<LnurlDrawer> {
       Navigator.of(context).pop();
       LightningInvoiceDrawer.show(
         context,
+        clientFactory: widget.clientFactory,
         client: widget.client,
         invoice: invoice,
       );
