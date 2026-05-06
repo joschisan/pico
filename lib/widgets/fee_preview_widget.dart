@@ -10,7 +10,7 @@ class FeePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final muted = smallStyle.copyWith(color: scheme.onSurfaceVariant);
+    final tinted = mediumStyle.copyWith(color: scheme.primary);
 
     return FutureBuilder<int>(
       future: fee,
@@ -21,29 +21,27 @@ class FeePreview extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(
-                width: 12,
-                height: 12,
+                width: 14,
+                height: 14,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    scheme.onSurfaceVariant,
-                  ),
+                  valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
                 ),
               ),
               const SizedBox(width: 8),
-              Text('Querying fee…', style: muted),
+              Text('Querying fee…', style: tinted),
             ],
           );
         }
 
         if (snapshot.hasError) {
-          return Text('Fee unavailable', style: muted);
+          return Text('Fee unavailable', style: tinted);
         }
 
         final sats = snapshot.data ?? 0;
         return Text(
           'Fee: ${NumberFormat('#,###').format(sats)} sat',
-          style: muted,
+          style: tinted,
         );
       },
     );
