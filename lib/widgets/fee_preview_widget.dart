@@ -35,7 +35,7 @@ class FeePreview extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
-          return Text('fee unavailable', style: tinted);
+          return Text('network fee not available', style: tinted);
         }
 
         final sats = snapshot.data ?? 0;
