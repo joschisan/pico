@@ -511,8 +511,15 @@ class _FederationRow extends StatelessWidget {
               return StreamBuilder<double>(
                 stream: client.subscribeRecoveryProgress(),
                 builder: (_, progressSnap) {
+                  // hasData stays sticky after the stream closes, so
+                  // also gate on connectionState — picomint ends the
+                  // stream the moment recovery finalizes.
+                  final inProgress =
+                      progressSnap.hasData &&
+                      progressSnap.connectionState !=
+                          ConnectionState.done;
                   final text =
-                      progressSnap.hasData
+                      inProgress
                           ? '$name · ${progressSnap.data!.round()}%'
                           : name;
                   return Text(
