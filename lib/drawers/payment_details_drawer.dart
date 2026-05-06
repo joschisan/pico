@@ -79,7 +79,6 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
                   for (var i = 0; i < _events.length; i++)
                     _TimelineRow(
                       event: _events[i],
-                      payment: widget.event,
                       clientFactory: widget.clientFactory,
                       isLast: i == _events.length - 1,
                     ),
@@ -94,20 +93,18 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
 
 class _TimelineRow extends StatelessWidget {
   final PaymentEvent event;
-  final OperationSummary payment;
   final PicoClientFactory clientFactory;
   final bool isLast;
 
   const _TimelineRow({
     required this.event,
-    required this.payment,
     required this.clientFactory,
     required this.isLast,
   });
 
   @override
   Widget build(BuildContext context) {
-    final desc = _describe(event, payment, clientFactory, context);
+    final desc = _describe(event, clientFactory, context);
     final scheme = Theme.of(context).colorScheme;
     final isAction = desc.onTap != null;
     // Tappable subtitles get the tone color so they read as a link;
@@ -223,7 +220,6 @@ Future<void> _openEcash(
 
 _Description _describe(
   PaymentEvent event,
-  OperationSummary payment,
   PicoClientFactory clientFactory,
   BuildContext context,
 ) {
@@ -295,7 +291,6 @@ _Description _describe(
     ),
     PaymentEvent_MintRemint() => _Description(
       label: 'Reminting eCash',
-      subtitle: _sats(payment.amountSats.toInt()),
       tone: neutral,
     ),
     PaymentEvent_MintReceive(:final amountSats) => _Description(
