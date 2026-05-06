@@ -50,6 +50,14 @@ impl GatewayInfoWrapper {
         let send_msats = self.gateway_info.send_fee.fee(msats).msats;
         ((ln_msats + send_msats) / 1000) as i64
     }
+
+    /// Fee (sats) the gateway deducts from a `amount_sats` incoming
+    /// payment. The recipient ultimately ends up with `amount - fee`.
+    #[frb(sync)]
+    pub fn gateway_fee_for_receive_amount(&self, amount_sats: i64) -> i64 {
+        let msats = (amount_sats as u64).saturating_mul(1000);
+        (self.gateway_info.receive_fee.fee(msats).msats / 1000) as i64
+    }
 }
 
 #[frb(opaque)]
@@ -186,23 +194,17 @@ impl PicoClient {
     }
 
     #[frb]
-    pub async fn ln_receive(&self, amount_sat: i64) -> Result<String, String> {
-        // Receive doesn't expose a fee preview yet — gateway selection
-        // stays internal so the existing UI (InvoiceAmountScreen) keeps
-        // its amount-only API.
-        let (gateway_api, gateway_info) = self
-            .client
-            .ln()
-            .select_gateway(None)
-            .await
-            .map_err(|e| e.to_string())?;
-
+    pub async fn ln_receive(
+        &self,
+        gateway: &GatewayInfoWrapper,
+        amount_sat: i64,
+    ) -> Result<String, String> {
         let invoice = self
             .client
             .ln()
             .receive(
-                gateway_api,
-                gateway_info,
+                gateway.gateway_api.clone(),
+                gateway.gateway_info.clone(),
                 Amount::from_sats(amount_sat as u64),
                 60 * 60 * 24,
                 picomint_core::ln::Bolt11InvoiceDescription::Direct(String::new()),

@@ -6,6 +6,7 @@ import 'package:pico/screens/display_invoice_screen.dart';
 import 'package:pico/screens/display_lnurl_screen.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/widgets/async_icon_button_widget.dart';
+import 'package:pico/widgets/fee_preview_widget.dart';
 import 'package:pico/widgets/federation_chip_widget.dart';
 
 class InvoiceAmountScreen extends StatefulWidget {
@@ -24,6 +25,28 @@ class InvoiceAmountScreen extends StatefulWidget {
 
 class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   late PicoClient _client = widget.client;
+  GatewayInfoWrapper? _gateway;
+  bool _gatewayFailed = false;
+  int _amountSats = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _kickoffGatewaySelection();
+  }
+
+  void _kickoffGatewaySelection() {
+    _gateway = null;
+    _gatewayFailed = false;
+    _client.lnSelectAnyGateway().then(
+      (g) {
+        if (mounted) setState(() => _gateway = g);
+      },
+      onError: (_) {
+        if (mounted) setState(() => _gatewayFailed = true);
+      },
+    );
+  }
 
   Future<void> _handleLnurlTap() async {
     final lnurl = await _client.lnurl();
@@ -36,7 +59,13 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   }
 
   Future<void> _handleConfirm(int amountSats) async {
-    final invoice = await _client.lnReceive(amountSat: amountSats);
+    final gateway = _gateway;
+    if (gateway == null) throw 'Querying gateway fee…';
+
+    final invoice = await _client.lnReceive(
+      gateway: gateway,
+      amountSat: amountSats,
+    );
 
     if (!mounted) return;
 
@@ -45,6 +74,16 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
         builder:
             (_) => DisplayInvoiceScreen(invoice: invoice, amount: amountSats),
       ),
+    );
+  }
+
+  Widget _buildFeePreview() {
+    if (_gatewayFailed) return const FeePreview.error(label: 'gateway fee');
+    final gateway = _gateway;
+    if (gateway == null) return const FeePreview.loading(label: 'gateway fee');
+    return FeePreview.value(
+      gateway.gatewayFeeForReceiveAmount(amountSats: _amountSats),
+      label: 'gateway fee',
     );
   }
 
@@ -68,14 +107,25 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
               child: FederationChip(
                 clientFactory: widget.clientFactory,
                 client: _client,
-                onChanged: (next) => setState(() => _client = next),
+                onChanged: (next) {
+                  setState(() {
+                    _client = next;
+                    _kickoffGatewaySelection();
+                  });
+                },
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: _buildFeePreview(),
             ),
             Expanded(
               child: AmountEntryWidget(
                 key: ValueKey(_client.federationId()),
                 client: _client,
                 onConfirm: _handleConfirm,
+                onAmountChanged:
+                    (sats) => setState(() => _amountSats = sats),
               ),
             ),
           ],
