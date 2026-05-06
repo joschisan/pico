@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
-import 'package:pico/screens/confirm_onchain_send_screen.dart';
+import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 
 /// Transfer between two federations, either over Lightning (dest mints
 /// a bolt11, source pays it — routing fees come out silently) or onchain
-/// (dest hands over a receive address, source sends; miner fee preview
-/// goes through the standard ConfirmOnchainSendScreen).
+/// (dest hands over a receive address, source sends).
 class TransferAmountScreen extends StatefulWidget {
   final PicoClient source;
   final PicoClient dest;
@@ -48,24 +47,16 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
   Future<void> _confirmOnchain(int amountSats) async {
     final addressStr = await widget.dest.onchainReceiveAddress();
     final address = parseBitcoinAddress(address: addressStr)!;
-    final feeSats = await widget.source.onchainCalculateFees(
-      address: address,
-      amountSats: amountSats,
-    );
 
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder:
-            (_) => ConfirmOnchainSendScreen(
-              client: widget.source,
-              address: address,
-              amountSats: amountSats,
-              feeSats: feeSats,
-            ),
-      ),
-    );
+    await requireBiometricAuth(context);
+
+    await widget.source.onchainSend(address: address, amountSats: amountSats);
+
+    if (!mounted) return;
+
+    Navigator.of(context).pop();
   }
 
   @override
