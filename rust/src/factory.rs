@@ -202,7 +202,7 @@ impl PicoClientFactory {
 
         dbtx.insert(&CLIENT_CONFIG, &federation_id, &config);
 
-        Client::init_recovery(&dbtx.as_ref().isolate(federation_id), federation_id);
+        Client::init_recovery(&dbtx.as_ref().isolate(federation_id));
 
         dbtx.commit();
 

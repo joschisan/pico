@@ -57,6 +57,7 @@ pub struct OperationSummary {
 pub enum Notification {
     LightningReceived { amount_sats: i64 },
     OnchainReceived { amount_sats: i64 },
+    EcashRecovered { amount_sats: i64 },
     LightningRefunding,
     TransactionRejected,
 }
@@ -137,8 +138,8 @@ pub enum PaymentEvent {
     },
     MintRecovery {
         timestamp: i64,
-        index: i64,
-        total: Option<i64>,
+        amount_sats: i64,
+        txid: Option<String>,
     },
 
     // ── Wallet / on-chain (`picomint_client::wallet`) ────────────────────
@@ -223,6 +224,18 @@ pub(crate) fn parse_summary(entry: &EventLogEntry) -> Option<OperationSummary> {
             timestamp,
         });
     }
+    // Recovery is now terminal-only — `RecoveryEvent` fires once with
+    // the gross recovered amount, so it materializes a card the same
+    // way a regular ECash receive does.
+    if let Some(e) = entry.to_event::<RecoveryEvent>() {
+        return Some(OperationSummary {
+            operation_id,
+            incoming: true,
+            payment_type: PaymentType::Ecash,
+            amount_sats: (e.amount.msats / 1000) as i64,
+            timestamp,
+        });
+    }
     None
 }
 
@@ -239,6 +252,11 @@ pub(crate) fn parse_notification(entry: &EventLogEntry) -> Option<Notification> 
     if let Some(e) = entry.to_event::<WalletReceive>() {
         return Some(Notification::OnchainReceived {
             amount_sats: e.amount.to_sat() as i64,
+        });
+    }
+    if let Some(e) = entry.to_event::<RecoveryEvent>() {
+        return Some(Notification::EcashRecovered {
+            amount_sats: (e.amount.msats / 1000) as i64,
         });
     }
     if entry.to_event::<SendRefundEvent>().is_some() {
@@ -347,8 +365,8 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     if let Some(e) = entry.to_event::<RecoveryEvent>() {
         return Some(PaymentEvent::MintRecovery {
             timestamp,
-            index: e.index as i64,
-            total: e.total.map(|t| t as i64),
+            amount_sats: (e.amount.msats / 1000) as i64,
+            txid: e.txid.map(|t| t.to_string()),
         });
     }
 

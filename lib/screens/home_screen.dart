@@ -94,6 +94,12 @@ class _HomeScreenState extends State<HomeScreen> {
           amountSats.toInt(),
           PaymentType.bitcoin,
         );
+      case Notification_EcashRecovered(:final amountSats):
+        NotificationUtils.showReceive(
+          context,
+          amountSats.toInt(),
+          PaymentType.ecash,
+        );
       case Notification_LightningRefunding():
         HapticFeedback.heavyImpact();
         NotificationUtils.showWarning(context, 'Lightning Refund');
@@ -495,13 +501,27 @@ class _FederationRow extends StatelessWidget {
                   style: mediumStyle,
                 ),
           ),
+          // Federation name + live recovery progress — picomint ends
+          // the stream on completion, so the % vanishes once recovery
+          // finalizes and the row falls back to just the name.
           FutureBuilder<String?>(
             future: client.federationName(),
-            builder:
-                (_, snapshot) => Text(
-                  snapshot.data ?? '…',
-                  style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
-                ),
+            builder: (_, nameSnap) {
+              final name = nameSnap.data ?? '…';
+              return StreamBuilder<double>(
+                stream: client.subscribeRecoveryProgress(),
+                builder: (_, progressSnap) {
+                  final text =
+                      progressSnap.hasData
+                          ? '$name · ${progressSnap.data!.round()}%'
+                          : name;
+                  return Text(
+                    text,
+                    style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+                  );
+                },
+              );
+            },
           ),
         ],
       ),

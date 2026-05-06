@@ -272,11 +272,10 @@ _Description _describe(
       subtitle: 'threshold signature invalid',
       tone: failure,
     ),
-    PaymentEvent_MintRecovery(:final index, :final total) => _Description(
-      label: 'Recovering eCash',
-      subtitle:
-          '${total == null ? 0 : (index.toInt() * 100) ~/ total.toInt()}%',
-      tone: neutral,
+    PaymentEvent_MintRecovery(:final amountSats) => _Description(
+      label: 'Recovery Complete',
+      subtitle: _sats(amountSats.toInt()),
+      tone: success,
     ),
 
     // ── Wallet (on-chain) ───────────────────────────────────────────────

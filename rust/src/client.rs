@@ -67,6 +67,21 @@ impl PicoClient {
         }
     }
 
+    /// Live recovery progress (0.0..=100.0). Stream ends when the
+    /// recovery row is removed (i.e. terminal `RecoveryEvent` has
+    /// fired) or immediately if no recovery is in progress at
+    /// subscribe time.
+    #[frb]
+    pub async fn subscribe_recovery_progress(&self, sink: StreamSink<f64>) {
+        let mut stream = self.client.mint().subscribe_recovery_progress();
+
+        while let Some(percent) = stream.next().await {
+            if sink.add(percent).is_err() {
+                break;
+            }
+        }
+    }
+
     #[frb]
     pub async fn subscribe_connection_status(&self, sink: StreamSink<Vec<(String, bool)>>) {
         let names: Vec<String> = self
