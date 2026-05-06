@@ -6,10 +6,51 @@ use futures::StreamExt;
 use picomint_client::Client;
 use picomint_core::Amount;
 use picomint_core::config::FederationId;
+use picomint_core::ln::gateway_api::GatewayInfo;
 
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
 use crate::{BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, InviteCodeWrapper};
+
+/// Holds a caller-selected gateway plus its routing info, returned by
+/// [`PicoClient::ln_select_gateway`] and handed back to
+/// [`PicoClient::ln_send`] so the fee we previewed is the fee we pay.
+/// Opaque on purpose — Dart only needs the two fee getters.
+#[frb(opaque)]
+#[derive(Clone)]
+pub struct GatewayInfoWrapper {
+    pub(crate) gateway_api: String,
+    pub(crate) gateway_info: GatewayInfo,
+}
+
+impl GatewayInfoWrapper {
+    /// Exact fee (sats) for paying this invoice through this gateway —
+    /// `send_fee + ln_fee`, with `ln_fee` zeroed when the gateway is the
+    /// invoice's payee (direct ecash swap).
+    #[frb(sync)]
+    pub fn gateway_fee_for_invoice(&self, invoice: &Bolt11InvoiceWrapper) -> i64 {
+        let amount_msats = invoice.0.amount_milli_satoshis().unwrap_or(0);
+        let is_direct =
+            invoice.0.recover_payee_pub_key() == self.gateway_info.lightning_public_key;
+        let ln_msats = if is_direct {
+            0
+        } else {
+            self.gateway_info.ln_fee.fee(amount_msats).msats
+        };
+        let send_msats = self.gateway_info.send_fee.fee(amount_msats).msats;
+        ((ln_msats + send_msats) / 1000) as i64
+    }
+
+    /// Worst-case fee (sats) for paying `amount_sats` through this gateway —
+    /// no direct-swap shortcut since we don't have an invoice yet.
+    #[frb(sync)]
+    pub fn gateway_fee_for_amount(&self, amount_sats: i64) -> i64 {
+        let msats = (amount_sats as u64).saturating_mul(1000);
+        let ln_msats = self.gateway_info.ln_fee.fee(msats).msats;
+        let send_msats = self.gateway_info.send_fee.fee(msats).msats;
+        ((ln_msats + send_msats) / 1000) as i64
+    }
+}
 
 #[frb(opaque)]
 #[derive(Clone)]
@@ -146,10 +187,22 @@ impl PicoClient {
 
     #[frb]
     pub async fn ln_receive(&self, amount_sat: i64) -> Result<String, String> {
+        // Receive doesn't expose a fee preview yet — gateway selection
+        // stays internal so the existing UI (InvoiceAmountScreen) keeps
+        // its amount-only API.
+        let (gateway_api, gateway_info) = self
+            .client
+            .ln()
+            .select_gateway(None)
+            .await
+            .map_err(|e| e.to_string())?;
+
         let invoice = self
             .client
             .ln()
             .receive(
+                gateway_api,
+                gateway_info,
                 Amount::from_sats(amount_sat as u64),
                 60 * 60 * 24,
                 picomint_core::ln::Bolt11InvoiceDescription::Direct(String::new()),
@@ -160,11 +213,57 @@ impl PicoClient {
         Ok(invoice.to_string())
     }
 
+    /// Pre-select a gateway biased toward the invoice's payee — picomint
+    /// picks the same gateway that issued the invoice when available, so
+    /// the payment becomes a direct ecash swap with zero LN fee.
     #[frb]
-    pub async fn ln_send(&self, invoice: &Bolt11InvoiceWrapper) -> Result<String, String> {
+    pub async fn ln_select_gateway_for_invoice(
+        &self,
+        invoice: &Bolt11InvoiceWrapper,
+    ) -> Result<GatewayInfoWrapper, String> {
+        let (gateway_api, gateway_info) = self
+            .client
+            .ln()
+            .select_gateway(Some(invoice.0.clone()))
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(GatewayInfoWrapper {
+            gateway_api,
+            gateway_info,
+        })
+    }
+
+    /// Pre-select any online gateway — for amount-entry flows like lnurl
+    /// where we don't have an invoice yet.
+    #[frb]
+    pub async fn ln_select_any_gateway(&self) -> Result<GatewayInfoWrapper, String> {
+        let (gateway_api, gateway_info) = self
+            .client
+            .ln()
+            .select_gateway(None)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(GatewayInfoWrapper {
+            gateway_api,
+            gateway_info,
+        })
+    }
+
+    #[frb]
+    pub async fn ln_send(
+        &self,
+        gateway: &GatewayInfoWrapper,
+        invoice: &Bolt11InvoiceWrapper,
+    ) -> Result<String, String> {
         self.client
             .ln()
-            .send(invoice.0.clone())
+            .send(
+                gateway.gateway_api.clone(),
+                gateway.gateway_info.clone(),
+                invoice.0.clone(),
+            )
             .await
             .map(|op| op.to_string())
             .map_err(|e| e.to_string())

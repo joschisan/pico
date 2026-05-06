@@ -37,7 +37,10 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
   Future<void> _confirmLightning(int amountSats) async {
     final bolt11 = await widget.dest.lnReceive(amountSat: amountSats);
     final invoice = parseBolt11Invoice(invoice: bolt11)!;
-    await widget.source.lnSend(invoice: invoice);
+    final gateway = await widget.source.lnSelectGatewayForInvoice(
+      invoice: invoice,
+    );
+    await widget.source.lnSend(gateway: gateway, invoice: invoice);
 
     if (!mounted) return;
 

@@ -5,6 +5,7 @@ import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/amount_display_widget.dart';
+import 'package:pico/widgets/fee_preview_widget.dart';
 import 'package:pico/widgets/federation_chip_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/auth_utils.dart';
@@ -44,15 +45,48 @@ class LightningInvoiceDrawer extends StatefulWidget {
 
 class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
   late PicoClient _client = widget.client;
+  GatewayInfoWrapper? _gateway;
+  bool _gatewayFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _kickoffGatewaySelection();
+  }
+
+  void _kickoffGatewaySelection() {
+    _gateway = null;
+    _gatewayFailed = false;
+    _client.lnSelectGatewayForInvoice(invoice: widget.invoice).then(
+      (g) {
+        if (mounted) setState(() => _gateway = g);
+      },
+      onError: (_) {
+        if (mounted) setState(() => _gatewayFailed = true);
+      },
+    );
+  }
 
   Future<void> _handleConfirm() async {
+    final gateway = _gateway;
+    if (gateway == null) throw 'Querying network fee…';
+
     await requireBiometricAuth(context);
 
-    await _client.lnSend(invoice: widget.invoice);
+    await _client.lnSend(gateway: gateway, invoice: widget.invoice);
 
     if (!mounted) return;
 
     Navigator.of(context).pop();
+  }
+
+  Widget _buildFeePreview() {
+    if (_gatewayFailed) return const FeePreview.error();
+    final gateway = _gateway;
+    if (gateway == null) return const FeePreview.loading();
+    return FeePreview.value(
+      gateway.gatewayFeeForInvoice(invoice: widget.invoice),
+    );
   }
 
   @override
@@ -64,10 +98,17 @@ class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
         FederationChip(
           clientFactory: widget.clientFactory,
           client: _client,
-          onChanged: (next) => setState(() => _client = next),
+          onChanged: (next) {
+            setState(() {
+              _client = next;
+              _kickoffGatewaySelection();
+            });
+          },
         ),
         const SizedBox(height: 64),
         AmountDisplay(widget.invoice.amountSats()),
+        const SizedBox(height: 16),
+        _buildFeePreview(),
         const SizedBox(height: 64),
         AsyncButton(text: 'Confirm', onPressed: _handleConfirm),
       ],

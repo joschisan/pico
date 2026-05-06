@@ -19,7 +19,7 @@ use picomint_client::mint::ECash;
 use picomint_core::invite::InviteCode;
 use picomint_redb::Database;
 
-pub use client::PicoClient;
+pub use client::{GatewayInfoWrapper, PicoClient};
 pub use currency::{FiatCurrency, find_fiat_currency, list_fiat_currencies};
 pub use events::{Notification, OperationSummary, PaymentEvent, PaymentType};
 pub use factory::{PicoClientFactory, PicoContact};

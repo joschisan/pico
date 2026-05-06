@@ -84,7 +84,7 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: FeePreview(fee: _feeFuture),
+              child: FeePreview.fromFuture(_feeFuture),
             ),
             Expanded(
               child: AmountEntryWidget(

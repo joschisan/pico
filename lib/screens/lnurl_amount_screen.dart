@@ -7,6 +7,7 @@ import 'package:pico/screens/contact_name_entry_screen.dart';
 import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
+import 'package:pico/widgets/fee_preview_widget.dart';
 import 'package:pico/widgets/federation_chip_widget.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -33,8 +34,33 @@ class LnurlAmountScreen extends StatefulWidget {
 class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   late PicoClient _client = widget.client;
   late String? _contactName = widget.contactName;
+  GatewayInfoWrapper? _gateway;
+  bool _gatewayFailed = false;
+  int _amountSats = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _kickoffGatewaySelection();
+  }
+
+  void _kickoffGatewaySelection() {
+    _gateway = null;
+    _gatewayFailed = false;
+    _client.lnSelectAnyGateway().then(
+      (g) {
+        if (mounted) setState(() => _gateway = g);
+      },
+      onError: (_) {
+        if (mounted) setState(() => _gatewayFailed = true);
+      },
+    );
+  }
 
   Future<void> _handleConfirm(int amountSats) async {
+    final gateway = _gateway;
+    if (gateway == null) throw 'Querying network fee…';
+
     final invoice = await lnurlResolve(
       payResponse: widget.payResponse,
       amountSats: amountSats,
@@ -44,7 +70,7 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
 
     await requireBiometricAuth(context);
 
-    await _client.lnSend(invoice: invoice);
+    await _client.lnSend(gateway: gateway, invoice: invoice);
 
     if (!mounted) return;
 
@@ -69,6 +95,15 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
 
   void _handleShare() {
     SharePlus.instance.share(ShareParams(text: widget.lnurl.encode()));
+  }
+
+  Widget _buildFeePreview() {
+    if (_gatewayFailed) return const FeePreview.error();
+    final gateway = _gateway;
+    if (gateway == null) return const FeePreview.loading();
+    return FeePreview.value(
+      gateway.gatewayFeeForAmount(amountSats: _amountSats),
+    );
   }
 
   @override
@@ -102,14 +137,25 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
               child: FederationChip(
                 clientFactory: widget.clientFactory,
                 client: _client,
-                onChanged: (next) => setState(() => _client = next),
+                onChanged: (next) {
+                  setState(() {
+                    _client = next;
+                    _kickoffGatewaySelection();
+                  });
+                },
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: _buildFeePreview(),
             ),
             Expanded(
               child: AmountEntryWidget(
                 key: ValueKey(_client.federationId()),
                 client: _client,
                 onConfirm: _handleConfirm,
+                onAmountChanged:
+                    (sats) => setState(() => _amountSats = sats),
               ),
             ),
           ],
