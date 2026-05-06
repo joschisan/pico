@@ -100,22 +100,9 @@ class _PaymentCardState extends State<PaymentCard> {
       onTap: widget.onTap,
       contentPadding: listTilePadding,
       leading: Icon(iconData, size: mediumIconSize, color: iconColor),
-      // Both texts in title slot so ListTile stays at 56dp instead of
-      // forcing the 72dp two-line layout — same trick the federation
-      // rows use to keep tap targets uniform across the home screen.
-      title: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$sign$formattedAmount sat',
-            style: mediumStyle.copyWith(color: titleColor),
-          ),
-          Text(
-            widget.event.federationName ?? 'Unknown Federation',
-            style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
-          ),
-        ],
+      title: Text(
+        '$sign$formattedAmount sat',
+        style: mediumStyle.copyWith(color: titleColor),
       ),
       trailing: Text(
         _formatTime(date),

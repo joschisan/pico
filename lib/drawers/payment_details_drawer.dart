@@ -68,7 +68,8 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
   Widget build(BuildContext context) {
     return DrawerShell(
       icon: PaymentTypeUtils.getIcon(widget.event.paymentType),
-      title: _formatDateTime(widget.event.timestamp.toInt()),
+      title: widget.event.federationName ?? 'Unknown Federation',
+      subtitle: _formatDateTime(widget.event.timestamp.toInt()),
       children: [
         if (_events.isNotEmpty)
           Flexible(
