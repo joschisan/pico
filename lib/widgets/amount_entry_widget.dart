@@ -118,6 +118,10 @@ class _AmountEntryWidgetState extends State<AmountEntryWidget> {
               if (_enterFiat) {
                 widget.client.prefetchExchangeRates();
               }
+
+              // Same digits, different sat value — parent's fee preview
+              // would otherwise stay frozen on the old interpretation.
+              _notifyParentAmountChanged();
             },
             child: Center(
               child: Column(
