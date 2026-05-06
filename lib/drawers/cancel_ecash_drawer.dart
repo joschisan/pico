@@ -8,27 +8,27 @@ import 'package:pico/utils/drawer_utils.dart';
 
 class CancelEcashDrawer extends StatelessWidget {
   final PicoClient client;
-  final ECashWrapper notes;
+  final ECashWrapper ecash;
 
   const CancelEcashDrawer({
     super.key,
     required this.client,
-    required this.notes,
+    required this.ecash,
   });
 
   static Future<void> show(
     BuildContext context, {
     required PicoClient client,
-    required ECashWrapper notes,
+    required ECashWrapper ecash,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: CancelEcashDrawer(client: client, notes: notes),
+      child: CancelEcashDrawer(client: client, ecash: ecash),
     );
   }
 
   Future<void> _handleConfirm(BuildContext context) async {
-    await client.ecashReceive(notes: notes);
+    await client.ecashReceive(ecash: ecash);
 
     if (!context.mounted) return;
 

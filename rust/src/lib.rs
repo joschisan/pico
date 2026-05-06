@@ -76,12 +76,20 @@ pub fn parse_invite_code(invite: &str) -> Option<InviteCodeWrapper> {
 }
 
 #[frb(opaque)]
+#[derive(Clone)]
 pub struct ECashWrapper(pub(crate) ECash);
 
 impl ECashWrapper {
     #[frb(sync)]
     pub fn amount_sats(&self) -> i64 {
         (self.0.amount().msats / 1000) as i64
+    }
+
+    /// Federation that minted these notes — needed to look up the
+    /// reissuing client when displaying ecash from history.
+    #[frb(sync)]
+    pub fn federation_id(&self) -> String {
+        self.0.mint.to_string()
     }
 
     #[frb(sync)]
@@ -91,12 +99,12 @@ impl ECashWrapper {
 }
 
 #[frb(sync)]
-pub fn parse_ecash(notes: &str) -> Option<ECashWrapper> {
-    if let Some(stripped) = notes.strip_prefix("picomint:") {
+pub fn parse_ecash(ecash: &str) -> Option<ECashWrapper> {
+    if let Some(stripped) = ecash.strip_prefix("picomint:") {
         return parse_ecash(stripped);
     }
 
-    picomint_base32::decode::<ECash>(notes)
+    picomint_base32::decode::<ECash>(ecash)
         .ok()
         .map(ECashWrapper)
 }

@@ -18,7 +18,8 @@ use picomint_client::ln::events::{
 };
 use picomint_client::mint::{
     MintFailureEvent, MintSuccessEvent, ReceiveEvent as MintReceive, RecoveryEvent, RemintEvent,
-    SendEvent as MintSend,
+    SendEvent as MintSend, SendFailureEvent as MintSendFailureEvent,
+    SendSuccessEvent as MintSendSuccessEvent,
 };
 use picomint_client::wallet::events::{
     ReceiveEvent as WalletReceive, SendEvent as WalletSend, SendFailureEvent,
@@ -125,7 +126,18 @@ pub enum PaymentEvent {
     MintSend {
         timestamp: i64,
         amount_sats: i64,
+    },
+    MintSendSuccess {
+        timestamp: i64,
+        /// Base32-encoded ecash; the Dart side parses it back into an
+        /// `ECashWrapper` on demand for the display screen. Stored as a
+        /// `String` (not `ECashWrapper`) because frb can't put opaque
+        /// types inside a value-typed enum without flipping the whole
+        /// enum opaque.
         ecash: String,
+    },
+    MintSendFailure {
+        timestamp: i64,
     },
     MintRemint {
         timestamp: i64,
@@ -300,7 +312,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::TxCreate {
             timestamp,
             txid: e.txid.to_string(),
-            change_sats: (e.change.msats / 1000) as i64,
+            change_sats: (e.remint.msats / 1000) as i64,
             fee_sats: (e.fee.msats / 1000) as i64,
         });
     }
@@ -357,8 +369,16 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::MintSend {
             timestamp,
             amount_sats: (e.amount.msats / 1000) as i64,
-            ecash: e.ecash,
         });
+    }
+    if let Some(e) = entry.to_event::<MintSendSuccessEvent>() {
+        return Some(PaymentEvent::MintSendSuccess {
+            timestamp,
+            ecash: e.ecash.to_string(),
+        });
+    }
+    if entry.to_event::<MintSendFailureEvent>().is_some() {
+        return Some(PaymentEvent::MintSendFailure { timestamp });
     }
     if let Some(e) = entry.to_event::<RemintEvent>() {
         return Some(PaymentEvent::MintRemint {

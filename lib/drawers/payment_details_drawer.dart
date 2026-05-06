@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/fountain.dart';
+import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/screens/display_ecash_screen.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/payment_utils.dart';
 import 'package:pico/utils/styles.dart';
@@ -78,6 +80,7 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
                     _TimelineRow(
                       event: _events[i],
                       payment: widget.event,
+                      clientFactory: widget.clientFactory,
                       isLast: i == _events.length - 1,
                     ),
                 ],
@@ -92,17 +95,24 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
 class _TimelineRow extends StatelessWidget {
   final PaymentEvent event;
   final OperationSummary payment;
+  final PicoClientFactory clientFactory;
   final bool isLast;
 
   const _TimelineRow({
     required this.event,
     required this.payment,
+    required this.clientFactory,
     required this.isLast,
   });
 
   @override
   Widget build(BuildContext context) {
-    final desc = _describe(event, payment, context);
+    final desc = _describe(event, payment, clientFactory, context);
+    final scheme = Theme.of(context).colorScheme;
+    final isAction = desc.onTap != null;
+    // Tappable subtitles get the tone color so they read as a link;
+    // plain subtitles stay muted onSurfaceVariant.
+    final subtitleColor = isAction ? desc.tone : scheme.onSurfaceVariant;
 
     return IntrinsicHeight(
       child: Row(
@@ -127,7 +137,7 @@ class _TimelineRow extends StatelessWidget {
                   Expanded(
                     child: Container(
                       width: 2,
-                      color: Theme.of(context).colorScheme.outlineVariant,
+                      color: scheme.outlineVariant,
                     ),
                   ),
               ],
@@ -135,30 +145,25 @@ class _TimelineRow extends StatelessWidget {
           ),
           const SizedBox(width: 16),
 
-          // Header (label + optional inline action) + optional subheader.
+          // Header label + optional subheader. When the description has
+          // an `onTap`, the subheader doubles as the tappable action
+          // surface (no inline icon — the wording itself signals intent).
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(bottom: isLast ? 0 : 36),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(desc.label, style: mediumStyle),
-                      if (desc.headerAction != null) ...[
-                        const SizedBox(width: 8),
-                        desc.headerAction!,
-                      ],
-                    ],
-                  ),
+                  Text(desc.label, style: mediumStyle),
                   if (desc.subtitle != null)
-                    Text(
-                      desc.subtitle!,
-                      style: smallStyle.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    GestureDetector(
+                      onTap: desc.onTap,
+                      behavior: HitTestBehavior.opaque,
+                      child: Text(
+                        desc.subtitle!,
+                        style: smallStyle.copyWith(color: subtitleColor),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
@@ -174,26 +179,52 @@ class _Description {
   final String label;
   final String? subtitle;
   final Color tone;
-  final Widget? headerAction;
+  final VoidCallback? onTap;
 
   const _Description({
     required this.label,
     required this.tone,
     this.subtitle,
-    this.headerAction,
+    this.onTap,
   });
 }
 
 String _sats(int n) => '${NumberFormat('#,###').format(n)} sat';
 
-Widget _shareIcon(String text, Color color) => GestureDetector(
-  onTap: () => SharePlus.instance.share(ShareParams(text: text)),
-  child: Icon(PhosphorIconsRegular.copy, size: smallIconSize, color: color),
-);
+void _share(String text) {
+  SharePlus.instance.share(ShareParams(text: text));
+}
+
+Future<void> _openEcash(
+  BuildContext context,
+  PicoClientFactory clientFactory,
+  String ecashString,
+) async {
+  final ecash = parseEcash(ecash: ecashString);
+  if (ecash == null) return;
+  // `client` may be null if the user has since left this federation —
+  // DisplayEcashScreen drops the cancel action in that case but still
+  // renders the QR + shareable string + amount.
+  final client = await clientFactory.client(
+    federationId: ecash.federationId(),
+  );
+  if (!context.mounted) return;
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder:
+          (_) => DisplayEcashScreen(
+            client: client,
+            ecash: ecash,
+            encoder: ECashEncoder(ecash: ecash),
+          ),
+    ),
+  );
+}
 
 _Description _describe(
   PaymentEvent event,
   OperationSummary payment,
+  PicoClientFactory clientFactory,
   BuildContext context,
 ) {
   final scheme = Theme.of(context).colorScheme;
@@ -209,9 +240,11 @@ _Description _describe(
       subtitle: '${_sats(changeSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
-    PaymentEvent_TxAccept() => _Description(
+    PaymentEvent_TxAccept(:final txid) => _Description(
       label: 'Transaction Accepted',
+      subtitle: 'Tap to share txid',
       tone: neutral,
+      onTap: () => _share(txid),
     ),
     PaymentEvent_TxReject() => _Description(
       label: 'Transaction Rejected',
@@ -226,8 +259,9 @@ _Description _describe(
     ),
     PaymentEvent_LnSendSuccess(:final preimage) => _Description(
       label: 'Sending Success',
+      subtitle: 'Tap to share preimage',
       tone: success,
-      headerAction: _shareIcon(preimage, success),
+      onTap: () => _share(preimage),
     ),
     PaymentEvent_LnSendRefund(:final expired) => _Description(
       label: 'Refunding',
@@ -246,11 +280,20 @@ _Description _describe(
     ),
 
     // ── Mint (ECash) ────────────────────────────────────────────────────
-    PaymentEvent_MintSend(:final amountSats, :final ecash) => _Description(
+    PaymentEvent_MintSend(:final amountSats) => _Description(
       label: 'Sending eCash',
       subtitle: _sats(amountSats.toInt()),
       tone: neutral,
-      headerAction: _shareIcon(ecash, neutral),
+    ),
+    PaymentEvent_MintSendSuccess(:final ecash) => _Description(
+      label: 'Sending Success',
+      subtitle: 'Tap to display eCash',
+      tone: success,
+      onTap: () => _openEcash(context, clientFactory, ecash),
+    ),
+    PaymentEvent_MintSendFailure() => _Description(
+      label: 'Sending Failure',
+      tone: failure,
     ),
     PaymentEvent_MintRemint() => _Description(
       label: 'Reminting eCash',
@@ -286,8 +329,9 @@ _Description _describe(
     ),
     PaymentEvent_WalletSendSuccess(:final txid) => _Description(
       label: 'Sending Success',
+      subtitle: 'Tap to share txid',
       tone: success,
-      headerAction: _shareIcon(txid, success),
+      onTap: () => _share(txid),
     ),
     PaymentEvent_WalletSendFailure() => _Description(
       label: 'Sending Failure',

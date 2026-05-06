@@ -136,10 +136,10 @@ impl PicoClient {
     }
 
     #[frb]
-    pub async fn ecash_receive(&self, notes: &ECashWrapper) -> Result<(), String> {
+    pub async fn ecash_receive(&self, ecash: &ECashWrapper) -> Result<(), String> {
         self.client
             .mint()
-            .receive(&notes.0)
+            .receive(&ecash.0)
             .map(|_| ())
             .map_err(|e| e.to_string())
     }

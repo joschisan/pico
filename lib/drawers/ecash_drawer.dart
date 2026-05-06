@@ -10,18 +10,18 @@ import 'package:pico/utils/drawer_utils.dart';
 
 class EcashDrawer extends StatefulWidget {
   final PicoClient client;
-  final ECashWrapper notes;
+  final ECashWrapper ecash;
 
-  const EcashDrawer({super.key, required this.client, required this.notes});
+  const EcashDrawer({super.key, required this.client, required this.ecash});
 
   static Future<bool?> show(
     BuildContext context, {
     required PicoClient client,
-    required ECashWrapper notes,
+    required ECashWrapper ecash,
   }) {
     return DrawerUtils.show<bool>(
       context: context,
-      child: EcashDrawer(client: client, notes: notes),
+      child: EcashDrawer(client: client, ecash: ecash),
     );
   }
 
@@ -31,7 +31,7 @@ class EcashDrawer extends StatefulWidget {
 
 class _EcashDrawerState extends State<EcashDrawer> {
   Future<void> _handleReceive() async {
-    await widget.client.ecashReceive(notes: widget.notes);
+    await widget.client.ecashReceive(ecash: widget.ecash);
 
     if (!mounted) return;
 
@@ -44,7 +44,7 @@ class _EcashDrawerState extends State<EcashDrawer> {
       icon: PhosphorIconsRegular.coinVertical,
       title: 'Receive eCash',
       children: [
-        PrimaryCard(child: AmountDisplay(widget.notes.amountSats())),
+        PrimaryCard(child: AmountDisplay(widget.ecash.amountSats())),
         const SizedBox(height: 16),
         AsyncButton(text: 'Receive', onPressed: _handleReceive),
       ],

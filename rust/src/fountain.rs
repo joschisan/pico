@@ -9,8 +9,8 @@ pub struct ECashEncoder(FountainEncoder);
 
 impl ECashEncoder {
     #[frb(sync)]
-    pub fn new(notes: &ECashWrapper) -> Self {
-        Self(FountainEncoder::new(&notes.0, 512))
+    pub fn new(ecash: &ECashWrapper) -> Self {
+        Self(FountainEncoder::new(&ecash.0, 512))
     }
 
     #[frb]

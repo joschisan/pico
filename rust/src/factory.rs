@@ -150,6 +150,16 @@ impl PicoClientFactory {
         self.clients.read().await.values().cloned().collect()
     }
 
+    /// Look up a single warm client by federation id. `None` if the user
+    /// has since left — used by the payment-details drawer to display
+    /// historical ecash without a cancel option when the federation is
+    /// no longer joined.
+    #[frb]
+    pub async fn client(&self, federation_id: &str) -> Option<PicoClient> {
+        let id = FederationId::from_str(federation_id).ok()?;
+        self.clients.read().await.get(&id).cloned()
+    }
+
     #[frb]
     pub async fn join(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
         let config = download(&self.endpoint, &invite.0)

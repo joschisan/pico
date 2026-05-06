@@ -27,7 +27,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
   Future<void> _handleConfirm(int amountSats) async {
     await requireBiometricAuth(context);
 
-    final notes = await _client.ecashSend(amountSat: amountSats);
+    final ecash = await _client.ecashSend(amountSat: amountSats);
 
     if (!mounted) return;
 
@@ -36,8 +36,8 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
         builder:
             (_) => DisplayEcashScreen(
               client: _client,
-              notes: notes,
-              encoder: ECashEncoder(notes: notes),
+              ecash: ecash,
+              encoder: ECashEncoder(ecash: ecash),
             ),
       ),
     );

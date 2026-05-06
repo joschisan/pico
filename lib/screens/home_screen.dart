@@ -146,9 +146,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       (
-        parseEcash(notes: input),
+        parseEcash(ecash: input),
         (dynamic result) =>
-            EcashDrawer.show(context, client: client, notes: result),
+            EcashDrawer.show(context, client: client, ecash: result),
       ),
       (
         parseBitcoinAddress(address: input),

@@ -25,6 +25,7 @@ _Status? _classify(PaymentEvent event) => switch (event) {
   PaymentEvent_TxReject() => _Status.error,
   PaymentEvent_LnSendRefund() => _Status.warning,
   PaymentEvent_LnSendFailure() => _Status.error,
+  PaymentEvent_MintSendFailure() => _Status.error,
   PaymentEvent_MintFailure() => _Status.error,
   PaymentEvent_WalletSendFailure() => _Status.error,
   _ => null,

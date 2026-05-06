@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.10.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1988411182;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1028144986;
 
 // Section: executor
 
@@ -245,27 +245,27 @@ fn wire__crate__fountain__ECashEncoder_new_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_notes = <RustOpaqueMoi<
+            let api_ecash = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ECashWrapper>,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
-                let mut api_notes_guard = None;
+                let mut api_ecash_guard = None;
                 let decode_indices_ =
                     flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
                         flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                            &api_notes, 0, false,
+                            &api_ecash, 0, false,
                         ),
                     ]);
                 for i in decode_indices_ {
                     match i {
-                        0 => api_notes_guard = Some(api_notes.lockable_decode_sync_ref()),
+                        0 => api_ecash_guard = Some(api_ecash.lockable_decode_sync_ref()),
                         _ => unreachable!(),
                     }
                 }
-                let api_notes_guard = api_notes_guard.unwrap();
+                let api_ecash_guard = api_ecash_guard.unwrap();
                 let output_ok =
-                    Result::<_, ()>::Ok(crate::fountain::ECashEncoder::new(&*api_notes_guard))?;
+                    Result::<_, ()>::Ok(crate::fountain::ECashEncoder::new(&*api_ecash_guard))?;
                 Ok(output_ok)
             })())
         },
@@ -364,6 +364,53 @@ fn wire__crate__ECashWrapper_amount_sats_impl(
                 let api_that_guard = api_that_guard.unwrap();
                 let output_ok =
                     Result::<_, ()>::Ok(crate::ECashWrapper::amount_sats(&*api_that_guard))?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__ECashWrapper_federation_id_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ECashWrapper_federation_id",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ECashWrapper>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok =
+                    Result::<_, ()>::Ok(crate::ECashWrapper::federation_id(&*api_that_guard))?;
                 Ok(output_ok)
             })())
         },
@@ -557,6 +604,68 @@ fn wire__crate__lnurl__PayResponseWrapper_min_sats_impl(
                 ))?;
                 Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__factory__PicoClientFactory_client_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PicoClientFactory_client",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClientFactory>,
+            >>::sse_decode(&mut deserializer);
+            let api_federation_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::factory::PicoClientFactory::client(
+                                &*api_that_guard,
+                                &api_federation_id,
+                            )
+                            .await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
         },
     )
 }
@@ -1833,7 +1942,7 @@ fn wire__crate__client__PicoClient_ecash_receive_impl(
             let api_that = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
             >>::sse_decode(&mut deserializer);
-            let api_notes = <RustOpaqueMoi<
+            let api_ecash = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ECashWrapper>,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
@@ -1841,7 +1950,7 @@ fn wire__crate__client__PicoClient_ecash_receive_impl(
                 transform_result_sse::<_, String>(
                     (move || async move {
                         let mut api_that_guard = None;
-                        let mut api_notes_guard = None;
+                        let mut api_ecash_guard = None;
                         let decode_indices_ =
                             flutter_rust_bridge::for_generated::lockable_compute_decode_order(
                                 vec![
@@ -1849,7 +1958,7 @@ fn wire__crate__client__PicoClient_ecash_receive_impl(
                                         &api_that, 0, false,
                                     ),
                                     flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                        &api_notes, 1, false,
+                                        &api_ecash, 1, false,
                                     ),
                                 ],
                             );
@@ -1860,17 +1969,17 @@ fn wire__crate__client__PicoClient_ecash_receive_impl(
                                         Some(api_that.lockable_decode_async_ref().await)
                                 }
                                 1 => {
-                                    api_notes_guard =
-                                        Some(api_notes.lockable_decode_async_ref().await)
+                                    api_ecash_guard =
+                                        Some(api_ecash.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
                         let api_that_guard = api_that_guard.unwrap();
-                        let api_notes_guard = api_notes_guard.unwrap();
+                        let api_ecash_guard = api_ecash_guard.unwrap();
                         let output_ok = crate::client::PicoClient::ecash_receive(
                             &*api_that_guard,
-                            &*api_notes_guard,
+                            &*api_ecash_guard,
                         )
                         .await?;
                         Ok(output_ok)
@@ -3407,10 +3516,10 @@ fn wire__crate__parse_ecash_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_notes = <String>::sse_decode(&mut deserializer);
+            let api_ecash = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
-                let output_ok = Result::<_, ()>::Ok(crate::parse_ecash(&api_notes))?;
+                let output_ok = Result::<_, ()>::Ok(crate::parse_ecash(&api_ecash))?;
                 Ok(output_ok)
             })())
         },
@@ -4161,6 +4270,17 @@ impl SseDecode for Option<MnemonicWrapper> {
     }
 }
 
+impl SseDecode for Option<PicoClient> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<PicoClient>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<PicoClientFactory> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4291,14 +4411,26 @@ impl SseDecode for crate::events::PaymentEvent {
             8 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
-                let mut var_ecash = <String>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::MintSend {
                     timestamp: var_timestamp,
                     amount_sats: var_amountSats,
-                    ecash: var_ecash,
                 };
             }
             9 => {
+                let mut var_timestamp = <i64>::sse_decode(deserializer);
+                let mut var_ecash = <String>::sse_decode(deserializer);
+                return crate::events::PaymentEvent::MintSendSuccess {
+                    timestamp: var_timestamp,
+                    ecash: var_ecash,
+                };
+            }
+            10 => {
+                let mut var_timestamp = <i64>::sse_decode(deserializer);
+                return crate::events::PaymentEvent::MintSendFailure {
+                    timestamp: var_timestamp,
+                };
+            }
+            11 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::MintRemint {
@@ -4306,7 +4438,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     txid: var_txid,
                 };
             }
-            10 => {
+            12 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4316,7 +4448,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     amount_sats: var_amountSats,
                 };
             }
-            11 => {
+            13 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4326,13 +4458,13 @@ impl SseDecode for crate::events::PaymentEvent {
                     amount_sats: var_amountSats,
                 };
             }
-            12 => {
+            14 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::MintFailure {
                     timestamp: var_timestamp,
                 };
             }
-            13 => {
+            15 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
                 let mut var_txid = <Option<String>>::sse_decode(deserializer);
@@ -4342,7 +4474,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     txid: var_txid,
                 };
             }
-            14 => {
+            16 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4354,7 +4486,7 @@ impl SseDecode for crate::events::PaymentEvent {
                     fee_sats: var_feeSats,
                 };
             }
-            15 => {
+            17 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::WalletSendSuccess {
@@ -4362,13 +4494,13 @@ impl SseDecode for crate::events::PaymentEvent {
                     txid: var_txid,
                 };
             }
-            16 => {
+            18 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 return crate::events::PaymentEvent::WalletSendFailure {
                     timestamp: var_timestamp,
                 };
             }
-            17 => {
+            19 => {
                 let mut var_timestamp = <i64>::sse_decode(deserializer);
                 let mut var_txid = <String>::sse_decode(deserializer);
                 let mut var_amountSats = <i64>::sse_decode(deserializer);
@@ -4443,157 +4575,160 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        12 => {
+        13 => {
+            wire__crate__factory__PicoClientFactory_client_impl(port, ptr, rust_vec_len, data_len)
+        }
+        14 => {
             wire__crate__factory__PicoClientFactory_clients_impl(port, ptr, rust_vec_len, data_len)
         }
-        13 => wire__crate__factory__PicoClientFactory_delete_contact_impl(
+        15 => wire__crate__factory__PicoClientFactory_delete_contact_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        14 => wire__crate__factory__PicoClientFactory_get_contact_name_impl(
+        16 => wire__crate__factory__PicoClientFactory_get_contact_name_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        15 => wire__crate__factory__PicoClientFactory_get_currency_impl(
+        17 => wire__crate__factory__PicoClientFactory_get_currency_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        16 => wire__crate__factory__PicoClientFactory_init_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__factory__PicoClientFactory_join_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__factory__PicoClientFactory_leave_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__factory__PicoClientFactory_list_contacts_impl(
+        18 => wire__crate__factory__PicoClientFactory_init_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__factory__PicoClientFactory_join_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__factory__PicoClientFactory_leave_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__factory__PicoClientFactory_list_contacts_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        20 => wire__crate__factory__PicoClientFactory_list_operations_impl(
+        22 => wire__crate__factory__PicoClientFactory_list_operations_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        21 => {
+        23 => {
             wire__crate__factory__PicoClientFactory_recover_impl(port, ptr, rust_vec_len, data_len)
         }
-        22 => wire__crate__factory__PicoClientFactory_save_contact_impl(
+        24 => wire__crate__factory__PicoClientFactory_save_contact_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        23 => wire__crate__factory__PicoClientFactory_seed_phrase_impl(
+        25 => wire__crate__factory__PicoClientFactory_seed_phrase_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        24 => wire__crate__factory__PicoClientFactory_set_currency_impl(
+        26 => wire__crate__factory__PicoClientFactory_set_currency_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        25 => wire__crate__factory__PicoClientFactory_subscribe_clients_impl(
+        27 => wire__crate__factory__PicoClientFactory_subscribe_clients_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        26 => wire__crate__factory__PicoClientFactory_subscribe_global_balance_impl(
+        28 => wire__crate__factory__PicoClientFactory_subscribe_global_balance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        27 => wire__crate__factory__PicoClientFactory_subscribe_notifications_impl(
+        29 => wire__crate__factory__PicoClientFactory_subscribe_notifications_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        28 => wire__crate__factory__PicoClientFactory_subscribe_payment_events_impl(
+        30 => wire__crate__factory__PicoClientFactory_subscribe_payment_events_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        29 => wire__crate__factory__PicoClientFactory_subscribe_recent_operations_impl(
+        31 => wire__crate__factory__PicoClientFactory_subscribe_recent_operations_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => {
+        32 => {
             wire__crate__factory__PicoClientFactory_try_load_impl(port, ptr, rust_vec_len, data_len)
         }
-        32 => wire__crate__client__PicoClient_ecash_receive_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__client__PicoClient_ecash_send_impl(port, ptr, rust_vec_len, data_len),
-        34 => {
+        34 => wire__crate__client__PicoClient_ecash_receive_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__client__PicoClient_ecash_send_impl(port, ptr, rust_vec_len, data_len),
+        36 => {
             wire__crate__client__PicoClient_expiration_date_impl(port, ptr, rust_vec_len, data_len)
         }
-        35 => wire__crate__client__PicoClient_expiration_successor_impl(
+        37 => wire__crate__client__PicoClient_expiration_successor_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        37 => {
+        39 => {
             wire__crate__client__PicoClient_federation_name_impl(port, ptr, rust_vec_len, data_len)
         }
-        38 => wire__crate__client__PicoClient_fiat_to_sats_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__client__PicoClient_ln_receive_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__client__PicoClient_ln_send_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__client__PicoClient_lnurl_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__client__PicoClient_onchain_calculate_fees_impl(
+        40 => wire__crate__client__PicoClient_fiat_to_sats_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__client__PicoClient_ln_receive_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__client__PicoClient_ln_send_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__client__PicoClient_lnurl_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__client__PicoClient_onchain_calculate_fees_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        43 => wire__crate__client__PicoClient_onchain_receive_address_impl(
+        45 => wire__crate__client__PicoClient_onchain_receive_address_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        44 => wire__crate__client__PicoClient_onchain_send_impl(port, ptr, rust_vec_len, data_len),
-        45 => wire__crate__client__PicoClient_prefetch_exchange_rates_impl(
+        46 => wire__crate__client__PicoClient_onchain_send_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__client__PicoClient_prefetch_exchange_rates_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        46 => wire__crate__client__PicoClient_shutdown_impl(port, ptr, rust_vec_len, data_len),
-        47 => wire__crate__client__PicoClient_subscribe_balance_impl(
+        48 => wire__crate__client__PicoClient_shutdown_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__client__PicoClient_subscribe_balance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        48 => wire__crate__client__PicoClient_subscribe_connection_status_impl(
+        50 => wire__crate__client__PicoClient_subscribe_connection_status_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        49 => wire__crate__client__PicoClient_subscribe_recovery_progress_impl(
+        51 => wire__crate__client__PicoClient_subscribe_recovery_progress_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        54 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
-        59 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
-        65 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        56 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        58 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
+        59 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
+        61 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
+        67 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -4612,26 +4747,27 @@ fn pde_ffi_dispatcher_sync_impl(
         4 => wire__crate__fountain__ECashDecoder_new_impl(ptr, rust_vec_len, data_len),
         5 => wire__crate__fountain__ECashEncoder_new_impl(ptr, rust_vec_len, data_len),
         7 => wire__crate__ECashWrapper_amount_sats_impl(ptr, rust_vec_len, data_len),
-        8 => wire__crate__ECashWrapper_to_string_impl(ptr, rust_vec_len, data_len),
-        9 => {
+        8 => wire__crate__ECashWrapper_federation_id_impl(ptr, rust_vec_len, data_len),
+        9 => wire__crate__ECashWrapper_to_string_impl(ptr, rust_vec_len, data_len),
+        10 => {
             wire__crate__lnurl__PayResponseWrapper_is_fixed_amount_impl(ptr, rust_vec_len, data_len)
         }
-        10 => wire__crate__lnurl__PayResponseWrapper_max_sats_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__lnurl__PayResponseWrapper_min_sats_impl(ptr, rust_vec_len, data_len),
-        31 => wire__crate__client__PicoClient_currency_code_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__client__PicoClient_federation_id_impl(ptr, rust_vec_len, data_len),
-        50 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
-        51 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
-        52 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
-        53 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
-        55 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
-        58 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
-        60 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
-        61 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
-        62 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
-        63 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
-        64 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
-        66 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
+        11 => wire__crate__lnurl__PayResponseWrapper_max_sats_impl(ptr, rust_vec_len, data_len),
+        12 => wire__crate__lnurl__PayResponseWrapper_min_sats_impl(ptr, rust_vec_len, data_len),
+        33 => wire__crate__client__PicoClient_currency_code_impl(ptr, rust_vec_len, data_len),
+        38 => wire__crate__client__PicoClient_federation_id_impl(ptr, rust_vec_len, data_len),
+        52 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
+        53 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
+        54 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
+        55 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
+        57 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
+        60 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
+        62 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
+        63 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
+        64 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
+        65 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
+        66 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
+        68 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -5001,16 +5137,23 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
             crate::events::PaymentEvent::MintSend {
                 timestamp,
                 amount_sats,
-                ecash,
             } => [
                 8.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::events::PaymentEvent::MintSendSuccess { timestamp, ecash } => [
+                9.into_dart(),
+                timestamp.into_into_dart().into_dart(),
                 ecash.into_into_dart().into_dart(),
             ]
             .into_dart(),
+            crate::events::PaymentEvent::MintSendFailure { timestamp } => {
+                [10.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
+            }
             crate::events::PaymentEvent::MintRemint { timestamp, txid } => [
-                9.into_dart(),
+                11.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
             ]
@@ -5020,7 +5163,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 txid,
                 amount_sats,
             } => [
-                10.into_dart(),
+                12.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
@@ -5031,21 +5174,21 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 txid,
                 amount_sats,
             } => [
-                11.into_dart(),
+                13.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
             ]
             .into_dart(),
             crate::events::PaymentEvent::MintFailure { timestamp } => {
-                [12.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
+                [14.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
             }
             crate::events::PaymentEvent::MintRecovery {
                 timestamp,
                 amount_sats,
                 txid,
             } => [
-                13.into_dart(),
+                15.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
@@ -5057,7 +5200,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => [
-                14.into_dart(),
+                16.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
@@ -5065,13 +5208,13 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
             ]
             .into_dart(),
             crate::events::PaymentEvent::WalletSendSuccess { timestamp, txid } => [
-                15.into_dart(),
+                17.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
             ]
             .into_dart(),
             crate::events::PaymentEvent::WalletSendFailure { timestamp } => {
-                [16.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
+                [18.into_dart(), timestamp.into_into_dart().into_dart()].into_dart()
             }
             crate::events::PaymentEvent::WalletReceive {
                 timestamp,
@@ -5079,7 +5222,7 @@ impl flutter_rust_bridge::IntoDart for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => [
-                17.into_dart(),
+                19.into_dart(),
                 timestamp.into_into_dart().into_dart(),
                 txid.into_into_dart().into_dart(),
                 amount_sats.into_into_dart().into_dart(),
@@ -5634,6 +5777,16 @@ impl SseEncode for Option<MnemonicWrapper> {
     }
 }
 
+impl SseEncode for Option<PicoClient> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <PicoClient>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<PicoClientFactory> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -5754,15 +5907,22 @@ impl SseEncode for crate::events::PaymentEvent {
             crate::events::PaymentEvent::MintSend {
                 timestamp,
                 amount_sats,
-                ecash,
             } => {
                 <i32>::sse_encode(8, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
+            }
+            crate::events::PaymentEvent::MintSendSuccess { timestamp, ecash } => {
+                <i32>::sse_encode(9, serializer);
+                <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(ecash, serializer);
             }
+            crate::events::PaymentEvent::MintSendFailure { timestamp } => {
+                <i32>::sse_encode(10, serializer);
+                <i64>::sse_encode(timestamp, serializer);
+            }
             crate::events::PaymentEvent::MintRemint { timestamp, txid } => {
-                <i32>::sse_encode(9, serializer);
+                <i32>::sse_encode(11, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
             }
@@ -5771,7 +5931,7 @@ impl SseEncode for crate::events::PaymentEvent {
                 txid,
                 amount_sats,
             } => {
-                <i32>::sse_encode(10, serializer);
+                <i32>::sse_encode(12, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
@@ -5781,13 +5941,13 @@ impl SseEncode for crate::events::PaymentEvent {
                 txid,
                 amount_sats,
             } => {
-                <i32>::sse_encode(11, serializer);
+                <i32>::sse_encode(13, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
             }
             crate::events::PaymentEvent::MintFailure { timestamp } => {
-                <i32>::sse_encode(12, serializer);
+                <i32>::sse_encode(14, serializer);
                 <i64>::sse_encode(timestamp, serializer);
             }
             crate::events::PaymentEvent::MintRecovery {
@@ -5795,7 +5955,7 @@ impl SseEncode for crate::events::PaymentEvent {
                 amount_sats,
                 txid,
             } => {
-                <i32>::sse_encode(13, serializer);
+                <i32>::sse_encode(15, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
                 <Option<String>>::sse_encode(txid, serializer);
@@ -5806,19 +5966,19 @@ impl SseEncode for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => {
-                <i32>::sse_encode(14, serializer);
+                <i32>::sse_encode(16, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);
                 <i64>::sse_encode(fee_sats, serializer);
             }
             crate::events::PaymentEvent::WalletSendSuccess { timestamp, txid } => {
-                <i32>::sse_encode(15, serializer);
+                <i32>::sse_encode(17, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
             }
             crate::events::PaymentEvent::WalletSendFailure { timestamp } => {
-                <i32>::sse_encode(16, serializer);
+                <i32>::sse_encode(18, serializer);
                 <i64>::sse_encode(timestamp, serializer);
             }
             crate::events::PaymentEvent::WalletReceive {
@@ -5827,7 +5987,7 @@ impl SseEncode for crate::events::PaymentEvent {
                 amount_sats,
                 fee_sats,
             } => {
-                <i32>::sse_encode(17, serializer);
+                <i32>::sse_encode(19, serializer);
                 <i64>::sse_encode(timestamp, serializer);
                 <String>::sse_encode(txid, serializer);
                 <i64>::sse_encode(amount_sats, serializer);

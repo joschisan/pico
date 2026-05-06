@@ -17,31 +17,41 @@ Stream<String> _createFrameStream(ECashEncoder encoder) async* {
 }
 
 class DisplayEcashScreen extends StatelessWidget {
-  final PicoClient client;
-  final ECashWrapper notes;
+  // Optional so the payment-details drawer can replay an old ecash
+  // bundle even after the user has left the issuing federation — in
+  // that case we drop the cancel action since reissuing requires a
+  // warm client for the same federation.
+  final PicoClient? client;
+  final ECashWrapper ecash;
   final ECashEncoder encoder;
 
   const DisplayEcashScreen({
     super.key,
-    required this.client,
-    required this.notes,
+    this.client,
+    required this.ecash,
     required this.encoder,
   });
 
-  void _showCancelDrawer(BuildContext context) {
-    CancelEcashDrawer.show(context, client: client, notes: notes);
-  }
-
   @override
   Widget build(BuildContext context) {
+    final client = this.client;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Send eCash'),
         actions: [
-          IconButton(
-            icon: const Icon(PhosphorIconsRegular.xCircle, size: smallIconSize),
-            onPressed: () => _showCancelDrawer(context),
-          ),
+          if (client != null)
+            IconButton(
+              icon: const Icon(
+                PhosphorIconsRegular.xCircle,
+                size: smallIconSize,
+              ),
+              onPressed:
+                  () => CancelEcashDrawer.show(
+                    context,
+                    client: client,
+                    ecash: ecash,
+                  ),
+            ),
         ],
       ),
       body: SafeArea(
@@ -59,8 +69,8 @@ class DisplayEcashScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 16),
-              ShareableData(data: notes.toString()),
-              Expanded(child: Center(child: AmountDisplay(notes.amountSats()))),
+              ShareableData(data: ecash.toString()),
+              Expanded(child: Center(child: AmountDisplay(ecash.amountSats()))),
             ],
           ),
         ),
