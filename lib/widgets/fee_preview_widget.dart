@@ -29,18 +29,18 @@ class FeePreview extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text('Querying fee…', style: tinted),
+              Text('querying fee…', style: tinted),
             ],
           );
         }
 
         if (snapshot.hasError) {
-          return Text('Fee unavailable', style: tinted);
+          return Text('fee unavailable', style: tinted);
         }
 
         final sats = snapshot.data ?? 0;
         return Text(
-          'Fee: ${NumberFormat('#,###').format(sats)} sat',
+          'fee ${NumberFormat('#,###').format(sats)} sat',
           style: tinted,
         );
       },
