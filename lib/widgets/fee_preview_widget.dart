@@ -50,31 +50,35 @@ class FeePreview extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final tinted = mediumStyle.copyWith(color: scheme.primary);
 
-    if (failed) return Text('$label not available', style: tinted);
-
-    final sats = feeSats;
-    if (sats == null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+    final Widget child;
+    if (failed) {
+      child = Text('$label not available', style: tinted);
+    } else {
+      final sats = feeSats;
+      if (sats == null) {
+        child = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text('querying $label…', style: tinted),
-        ],
-      );
+            const SizedBox(width: 8),
+            Text('querying $label…', style: tinted),
+          ],
+        );
+      } else {
+        child = Text(
+          '${NumberFormat('#,###').format(sats)} sat $label',
+          style: tinted,
+        );
+      }
     }
 
-    return Text(
-      '${NumberFormat('#,###').format(sats)} sat $label',
-      style: tinted,
-    );
+    return Center(child: child);
   }
 }
