@@ -151,7 +151,6 @@ class _HomeScreenState extends State<HomeScreen> {
         (dynamic result) => EcashDrawer.show(
           context,
           clientFactory: widget.clientFactory,
-          client: client,
           ecash: result,
         ),
       ),

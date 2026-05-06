@@ -12,29 +12,22 @@ import 'package:pico/utils/drawer_utils.dart';
 
 class EcashDrawer extends StatefulWidget {
   final PicoClientFactory clientFactory;
-  final PicoClient client;
   final ECashWrapper ecash;
 
   const EcashDrawer({
     super.key,
     required this.clientFactory,
-    required this.client,
     required this.ecash,
   });
 
   static Future<bool?> show(
     BuildContext context, {
     required PicoClientFactory clientFactory,
-    required PicoClient client,
     required ECashWrapper ecash,
   }) {
     return DrawerUtils.show<bool>(
       context: context,
-      child: EcashDrawer(
-        clientFactory: clientFactory,
-        client: client,
-        ecash: ecash,
-      ),
+      child: EcashDrawer(clientFactory: clientFactory, ecash: ecash),
     );
   }
 
@@ -43,8 +36,18 @@ class EcashDrawer extends StatefulWidget {
 }
 
 class _EcashDrawerState extends State<EcashDrawer> {
+  // Cached so the chip's FutureBuilder and the receive button look at
+  // the same lookup — and so the lookup doesn't re-fire on every
+  // rebuild.
+  late final Future<PicoClient?> _issuer = widget.clientFactory.client(
+    federationId: widget.ecash.federationId(),
+  );
+
   Future<void> _handleReceive() async {
-    await widget.client.ecashReceive(ecash: widget.ecash);
+    final issuer = await _issuer;
+    if (issuer == null) throw Exception('Federation is unknown');
+
+    await issuer.ecashReceive(ecash: widget.ecash);
 
     if (!mounted) return;
 
@@ -57,13 +60,12 @@ class _EcashDrawerState extends State<EcashDrawer> {
       icon: PhosphorIconsRegular.coinVertical,
       title: 'Receive eCash',
       children: [
-        // Read-only — the federation is fixed by the ecash bundle, not
-        // a user choice. Resolved against the warm clients; if the
-        // user has since left, we render the bundle without the tile.
+        // Read-only — the federation is fixed by the ecash bundle.
+        // While loading or if the user has since left, the chip
+        // silently drops; the receive button throws on the same null
+        // and AsyncButton surfaces it as a toast.
         FutureBuilder<PicoClient?>(
-          future: widget.clientFactory.client(
-            federationId: widget.ecash.federationId(),
-          ),
+          future: _issuer,
           builder: (_, snapshot) {
             final issuer = snapshot.data;
             if (issuer == null) return const SizedBox.shrink();
