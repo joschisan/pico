@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -38,7 +38,7 @@ pub struct PicoClientFactory {
     /// Re-joining a previously-left federation reuses the same key —
     /// `Client::wipe` clears the per-federation isolated tables on
     /// leave, so the second join sees a clean state.
-    clients: Arc<RwLock<HashMap<FederationId, PicoClient>>>,
+    clients: Arc<RwLock<BTreeMap<FederationId, PicoClient>>>,
     /// Wakes anyone iterating the client set when membership changes.
     /// `notify_waiters` is fire-and-forget; subscribers re-snapshot the
     /// map after waking.
@@ -114,7 +114,7 @@ impl PicoClientFactory {
             .get(&SELECTED_CURRENCY, &())
             .unwrap_or_else(|| "USD".to_string());
 
-        let mut warmed: HashMap<FederationId, PicoClient> = HashMap::new();
+        let mut warmed: BTreeMap<FederationId, PicoClient> = BTreeMap::new();
         for (fed_id, config) in entries {
             let isolated = db.isolate(fed_id);
 
