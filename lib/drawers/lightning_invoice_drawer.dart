@@ -6,7 +6,6 @@ import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/amount_display_widget.dart';
 import 'package:pico/widgets/federation_chip_widget.dart';
-import 'package:pico/widgets/primary_card_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/utils/drawer_utils.dart';
@@ -67,9 +66,9 @@ class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
           client: _client,
           onChanged: (next) => setState(() => _client = next),
         ),
-        const SizedBox(height: 16),
-        PrimaryCard(child: AmountDisplay(widget.invoice.amountSats())),
-        const SizedBox(height: 16),
+        const SizedBox(height: 64),
+        AmountDisplay(widget.invoice.amountSats()),
+        const SizedBox(height: 64),
         AsyncButton(text: 'Confirm', onPressed: _handleConfirm),
       ],
     );

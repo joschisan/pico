@@ -6,7 +6,6 @@ import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/amount_display_widget.dart';
 import 'package:pico/widgets/federation_chip_widget.dart';
-import 'package:pico/widgets/primary_card_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
 
@@ -69,17 +68,15 @@ class _EcashDrawerState extends State<EcashDrawer> {
           builder: (_, snapshot) {
             final issuer = snapshot.data;
             if (issuer == null) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: FederationChip(
-                clientFactory: widget.clientFactory,
-                client: issuer,
-              ),
+            return FederationChip(
+              clientFactory: widget.clientFactory,
+              client: issuer,
             );
           },
         ),
-        PrimaryCard(child: AmountDisplay(widget.ecash.amountSats())),
-        const SizedBox(height: 16),
+        const SizedBox(height: 64),
+        AmountDisplay(widget.ecash.amountSats()),
+        const SizedBox(height: 64),
         AsyncButton(text: 'Receive', onPressed: _handleReceive),
       ],
     );
