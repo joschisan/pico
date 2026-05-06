@@ -240,11 +240,9 @@ _Description _describe(
       subtitle: '${_sats(changeSats.toInt())} · ${_sats(feeSats.toInt())}',
       tone: neutral,
     ),
-    PaymentEvent_TxAccept(:final txid) => _Description(
+    PaymentEvent_TxAccept() => _Description(
       label: 'Transaction Accepted',
-      subtitle: 'Tap to share txid',
       tone: neutral,
-      onTap: () => _share(txid),
     ),
     PaymentEvent_TxReject() => _Description(
       label: 'Transaction Rejected',
