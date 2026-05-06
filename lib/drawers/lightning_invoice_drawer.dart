@@ -62,12 +62,10 @@ class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
       icon: PhosphorIconsRegular.lightning,
       title: 'Send Lightning',
       children: [
-        Center(
-          child: FederationChip(
-            clientFactory: widget.clientFactory,
-            client: _client,
-            onChanged: (next) => setState(() => _client = next),
-          ),
+        FederationChip(
+          clientFactory: widget.clientFactory,
+          client: _client,
+          onChanged: (next) => setState(() => _client = next),
         ),
         const SizedBox(height: 16),
         PrimaryCard(child: AmountDisplay(widget.invoice.amountSats())),

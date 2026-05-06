@@ -54,7 +54,7 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: FederationChip(
                 clientFactory: widget.clientFactory,
                 client: _client,

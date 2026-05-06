@@ -36,65 +36,72 @@ class FederationChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    // Matches the rounded-rect border styling of `BorderedList` items
-    // so the chip reads as a single-row tile in the same visual family
-    // as the federation list on the home screen.
-    return InkWell(
-      onTap: () => _openPicker(context),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: listTilePadding,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            StreamBuilder<List<(String, bool)>>(
-              stream: client.subscribeConnectionStatus(),
-              builder: (_, snapshot) {
-                final online = snapshot.data?.any((s) => s.$2) ?? false;
-                return Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color:
-                        online
-                            ? scheme.primary
-                            : scheme.primary.withValues(alpha: 0.3),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: FutureBuilder<String?>(
-                future: client.federationName(),
-                builder:
-                    (_, snapshot) => Text(
-                      snapshot.data ?? '…',
-                      style: smallStyle.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+    // Full-width single-tile mirror of `_FederationRow` on the home
+    // screen: status dot + balance/name stack, wrapped in a bordered
+    // container that matches `BorderedList` corners.
+    return Material(
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openPicker(context),
+        child: Padding(
+          padding: listTilePadding,
+          child: Row(
+            children: [
+              StreamBuilder<List<(String, bool)>>(
+                stream: client.subscribeConnectionStatus(),
+                builder: (_, snapshot) {
+                  final online = snapshot.data?.any((s) => s.$2) ?? false;
+                  return Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color:
+                          online
+                              ? scheme.primary
+                              : scheme.primary.withValues(alpha: 0.3),
                     ),
+                  );
+                },
               ),
-            ),
-            const SizedBox(width: 8),
-            StreamBuilder<int>(
-              stream: client.subscribeBalance(),
-              builder: (_, snapshot) {
-                final sats = snapshot.data ?? 0;
-                return Text(
-                  '· ${NumberFormat('#,###').format(sats)} sat',
-                  style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
-                );
-              },
-            ),
-          ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    StreamBuilder<int>(
+                      stream: client.subscribeBalance(),
+                      builder: (_, snapshot) {
+                        final sats = snapshot.data ?? 0;
+                        return Text(
+                          '${NumberFormat('#,###').format(sats)} sat',
+                          style: mediumStyle,
+                        );
+                      },
+                    ),
+                    FutureBuilder<String?>(
+                      future: client.federationName(),
+                      builder:
+                          (_, snapshot) => Text(
+                            snapshot.data ?? '…',
+                            style: smallStyle.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
