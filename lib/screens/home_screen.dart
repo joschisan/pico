@@ -381,27 +381,34 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                       ],
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _CircularActionButton(
-                          icon: PhosphorIconsRegular.lightning,
-                          label: 'Lightning',
-                          onTap: _onCreateInvoice,
-                        ),
-                        _CircularActionButton(
-                          icon: PhosphorIconsRegular.link,
-                          label: 'Onchain',
-                          onTap: _onReceiveBitcoin,
-                        ),
-                        _CircularActionButton(
-                          icon: PhosphorIconsRegular.coinVertical,
-                          label: 'eCash',
-                          onTap: _onSendEcash,
-                        ),
-                      ],
+                    // ListTile centering + contentPadding leave ~32px of
+                    // implicit slack between the federation list border
+                    // and the action row. Pull the row up 16px and drop
+                    // the SizedBox below so the visible gap above is
+                    // ~16px and the gap to RecentPayments stays ~16px.
+                    Transform.translate(
+                      offset: const Offset(0, -16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _CircularActionButton(
+                            icon: PhosphorIconsRegular.lightning,
+                            label: 'Lightning',
+                            onTap: _onCreateInvoice,
+                          ),
+                          _CircularActionButton(
+                            icon: PhosphorIconsRegular.link,
+                            label: 'Onchain',
+                            onTap: _onReceiveBitcoin,
+                          ),
+                          _CircularActionButton(
+                            icon: PhosphorIconsRegular.coinVertical,
+                            label: 'eCash',
+                            onTap: _onSendEcash,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
                     RecentPayments(
                       clientFactory: widget.clientFactory,
                       stream: _recentStream,
@@ -536,8 +543,7 @@ class _FederationRow extends StatelessWidget {
                   // stream the moment recovery finalizes.
                   final inProgress =
                       progressSnap.hasData &&
-                      progressSnap.connectionState !=
-                          ConnectionState.done;
+                      progressSnap.connectionState != ConnectionState.done;
                   final text =
                       inProgress
                           ? '$name · ${progressSnap.data!.round()}%'
