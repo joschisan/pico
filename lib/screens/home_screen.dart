@@ -280,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onTransfer() {
     FederationPickerDrawer.show(
       context,
-      title: 'Transfer from',
+      title: 'Select Origin',
       clients: _clients,
       onSelected: _onTransferSourcePicked,
     );
@@ -289,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onTransferSourcePicked(PicoClient source) {
     FederationPickerDrawer.show(
       context,
-      title: 'Transfer to',
+      title: 'Select Destination',
       clients: _clients,
       onSelected: (dest) => _onTransferDestPicked(source, dest),
     );
