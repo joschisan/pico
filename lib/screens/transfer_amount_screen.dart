@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/drawers/federation_picker_drawer.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
@@ -12,11 +14,13 @@ import 'package:pico/widgets/fee_preview_widget.dart';
 class TransferAmountScreen extends StatefulWidget {
   final PicoClient source;
   final PicoClient dest;
+  final PicoClientFactory clientFactory;
 
   const TransferAmountScreen({
     super.key,
     required this.source,
     required this.dest,
+    required this.clientFactory,
   });
 
   @override
@@ -24,10 +28,12 @@ class TransferAmountScreen extends StatefulWidget {
 }
 
 class _TransferAmountScreenState extends State<TransferAmountScreen> {
+  late PicoClient _source = widget.source;
+  late PicoClient _dest = widget.dest;
   int _amountSats = 0;
 
-  // Both gateways prefetched on init so the combined fee updates
-  // synchronously as the user types.
+  // Both gateways prefetched on init / on endpoint swap so the
+  // combined fee updates synchronously as the user types.
   GatewayInfoWrapper? _sourceGateway;
   GatewayInfoWrapper? _destGateway;
   bool _gatewayFailed = false;
@@ -35,7 +41,14 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
   @override
   void initState() {
     super.initState();
-    widget.source.lnSelectAnyGateway().then(
+    _kickoffSourceGateway();
+    _kickoffDestGateway();
+  }
+
+  void _kickoffSourceGateway() {
+    _sourceGateway = null;
+    _gatewayFailed = false;
+    _source.lnSelectAnyGateway().then(
       (g) {
         if (mounted) setState(() => _sourceGateway = g);
       },
@@ -43,7 +56,12 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
         if (mounted) setState(() => _gatewayFailed = true);
       },
     );
-    widget.dest.lnSelectAnyGateway().then(
+  }
+
+  void _kickoffDestGateway() {
+    _destGateway = null;
+    _gatewayFailed = false;
+    _dest.lnSelectAnyGateway().then(
       (g) {
         if (mounted) setState(() => _destGateway = g);
       },
@@ -53,17 +71,28 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
     );
   }
 
+  Future<void> _openPicker({
+    required String title,
+    required ValueChanged<PicoClient> onSelected,
+  }) async {
+    final clients = await widget.clientFactory.clients();
+    if (!mounted) return;
+    FederationPickerDrawer.show(
+      context,
+      clients: clients,
+      onSelected: onSelected,
+      title: title,
+    );
+  }
+
   Future<void> _handleConfirm(int amountSats) async {
     final src = _sourceGateway;
     final dst = _destGateway;
     if (src == null || dst == null) throw 'Querying gateway fees…';
 
-    final bolt11 = await widget.dest.lnReceive(
-      gateway: dst,
-      amountSat: amountSats,
-    );
+    final bolt11 = await _dest.lnReceive(gateway: dst, amountSat: amountSats);
     final invoice = parseBolt11Invoice(invoice: bolt11)!;
-    await widget.source.lnSend(gateway: src, invoice: invoice);
+    await _source.lnSend(gateway: src, invoice: invoice);
 
     if (!mounted) return;
 
@@ -94,8 +123,32 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: BorderedList.column(
                 children: [
-                  _EndpointRow(client: widget.source, role: 'Origin'),
-                  _EndpointRow(client: widget.dest, role: 'Destination'),
+                  _EndpointRow(
+                    client: _source,
+                    role: 'Source',
+                    onTap:
+                        () => _openPicker(
+                          title: 'Select Source',
+                          onSelected:
+                              (c) => setState(() {
+                                _source = c;
+                                _kickoffSourceGateway();
+                              }),
+                        ),
+                  ),
+                  _EndpointRow(
+                    client: _dest,
+                    role: 'Destination',
+                    onTap:
+                        () => _openPicker(
+                          title: 'Select Destination',
+                          onSelected:
+                              (c) => setState(() {
+                                _dest = c;
+                                _kickoffDestGateway();
+                              }),
+                        ),
+                  ),
                 ],
               ),
             ),
@@ -105,7 +158,8 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
             ),
             Expanded(
               child: AmountEntryWidget(
-                client: widget.source,
+                key: ValueKey(_source.federationId()),
+                client: _source,
                 onConfirm: _handleConfirm,
                 onAmountChanged:
                     (sats) => setState(() => _amountSats = sats),
@@ -121,14 +175,20 @@ class _TransferAmountScreenState extends State<TransferAmountScreen> {
 class _EndpointRow extends StatelessWidget {
   final PicoClient client;
   final String role;
+  final VoidCallback onTap;
 
-  const _EndpointRow({required this.client, required this.role});
+  const _EndpointRow({
+    required this.client,
+    required this.role,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
     return ListTile(
+      onTap: onTap,
       contentPadding: listTilePadding,
       trailing: Text(
         role,

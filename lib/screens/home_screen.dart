@@ -280,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onTransfer() {
     FederationPickerDrawer.show(
       context,
-      title: 'Select Origin',
+      title: 'Select Source',
       clients: _clients,
       onSelected: _onTransferSourcePicked,
     );
@@ -298,7 +298,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onTransferDestPicked(PicoClient source, PicoClient dest) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => TransferAmountScreen(source: source, dest: dest),
+        builder:
+            (_) => TransferAmountScreen(
+              source: source,
+              dest: dest,
+              clientFactory: widget.clientFactory,
+            ),
       ),
     );
   }
