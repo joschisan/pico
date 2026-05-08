@@ -71,8 +71,7 @@ class ConnectionStatusScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color:
-                            Color.lerp(Colors.red, Colors.green, quality) ??
-                            color,
+                            Color.lerp(Colors.red, color, quality) ?? color,
                       ),
                     ),
                     title: Text(name, style: mediumStyle),
