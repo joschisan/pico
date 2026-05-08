@@ -49,7 +49,7 @@ class ConnectionStatusScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<(String, bool)>>(
+      body: StreamBuilder<List<(String, double)>>(
         stream: client.subscribeConnectionStatus(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
@@ -62,7 +62,7 @@ class ConnectionStatusScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: BorderedList.column(
               children: [
-                for (final (name, connected) in statuses)
+                for (final (name, quality) in statuses)
                   ListTile(
                     contentPadding: listTilePadding,
                     leading: Container(
@@ -70,14 +70,20 @@ class ConnectionStatusScreen extends StatelessWidget {
                       height: 14,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: connected ? color : color.withValues(alpha: 0.3),
+                        color:
+                            Color.lerp(Colors.red, Colors.green, quality) ??
+                            color,
                       ),
                     ),
                     title: Text(name, style: mediumStyle),
                     trailing: Text(
-                      connected ? 'Online' : 'Offline',
+                      quality <= 0.0
+                          ? 'Offline'
+                          : quality >= 1.0
+                          ? 'Online'
+                          : 'Slow',
                       style: smallStyle.copyWith(
-                        color: connected ? color : null,
+                        color: quality > 0.0 ? color : null,
                       ),
                     ),
                   ),

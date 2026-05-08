@@ -3264,7 +3264,7 @@ fn wire__crate__client__PicoClient_subscribe_connection_status_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
             >>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
-                Vec<(String, bool)>,
+                Vec<(String, f64)>,
                 flutter_rust_bridge::for_generated::SseCodec,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
@@ -4331,7 +4331,7 @@ impl SseDecode
     }
 }
 
-impl SseDecode for StreamSink<Vec<(String, bool)>, flutter_rust_bridge::for_generated::SseCodec> {
+impl SseDecode for StreamSink<Vec<(String, f64)>, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <String>::sse_decode(deserializer);
@@ -4483,13 +4483,13 @@ impl SseDecode for Vec<u8> {
     }
 }
 
-impl SseDecode for Vec<(String, bool)> {
+impl SseDecode for Vec<(String, f64)> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut len_ = <i32>::sse_decode(deserializer);
         let mut ans_ = vec![];
         for idx_ in 0..len_ {
-            ans_.push(<(String, bool)>::sse_decode(deserializer));
+            ans_.push(<(String, f64)>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -4887,11 +4887,11 @@ impl SseDecode for crate::events::PaymentType {
     }
 }
 
-impl SseDecode for (String, bool) {
+impl SseDecode for (String, f64) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_field0 = <String>::sse_decode(deserializer);
-        let mut var_field1 = <bool>::sse_decode(deserializer);
+        let mut var_field1 = <f64>::sse_decode(deserializer);
         return (var_field0, var_field1);
     }
 }
@@ -5947,7 +5947,7 @@ impl SseEncode
     }
 }
 
-impl SseEncode for StreamSink<Vec<(String, bool)>, flutter_rust_bridge::for_generated::SseCodec> {
+impl SseEncode for StreamSink<Vec<(String, f64)>, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         unimplemented!("")
@@ -6077,12 +6077,12 @@ impl SseEncode for Vec<u8> {
     }
 }
 
-impl SseEncode for Vec<(String, bool)> {
+impl SseEncode for Vec<(String, f64)> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
-            <(String, bool)>::sse_encode(item, serializer);
+            <(String, f64)>::sse_encode(item, serializer);
         }
     }
 }
@@ -6435,11 +6435,11 @@ impl SseEncode for crate::events::PaymentType {
     }
 }
 
-impl SseEncode for (String, bool) {
+impl SseEncode for (String, f64) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.0, serializer);
-        <bool>::sse_encode(self.1, serializer);
+        <f64>::sse_encode(self.1, serializer);
     }
 }
 

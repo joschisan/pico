@@ -18,9 +18,8 @@ picomint-fountain = { git = "https://github.com/joschisan/picomint" }
 picomint-lnurl = { git = "https://github.com/joschisan/picomint" }
 picomint-redb = { git = "https://github.com/joschisan/picomint" }
 
-iroh = { version = "=0.98.0", default-features = false, features = ["tls-ring", "address-lookup-mdns"] }
-# Pin to match picomint workspace — ed25519 3.0.0-rc.5 broke ed25519-dalek-3.0.0-pre.6.
-ed25519 = "=3.0.0-rc.4"
+iroh = { version = "=1.0.0-rc.0", default-features = false, features = ["tls-ring"] }
+iroh-mdns-address-lookup = "=0.2.0"
 bitcoin = "0.32.5"
 flutter_rust_bridge = "=2.10.0"
 futures = "0.3"

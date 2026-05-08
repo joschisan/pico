@@ -194,10 +194,10 @@ class _EndpointRow extends StatelessWidget {
         role,
         style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
       ),
-      leading: StreamBuilder<List<(String, bool)>>(
+      leading: StreamBuilder<List<(String, double)>>(
         stream: client.subscribeConnectionStatus(),
         builder: (_, snapshot) {
-          final online = snapshot.data?.any((s) => s.$2) ?? false;
+          final online = snapshot.data?.any((s) => s.$2 > 0.0) ?? false;
           return Container(
             width: 14,
             height: 14,

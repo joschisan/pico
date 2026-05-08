@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use bitcoin::Amount as BtcAmount;
 use flutter_rust_bridge::frb;
@@ -7,6 +8,8 @@ use picomint_client::Client;
 use picomint_core::Amount;
 use picomint_core::config::FederationId;
 use picomint_core::ln::gateway_api::GatewayInfo;
+use picomint_core::methods::{CoreMethod, LivenessRequest, LivenessResponse};
+use picomint_core::module::Method;
 
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
@@ -134,29 +137,52 @@ impl PicoClient {
         }
     }
 
+    /// Per-peer connection quality, polled continuously via the liveness
+    /// endpoint. Quality is `1.0` for RTTs under 1s, `0.0` at or above 5s,
+    /// and linearly interpolated in between. Failures and the 5s timeout
+    /// both collapse to `0.0`. The UI maps these to a green→red gradient.
     #[frb]
-    pub async fn subscribe_connection_status(&self, sink: StreamSink<Vec<(String, bool)>>) {
-        let names: Vec<String> = self
+    pub async fn subscribe_connection_status(&self, sink: StreamSink<Vec<(String, f64)>>) {
+        let peers: Vec<(picomint_core::PeerId, String)> = self
             .client
             .config()
             .await
             .peers
-            .values()
-            .map(|peer| peer.name.clone())
+            .iter()
+            .map(|(id, peer)| (*id, peer.name.clone()))
             .collect();
 
-        let mut stream = self.client.connection_status_stream();
+        loop {
+            let api = self.client.api();
+            let samples = futures::future::join_all(peers.iter().map(|(peer_id, name)| {
+                let api = api.clone();
+                let peer_id = *peer_id;
+                let name = name.clone();
+                async move {
+                    let started = Instant::now();
+                    let result = tokio::time::timeout(
+                        Duration::from_secs(5),
+                        api.request_single_peer::<LivenessResponse>(
+                            Method::Core(CoreMethod::Liveness(LivenessRequest)),
+                            peer_id,
+                        ),
+                    )
+                    .await;
 
-        while let Some(status_map) = stream.next().await {
-            let statuses: Vec<(String, bool)> = names
-                .iter()
-                .zip(status_map.into_values())
-                .map(|(name, status)| (name.clone(), status))
-                .collect();
+                    let quality = match result {
+                        Ok(Ok(_)) => rtt_to_quality(started.elapsed()),
+                        _ => 0.0,
+                    };
+                    (name, quality)
+                }
+            }))
+            .await;
 
-            if sink.add(statuses).is_err() {
+            if sink.add(samples).is_err() {
                 break;
             }
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
     }
 
@@ -207,7 +233,6 @@ impl PicoClient {
                 gateway.gateway_info.clone(),
                 Amount::from_sats(amount_sat as u64),
                 60 * 60 * 24,
-                picomint_core::ln::Bolt11InvoiceDescription::Direct(String::new()),
             )
             .await
             .map_err(|e| e.to_string())?;
@@ -226,8 +251,7 @@ impl PicoClient {
         let (gateway_api, gateway_info) = self
             .client
             .ln()
-            .select_gateway(Some(invoice.0.clone()))
-            .await
+            .select_gateway(Some(&invoice.0))
             .map_err(|e| e.to_string())?;
 
         Ok(GatewayInfoWrapper {
@@ -244,7 +268,6 @@ impl PicoClient {
             .client
             .ln()
             .select_gateway(None)
-            .await
             .map_err(|e| e.to_string())?;
 
         Ok(GatewayInfoWrapper {
@@ -318,5 +341,16 @@ impl PicoClient {
     #[frb]
     pub async fn onchain_receive_address(&self) -> Result<String, String> {
         Ok(self.client.wallet().receive().await.to_string())
+    }
+}
+
+fn rtt_to_quality(rtt: Duration) -> f64 {
+    let secs = rtt.as_secs_f64();
+    if secs <= 1.0 {
+        1.0
+    } else if secs >= 5.0 {
+        0.0
+    } else {
+        1.0 - (secs - 1.0) / 4.0
     }
 }
