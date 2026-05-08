@@ -54,19 +54,19 @@ class FederationChip extends StatelessWidget {
       child: ListTile(
         onTap: onChanged == null ? null : () => _openPicker(context),
         contentPadding: listTilePadding,
-        leading: StreamBuilder<List<(String, double)>>(
-          stream: client.subscribeConnectionStatus(),
+        leading: StreamBuilder<bool>(
+          stream: client.liveness(),
           builder: (_, snapshot) {
-            final online = snapshot.data?.any((s) => s.$2 > 0.0) ?? false;
             return Container(
               width: 14,
               height: 14,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color:
-                    online
-                        ? scheme.primary
-                        : scheme.primary.withValues(alpha: 0.3),
+                color: switch (snapshot.data) {
+                  null => scheme.primary.withValues(alpha: 0.3),
+                  true => scheme.primary,
+                  false => Colors.red,
+                },
               ),
             );
           },

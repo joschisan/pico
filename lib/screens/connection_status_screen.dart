@@ -49,42 +49,51 @@ class ConnectionStatusScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<(String, double)>>(
-        stream: client.subscribeConnectionStatus(),
+      body: FutureBuilder<List<(int, String)>>(
+        future: client.peers(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final statuses = snapshot.data!;
+          final peers = snapshot.data!;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: BorderedList.column(
               children: [
-                for (final (name, quality) in statuses)
-                  ListTile(
-                    contentPadding: listTilePadding,
-                    leading: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color:
-                            Color.lerp(Colors.red, color, quality) ?? color,
-                      ),
-                    ),
-                    title: Text(name, style: mediumStyle),
-                    trailing: Text(
-                      quality <= 0.0
-                          ? 'Offline'
-                          : quality >= 1.0
-                          ? 'Online'
-                          : 'Slow',
-                      style: smallStyle.copyWith(
-                        color: quality > 0.0 ? color : null,
-                      ),
-                    ),
+                for (final (peerId, name) in peers)
+                  StreamBuilder<bool>(
+                    stream: client.livenessPeer(peerId: peerId),
+                    builder: (_, peerSnap) {
+                      final online = peerSnap.data;
+                      return ListTile(
+                        contentPadding: listTilePadding,
+                        leading: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: switch (online) {
+                              null => color.withValues(alpha: 0.3),
+                              true => color,
+                              false => Colors.red,
+                            },
+                          ),
+                        ),
+                        title: Text(name, style: mediumStyle),
+                        trailing: Text(
+                          switch (online) {
+                            null => '',
+                            true => 'Online',
+                            false => 'Offline',
+                          },
+                          style: smallStyle.copyWith(
+                            color: online == true ? color : null,
+                          ),
+                        ),
+                      );
+                    },
                   ),
               ],
             ),

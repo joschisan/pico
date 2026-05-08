@@ -74,12 +74,9 @@ class _FederationRow extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       contentPadding: listTilePadding,
-      leading: StreamBuilder<List<(String, double)>>(
-        stream: client.subscribeConnectionStatus(),
-        builder: (_, snapshot) {
-          final online = snapshot.data?.any((s) => s.$2 > 0.0) ?? false;
-          return _ConnectionDot(online: online);
-        },
+      leading: StreamBuilder<bool>(
+        stream: client.liveness(),
+        builder: (_, snapshot) => _ConnectionDot(online: snapshot.data),
       ),
       // Both texts in the title slot so ListTile renders as
       // single-line (56dp) instead of the taller two-line variant
@@ -111,7 +108,9 @@ class _FederationRow extends StatelessWidget {
 }
 
 class _ConnectionDot extends StatelessWidget {
-  final bool online;
+  /// `null` until the first liveness sample arrives (faded), `true`
+  /// after a successful poll (primary), `false` after a failed poll (red).
+  final bool? online;
   const _ConnectionDot({required this.online});
 
   @override
@@ -122,7 +121,11 @@ class _ConnectionDot extends StatelessWidget {
       height: 14,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: online ? color : color.withValues(alpha: 0.3),
+        color: switch (online) {
+          null => color.withValues(alpha: 0.3),
+          true => color,
+          false => Colors.red,
+        },
       ),
     );
   }

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bitcoin::Amount as BtcAmount;
 use flutter_rust_bridge::frb;
@@ -8,8 +8,6 @@ use picomint_client::Client;
 use picomint_core::Amount;
 use picomint_core::config::FederationId;
 use picomint_core::ln::gateway_api::GatewayInfo;
-use picomint_core::methods::{CoreMethod, LivenessRequest, LivenessResponse};
-use picomint_core::module::Method;
 
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
@@ -137,52 +135,62 @@ impl PicoClient {
         }
     }
 
-    /// Per-peer connection quality, polled continuously via the liveness
-    /// endpoint. Quality is `1.0` for RTTs under 1s, `0.0` at or above 5s,
-    /// and linearly interpolated in between. Failures and the 5s timeout
-    /// both collapse to `0.0`. The UI maps these to a green→red gradient.
+    /// `(peer_id, name)` pairs for every guardian in the federation, in
+     /// `PeerId` order. Used by [`Self::liveness_peer`] callers to enumerate
+    /// rows on the connection-status screen.
     #[frb]
-    pub async fn subscribe_connection_status(&self, sink: StreamSink<Vec<(String, f64)>>) {
-        let peers: Vec<(picomint_core::PeerId, String)> = self
-            .client
+    pub async fn peers(&self) -> Vec<(u8, String)> {
+        self.client
             .config()
             .await
             .peers
             .iter()
-            .map(|(id, peer)| (*id, peer.name.clone()))
-            .collect();
+            .map(|(id, peer)| (u8::from(*id), peer.name.clone()))
+            .collect()
+    }
 
+    /// Federation-level reachability. Polls the threshold-consensus
+    /// liveness endpoint every 3s; emits `true` when the federation
+    /// answers, `false` on error.
+    #[frb]
+    pub async fn liveness(&self, sink: StreamSink<bool>) {
         loop {
-            let api = self.client.api();
-            let samples = futures::future::join_all(peers.iter().map(|(peer_id, name)| {
-                let api = api.clone();
-                let peer_id = *peer_id;
-                let name = name.clone();
-                async move {
-                    let started = Instant::now();
-                    let result = tokio::time::timeout(
-                        Duration::from_secs(5),
-                        api.request_single_peer::<LivenessResponse>(
-                            Method::Core(CoreMethod::Liveness(LivenessRequest)),
-                            peer_id,
-                        ),
-                    )
-                    .await;
+            let ok = tokio::time::timeout(
+                Duration::from_secs(3),
+                self.client.api().liveness(),
+            )
+            .await
+            .map(|r| r.is_ok())
+            .unwrap_or(false);
 
-                    let quality = match result {
-                        Ok(Ok(_)) => rtt_to_quality(started.elapsed()),
-                        _ => 0.0,
-                    };
-                    (name, quality)
-                }
-            }))
-            .await;
-
-            if sink.add(samples).is_err() {
+            if sink.add(ok).is_err() {
                 break;
             }
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(3)).await;
+        }
+    }
+
+    /// Single-peer reachability. Polls one guardian's liveness endpoint
+    /// every 3s; emits `true` on success, `false` on error or 3s timeout.
+    #[frb]
+    pub async fn liveness_peer(&self, peer_id: u8, sink: StreamSink<bool>) {
+        let peer_id = picomint_core::PeerId::from(peer_id);
+
+        loop {
+            let ok = tokio::time::timeout(
+                Duration::from_secs(3),
+                self.client.api().liveness_peer(peer_id),
+            )
+            .await
+            .map(|r| r.is_ok())
+            .unwrap_or(false);
+
+            if sink.add(ok).is_err() {
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_secs(3)).await;
         }
     }
 
@@ -341,16 +349,5 @@ impl PicoClient {
     #[frb]
     pub async fn onchain_receive_address(&self) -> Result<String, String> {
         Ok(self.client.wallet().receive().await.to_string())
-    }
-}
-
-fn rtt_to_quality(rtt: Duration) -> f64 {
-    let secs = rtt.as_secs_f64();
-    if secs <= 1.0 {
-        1.0
-    } else if secs >= 5.0 {
-        0.0
-    } else {
-        1.0 - (secs - 1.0) / 4.0
     }
 }
