@@ -11,12 +11,14 @@ use iroh_mdns_address_lookup::MdnsAddressLookup;
 use picomint_client::{Client, Mnemonic, OperationId, download};
 use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
-use picomint_eventlog::EventLogId;
+use picomint_eventlog::{EventLogId, EventLogger};
 use picomint_redb::Database;
 use tokio::sync::{Mutex, Notify, RwLock};
 
 use crate::client::PicoClient;
-use crate::db::{CLIENT_CONFIG, CONTACT, ROOT_ENTROPY, SELECTED_CURRENCY};
+use crate::db::{
+    ClientConfig, CONTACT, EventLog, EventLogByOperation, RootEntropy, SelectedCurrency,
+};
 use crate::events::{
     Notification, OperationSummary, PaymentEvent, parse_notification, parse_payment_event,
     parse_summary,
@@ -28,15 +30,18 @@ use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
 #[frb(opaque)]
 pub struct PicoClientFactory {
     db: Database,
+    /// Daemon-wide event log over the app's `EVENT_LOG` tables. Cloned into
+    /// every `Client::new` so all federations append to one ordered log.
+    logger: EventLogger,
     mnemonic: Mnemonic,
     /// Single iroh endpoint shared across all per-federation clients.
     /// Address grinding is the slowest part of bringup so we bind once
     /// at factory construction and reuse for every `Client::new`.
     endpoint: Endpoint,
     /// All warm clients, keyed by `FederationId`. Constructed at startup
-    /// from `CLIENT_CONFIG`; `join` / `recover` insert, `leave` removes.
+    /// from `ClientConfig`; `join` / `recover` insert, `leave` removes.
     /// Re-joining a previously-left federation reuses the same key —
-    /// `Client::wipe` clears the per-federation isolated tables on
+    /// `Client::wipe` clears the federation's prefixed tables on
     /// leave, so the second join sees a clean state.
     clients: Arc<RwLock<BTreeMap<FederationId, PicoClient>>>,
     /// Wakes anyone iterating the client set when membership changes.
@@ -77,7 +82,7 @@ impl PicoClientFactory {
     pub async fn init(db: &DatabaseWrapper, mnemonic: &MnemonicWrapper) -> Result<Self, String> {
         let dbtx = db.0.begin_write();
 
-        dbtx.insert(&ROOT_ENTROPY, &(), &mnemonic.0.to_entropy().to_vec());
+        dbtx.insert(&RootEntropy, &(), &mnemonic.0.to_entropy().to_vec());
 
         dbtx.commit();
 
@@ -88,7 +93,7 @@ impl PicoClientFactory {
 
     #[frb]
     pub async fn try_load(db: &DatabaseWrapper) -> Option<Self> {
-        let entropy = db.0.begin_read().get(&ROOT_ENTROPY, &())?;
+        let entropy = db.0.begin_read().get(&RootEntropy, &())?;
 
         let mnemonic = Mnemonic::from_entropy(&entropy).ok()?;
 
@@ -107,19 +112,18 @@ impl PicoClientFactory {
         endpoint: Endpoint,
     ) -> Result<Self, String> {
         let entries: Vec<(FederationId, picomint_core::config::ConsensusConfig)> =
-            db.begin_read().iter(&CLIENT_CONFIG, |it| it.collect());
+            db.begin_read().iter(&ClientConfig, |it| it.collect());
 
         let currency_code = db
             .begin_read()
-            .get(&SELECTED_CURRENCY, &())
+            .get(&SelectedCurrency, &())
             .unwrap_or_else(|| "USD".to_string());
+
+        let logger = EventLogger::new(EventLog, EventLogByOperation);
 
         let mut warmed: BTreeMap<FederationId, PicoClient> = BTreeMap::new();
         for (fed_id, config) in entries {
-            let isolated = db.isolate(fed_id);
-
-            let client = Client::new(endpoint.clone(), isolated, &mnemonic, config)
-                .await
+            let client = Client::new(endpoint.clone(), db.clone(), logger.clone(), &mnemonic, config)
                 .map_err(|e| e.to_string())?;
 
             warmed.insert(
@@ -130,6 +134,7 @@ impl PicoClientFactory {
 
         Ok(Self {
             db,
+            logger,
             mnemonic,
             endpoint,
             clients: Arc::new(RwLock::new(warmed)),
@@ -173,14 +178,17 @@ impl PicoClientFactory {
         }
 
         let dbtx = self.db.begin_write();
-        dbtx.insert(&CLIENT_CONFIG, &federation_id, &config);
+        dbtx.insert(&ClientConfig, &federation_id, &config);
         dbtx.commit();
 
-        let isolated = self.db.isolate(federation_id);
-
-        let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
-            .await
-            .map_err(|e| e.to_string())?;
+        let client = Client::new(
+            self.endpoint.clone(),
+            self.db.clone(),
+            self.logger.clone(),
+            &self.mnemonic,
+            config,
+        )
+        .map_err(|e| e.to_string())?;
 
         let pico = build_pico_client(client, federation_id, self.currency().await).await;
 
@@ -210,17 +218,20 @@ impl PicoClientFactory {
         // row up via `MintClientModule::new`.
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(&CLIENT_CONFIG, &federation_id, &config);
+        dbtx.insert(&ClientConfig, &federation_id, &config);
 
-        Client::init_recovery(&dbtx.as_ref().isolate(federation_id));
+        Client::init_recovery(&dbtx.as_ref(), federation_id);
 
         dbtx.commit();
 
-        let isolated = self.db.isolate(federation_id);
-
-        let client = Client::new(self.endpoint.clone(), isolated, &self.mnemonic, config)
-            .await
-            .map_err(|e| e.to_string())?;
+        let client = Client::new(
+            self.endpoint.clone(),
+            self.db.clone(),
+            self.logger.clone(),
+            &self.mnemonic,
+            config,
+        )
+        .map_err(|e| e.to_string())?;
 
         let pico = build_pico_client(client, federation_id, self.currency().await).await;
 
@@ -237,7 +248,7 @@ impl PicoClientFactory {
     pub async fn set_currency(&self, currency_code: &str) {
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(&SELECTED_CURRENCY, &(), &currency_code.to_string());
+        dbtx.insert(&SelectedCurrency, &(), &currency_code.to_string());
 
         dbtx.commit();
     }
@@ -250,12 +261,12 @@ impl PicoClientFactory {
     async fn currency(&self) -> String {
         self.db
             .begin_read()
-            .get(&SELECTED_CURRENCY, &())
+            .get(&SelectedCurrency, &())
             .unwrap_or_else(|| "USD".to_string())
     }
 
-    /// Drop a federation: shut down the client, wipe its isolated
-    /// per-federation tables, then drop the config row. Wipe + remove
+    /// Drop a federation: shut down the client, wipe its per-federation
+    /// prefixed tables, then drop the config row. Wipe + remove
     /// share a single write tx so a crash mid-leave can never leave
     /// orphan client state behind a missing config row. Re-joining the
     /// same federation later starts from a fresh ledger.
@@ -270,8 +281,8 @@ impl PicoClientFactory {
         client.client.shutdown().await;
 
         let dbtx = self.db.begin_write();
-        client.client.wipe(&dbtx.as_ref().isolate(fed_id));
-        dbtx.remove(&CLIENT_CONFIG, &fed_id);
+        client.client.wipe(&dbtx.as_ref());
+        dbtx.remove(&ClientConfig, &fed_id);
         dbtx.commit();
 
         self.set_changed.notify_waiters();
@@ -364,7 +375,7 @@ impl PicoClientFactory {
         let mut summaries: Vec<OperationSummary> = Vec::new();
 
         loop {
-            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+            let batch = self.logger.get_event_log(&self.db, position, 1000);
 
             for entry in &batch {
                 if let Some(summary) = parse_summary(&entry.1, &names) {
@@ -396,7 +407,7 @@ impl PicoClientFactory {
         let names = self.federation_names_snapshot().await;
 
         loop {
-            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+            let batch = self.logger.get_event_log(&self.db, position, 1000);
 
             for entry in &batch {
                 if let Some(summary) = parse_summary(&entry.1, &names) {
@@ -419,12 +430,12 @@ impl PicoClientFactory {
 
         // Phase 2: tail live events. Re-snapshot names per batch so a
         // newly-joined federation's name lands on its own first event.
-        let notify: Arc<Notify> = picomint_eventlog::event_notify(&self.db);
+        let notify: Arc<Notify> = self.logger.event_notify(&self.db);
 
         loop {
             let notified = notify.notified();
 
-            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+            let batch = self.logger.get_event_log(&self.db, position, 1000);
             let names = self.federation_names_snapshot().await;
 
             for entry in &batch {
@@ -474,9 +485,11 @@ impl PicoClientFactory {
         };
         let op = OperationId(hash);
 
-        let notify = picomint_eventlog::event_notify(&self.db);
-        let mut stream =
-            picomint_eventlog::subscribe_operation_events(self.db.clone(), notify, op).boxed();
+        let notify = self.logger.event_notify(&self.db);
+        let mut stream = self
+            .logger
+            .subscribe_operation_events(self.db.clone(), notify, op)
+            .boxed();
 
         while let Some(entry) = stream.next().await {
             let Some(event) = parse_payment_event(&entry) else {
@@ -498,7 +511,7 @@ impl PicoClientFactory {
         let mut position = EventLogId::LOG_START;
 
         loop {
-            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+            let batch = self.logger.get_event_log(&self.db, position, 1000);
 
             position = position.saturating_add(batch.len() as u64);
 
@@ -508,12 +521,12 @@ impl PicoClientFactory {
         }
 
         // Phase 2: tail live events; every match fires a notification.
-        let notify: Arc<Notify> = picomint_eventlog::event_notify(&self.db);
+        let notify: Arc<Notify> = self.logger.event_notify(&self.db);
 
         loop {
             let notified = notify.notified();
 
-            let batch = picomint_eventlog::get_event_log(&self.db, position, 1000);
+            let batch = self.logger.get_event_log(&self.db, position, 1000);
 
             for entry in &batch {
                 if let Some(notification) = parse_notification(&entry.1) {

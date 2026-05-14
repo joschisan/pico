@@ -7,7 +7,7 @@ use futures::StreamExt;
 use picomint_client::Client;
 use picomint_core::Amount;
 use picomint_core::config::FederationId;
-use picomint_core::ln::gateway_api::GatewayInfo;
+use picomint_core::ln::gateway_api::{GatewayInfo, GatewayPk};
 
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
@@ -20,7 +20,7 @@ use crate::{BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, InviteCod
 #[frb(opaque)]
 #[derive(Clone)]
 pub struct GatewayInfoWrapper {
-    pub(crate) gateway_api: String,
+    pub(crate) gateway_pk: GatewayPk,
     pub(crate) gateway_info: GatewayInfo,
 }
 
@@ -237,7 +237,7 @@ impl PicoClient {
             .client
             .ln()
             .receive(
-                gateway.gateway_api.clone(),
+                gateway.gateway_pk,
                 gateway.gateway_info.clone(),
                 Amount::from_sats(amount_sat as u64),
                 60 * 60 * 24,
@@ -256,14 +256,14 @@ impl PicoClient {
         &self,
         invoice: &Bolt11InvoiceWrapper,
     ) -> Result<GatewayInfoWrapper, String> {
-        let (gateway_api, gateway_info) = self
+        let (gateway_pk, gateway_info) = self
             .client
             .ln()
             .select_gateway(Some(&invoice.0))
             .map_err(|e| e.to_string())?;
 
         Ok(GatewayInfoWrapper {
-            gateway_api,
+            gateway_pk,
             gateway_info,
         })
     }
@@ -272,14 +272,14 @@ impl PicoClient {
     /// where we don't have an invoice yet.
     #[frb]
     pub async fn ln_select_any_gateway(&self) -> Result<GatewayInfoWrapper, String> {
-        let (gateway_api, gateway_info) = self
+        let (gateway_pk, gateway_info) = self
             .client
             .ln()
             .select_gateway(None)
             .map_err(|e| e.to_string())?;
 
         Ok(GatewayInfoWrapper {
-            gateway_api,
+            gateway_pk,
             gateway_info,
         })
     }
@@ -293,7 +293,7 @@ impl PicoClient {
         self.client
             .ln()
             .send(
-                gateway.gateway_api.clone(),
+                gateway.gateway_pk,
                 gateway.gateway_info.clone(),
                 invoice.0.clone(),
             )

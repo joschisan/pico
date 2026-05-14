@@ -194,7 +194,7 @@ pub(crate) fn parse_summary(
 ) -> Option<OperationSummary> {
     let operation_id = entry.operation.to_string();
     let timestamp = entry.timestamp as i64;
-    let federation_name = names.get(&entry.federation_id).cloned();
+    let federation_name = names.get(&entry.federation).cloned();
 
     if let Some(e) = entry.to_event::<MintSend>() {
         return Some(OperationSummary {
