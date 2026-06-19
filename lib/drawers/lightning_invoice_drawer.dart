@@ -6,7 +6,6 @@ import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/amount_display_widget.dart';
 import 'package:pico/widgets/fee_preview_widget.dart';
-import 'package:pico/widgets/federation_chip_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/utils/drawer_utils.dart';
@@ -44,7 +43,7 @@ class LightningInvoiceDrawer extends StatefulWidget {
 }
 
 class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
-  late PicoClient _client = widget.client;
+  late final PicoClient _client = widget.client;
   GatewayInfoWrapper? _gateway;
   bool _gatewayFailed = false;
 
@@ -96,17 +95,6 @@ class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
       icon: PhosphorIconsRegular.lightning,
       title: 'Send Lightning',
       children: [
-        FederationChip(
-          clientFactory: widget.clientFactory,
-          client: _client,
-          onChanged: (next) {
-            setState(() {
-              _client = next;
-              _kickoffGatewaySelection();
-            });
-          },
-        ),
-        const SizedBox(height: 16),
         _buildFeePreview(),
         const SizedBox(height: 64),
         AmountDisplay(widget.invoice.amountSats()),

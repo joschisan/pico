@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart' hide Notification;
@@ -11,7 +10,6 @@ import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/drawers/ecash_drawer.dart';
-import 'package:pico/drawers/federation_picker_drawer.dart';
 import 'package:pico/drawers/lightning_invoice_drawer.dart';
 import 'package:pico/drawers/lnurl_drawer.dart';
 import 'package:pico/drawers/onchain_address_drawer.dart';
@@ -23,7 +21,6 @@ import 'package:pico/screens/ecash_amount_screen.dart';
 import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/screens/lightning_address_entry_screen.dart';
 import 'package:pico/screens/settings_screen.dart';
-import 'package:pico/screens/transfer_amount_screen.dart';
 import 'package:pico/screens/wallet_v2_receive_screen.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
@@ -32,10 +29,11 @@ import 'package:pico/widgets/animated_entry_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/recent_payments_widget.dart';
 
-/// Multimint home: aggregated balance + global recent activity + three
-/// receive buttons that auto-pick a fresh random client per tap. The
-/// picomint eventlog is daemon-wide so recent ops and notifications come
-/// from a single factory-level stream — no per-client merging needed.
+/// Multimint home: the federation list doubles as the active-federation
+/// selector — short-tap selects, long-press opens connection status. Every
+/// action routes through the selected federation. The picomint eventlog is
+/// daemon-wide so recent ops and notifications come from a single
+/// factory-level stream — no per-client merging needed.
 class HomeScreen extends StatefulWidget {
   final PicoClientFactory clientFactory;
 
@@ -46,8 +44,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _random = Random();
-
   late final Stream<List<OperationSummary>> _recentStream;
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
@@ -55,6 +51,10 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<List<PicoClient>>? _clientsSubscription;
 
   List<PicoClient> _clients = [];
+  // The federation every action routes through. Defaults to the first
+  // joined federation and follows short-taps on the list; in-memory only,
+  // so it resets to the first on restart.
+  String? _selectedFederationId;
   // Off until after the first frame paints — federations rendered
   // before the flip snap in; joins after the flip animate on entry.
   bool _initialBuildDone = false;
@@ -71,7 +71,17 @@ class _HomeScreenState extends State<HomeScreen> {
     ) {
       if (!mounted) return;
       final wasFirst = !_initialBuildDone;
-      setState(() => _clients = clients);
+      setState(() {
+        _clients = clients;
+        // Keep the selection valid: default to / fall back on the first
+        // federation when nothing is selected or the selected one is gone.
+        final ids = clients.map((c) => c.federationId()).toSet();
+        if (_selectedFederationId == null ||
+            !ids.contains(_selectedFederationId)) {
+          _selectedFederationId =
+              clients.isEmpty ? null : clients.first.federationId();
+        }
+      });
       // Wait for the first emission to actually paint, then flip the
       // flag so subsequent joins animate. Scheduling in initState was
       // too eager — the stream emits after the first frame, so by the
@@ -133,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleDeepLink(Uri uri) {
     final input = uri.toString();
-    final client = _pickClient();
+    final client = _selectedClient();
     if (client == null) return;
 
     final parsers = [
@@ -182,17 +192,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Auto-pick a random warm client for actions that are payment-type
-  /// agnostic. Returns null only when no federations are joined; the
-  /// onboarding empty-state handles that case before the user can tap
+  /// The currently selected federation that every action routes through.
+  /// Resolves the selected id against the live list, falling back to the
+  /// first federation. Returns null only when no federations are joined;
+  /// the onboarding empty-state handles that case before the user can tap
   /// anything.
-  PicoClient? _pickClient() {
+  PicoClient? _selectedClient() {
     if (_clients.isEmpty) return null;
-    return _clients[_random.nextInt(_clients.length)];
+    for (final client in _clients) {
+      if (client.federationId() == _selectedFederationId) return client;
+    }
+    return _clients.first;
   }
 
   void _onCreateInvoice() {
-    final client = _pickClient();
+    final client = _selectedClient();
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -206,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onSendEcash() {
-    final client = _pickClient();
+    final client = _selectedClient();
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -220,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onReceiveBitcoin() {
-    final client = _pickClient();
+    final client = _selectedClient();
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -234,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onLightningAddress() {
-    final client = _pickClient();
+    final client = _selectedClient();
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -248,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onContacts() {
-    final client = _pickClient();
+    final client = _selectedClient();
     if (client == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -264,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onScan() {
     ScannerDrawer.show(
       context,
-      client: _pickClient(),
+      client: _selectedClient(),
       clientFactory: widget.clientFactory,
     );
   }
@@ -277,35 +291,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _onTransfer() {
-    FederationPickerDrawer.show(
-      context,
-      title: 'Select Source',
-      clients: _clients,
-      onSelected: _onTransferSourcePicked,
-    );
-  }
-
-  void _onTransferSourcePicked(PicoClient source) {
-    FederationPickerDrawer.show(
-      context,
-      title: 'Select Destination',
-      clients: _clients,
-      onSelected: (dest) => _onTransferDestPicked(source, dest),
-    );
-  }
-
-  void _onTransferDestPicked(PicoClient source, PicoClient dest) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder:
-            (_) => TransferAmountScreen(
-              source: source,
-              dest: dest,
-              clientFactory: widget.clientFactory,
-            ),
-      ),
-    );
+  void _onSelectFederation(PicoClient client) {
+    HapticFeedback.selectionClick();
+    setState(() => _selectedFederationId = client.federationId());
   }
 
   void _onTapFederation(PicoClient client) {
@@ -332,23 +320,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leadingWidth: _clients.isNotEmpty ? 96 : 56,
-        leading: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(PhosphorIconsRegular.gear, size: smallIconSize),
-              onPressed: _onSettings,
-            ),
-            if (_clients.isNotEmpty)
-              IconButton(
-                icon: const Icon(
-                  PhosphorIconsRegular.arrowsLeftRight,
-                  size: smallIconSize,
-                ),
-                onPressed: _onTransfer,
-              ),
-          ],
+        leading: IconButton(
+          icon: const Icon(PhosphorIconsRegular.gear, size: smallIconSize),
+          onPressed: _onSettings,
         ),
         actions: [
           if (_clients.isNotEmpty) ...[
@@ -384,7 +358,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               animate: _initialBuildDone,
                               child: _FederationRow(
                                 client: client,
-                                onTap: () => _onTapFederation(client),
+                                selected:
+                                    client.federationId() ==
+                                    _selectedFederationId,
+                                onTap: () => _onSelectFederation(client),
+                                onLongPress: () => _onTapFederation(client),
                               ),
                             ),
                           ),
@@ -493,9 +471,16 @@ class _OnboardingCard extends StatelessWidget {
 
 class _FederationRow extends StatelessWidget {
   final PicoClient client;
+  final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
-  const _FederationRow({required this.client, required this.onTap});
+  const _FederationRow({
+    required this.client,
+    required this.selected,
+    required this.onTap,
+    required this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -503,6 +488,7 @@ class _FederationRow extends StatelessWidget {
 
     return ListTile(
       onTap: onTap,
+      onLongPress: onLongPress,
       contentPadding: listTilePadding,
       leading: StreamBuilder<bool>(
         stream: client.liveness(),
@@ -557,9 +543,14 @@ class _FederationRow extends StatelessWidget {
                       inProgress
                           ? '$name · ${progressSnap.data!.round()}%'
                           : name;
+                  // The selected federation drives every action — flag it
+                  // by tinting its name in the primary color.
                   return Text(
                     text,
-                    style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+                    style: smallStyle.copyWith(
+                      color:
+                          selected ? scheme.primary : scheme.onSurfaceVariant,
+                    ),
                   );
                 },
               );

@@ -3,7 +3,6 @@ import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
-import 'package:pico/widgets/federation_chip_widget.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
 import 'package:pico/widgets/shareable_data_widget.dart';
 
@@ -22,7 +21,7 @@ class WalletV2ReceiveScreen extends StatefulWidget {
 }
 
 class _WalletV2ReceiveScreenState extends State<WalletV2ReceiveScreen> {
-  late PicoClient _client = widget.client;
+  late final PicoClient _client = widget.client;
   String? _address;
 
   @override
@@ -43,11 +42,6 @@ class _WalletV2ReceiveScreenState extends State<WalletV2ReceiveScreen> {
     }
   }
 
-  void _onClientChanged(PicoClient next) {
-    setState(() => _client = next);
-    _fetchAddress();
-  }
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Onchain Address')),
@@ -56,12 +50,6 @@ class _WalletV2ReceiveScreenState extends State<WalletV2ReceiveScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            FederationChip(
-              clientFactory: widget.clientFactory,
-              client: _client,
-              onChanged: _onClientChanged,
-            ),
-            const SizedBox(height: 16),
             if (_address case final address?) ...[
               QrCodeWidget(data: address),
               const SizedBox(height: 16),

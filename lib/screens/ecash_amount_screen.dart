@@ -5,7 +5,6 @@ import 'package:pico/bridge_generated.dart/fountain.dart';
 import 'package:pico/screens/display_ecash_screen.dart';
 import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
-import 'package:pico/widgets/federation_chip_widget.dart';
 
 class EcashAmountScreen extends StatefulWidget {
   final PicoClient client;
@@ -22,7 +21,7 @@ class EcashAmountScreen extends StatefulWidget {
 }
 
 class _EcashAmountScreenState extends State<EcashAmountScreen> {
-  late PicoClient _client = widget.client;
+  late final PicoClient _client = widget.client;
 
   Future<void> _handleConfirm(int amountSats) async {
     await requireBiometricAuth(context);
@@ -50,14 +49,6 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: FederationChip(
-                clientFactory: widget.clientFactory,
-                client: _client,
-                onChanged: (next) => setState(() => _client = next),
-              ),
-            ),
             Expanded(
               child: AmountEntryWidget(
                 key: ValueKey(_client.federationId()),

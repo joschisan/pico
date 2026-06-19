@@ -8,7 +8,6 @@ import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/widgets/fee_preview_widget.dart';
-import 'package:pico/widgets/federation_chip_widget.dart';
 import 'package:share_plus/share_plus.dart';
 
 class LnurlAmountScreen extends StatefulWidget {
@@ -32,7 +31,7 @@ class LnurlAmountScreen extends StatefulWidget {
 }
 
 class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
-  late PicoClient _client = widget.client;
+  late final PicoClient _client = widget.client;
   late String? _contactName = widget.contactName;
   GatewayInfoWrapper? _gateway;
   bool _gatewayFailed = false;
@@ -133,19 +132,6 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
         maintainBottomViewPadding: true,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: FederationChip(
-                clientFactory: widget.clientFactory,
-                client: _client,
-                onChanged: (next) {
-                  setState(() {
-                    _client = next;
-                    _kickoffGatewaySelection();
-                  });
-                },
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: _buildFeePreview(),

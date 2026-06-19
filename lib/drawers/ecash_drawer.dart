@@ -5,7 +5,6 @@ import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/amount_display_widget.dart';
-import 'package:pico/widgets/federation_chip_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
 
@@ -35,9 +34,7 @@ class EcashDrawer extends StatefulWidget {
 }
 
 class _EcashDrawerState extends State<EcashDrawer> {
-  // Cached so the chip's FutureBuilder and the receive button look at
-  // the same lookup — and so the lookup doesn't re-fire on every
-  // rebuild.
+  // Cached so the lookup doesn't re-fire on every rebuild.
   late final Future<PicoClient?> _issuer = widget.clientFactory.client(
     federationId: widget.ecash.federationId(),
   );
@@ -59,21 +56,6 @@ class _EcashDrawerState extends State<EcashDrawer> {
       icon: PhosphorIconsRegular.coinVertical,
       title: 'Receive eCash',
       children: [
-        // Read-only — the federation is fixed by the ecash bundle.
-        // While loading or if the user has since left, the chip
-        // silently drops; the receive button throws on the same null
-        // and AsyncButton surfaces it as a toast.
-        FutureBuilder<PicoClient?>(
-          future: _issuer,
-          builder: (_, snapshot) {
-            final issuer = snapshot.data;
-            if (issuer == null) return const SizedBox.shrink();
-            return FederationChip(
-              clientFactory: widget.clientFactory,
-              client: issuer,
-            );
-          },
-        ),
         const SizedBox(height: 64),
         AmountDisplay(widget.ecash.amountSats()),
         const SizedBox(height: 64),

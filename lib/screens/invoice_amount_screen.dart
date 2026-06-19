@@ -7,7 +7,6 @@ import 'package:pico/screens/display_lnurl_screen.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/widgets/async_icon_button_widget.dart';
 import 'package:pico/widgets/fee_preview_widget.dart';
-import 'package:pico/widgets/federation_chip_widget.dart';
 
 class InvoiceAmountScreen extends StatefulWidget {
   final PicoClient client;
@@ -24,7 +23,7 @@ class InvoiceAmountScreen extends StatefulWidget {
 }
 
 class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
-  late PicoClient _client = widget.client;
+  late final PicoClient _client = widget.client;
   GatewayInfoWrapper? _gateway;
   bool _gatewayFailed = false;
   int _amountSats = 0;
@@ -102,19 +101,6 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: FederationChip(
-                clientFactory: widget.clientFactory,
-                client: _client,
-                onChanged: (next) {
-                  setState(() {
-                    _client = next;
-                    _kickoffGatewaySelection();
-                  });
-                },
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: _buildFeePreview(),

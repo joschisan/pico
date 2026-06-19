@@ -5,7 +5,6 @@ import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/widgets/fee_preview_widget.dart';
-import 'package:pico/widgets/federation_chip_widget.dart';
 
 class OnchainAmountScreen extends StatefulWidget {
   final PicoClient client;
@@ -24,7 +23,7 @@ class OnchainAmountScreen extends StatefulWidget {
 }
 
 class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
-  late PicoClient _client = widget.client;
+  late final PicoClient _client = widget.client;
   late Future<int> _feeFuture;
   int? _feeSats;
 
@@ -69,19 +68,6 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: FederationChip(
-                clientFactory: widget.clientFactory,
-                client: _client,
-                onChanged: (next) {
-                  setState(() {
-                    _client = next;
-                    _kickoffFeeFetch();
-                  });
-                },
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: FeePreview.fromFuture(_feeFuture),
