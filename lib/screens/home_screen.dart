@@ -499,17 +499,14 @@ class _FederationRow extends StatelessWidget {
       leading: StreamBuilder<bool>(
         stream: client.liveness(),
         builder: (_, snapshot) {
-          return Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: switch (snapshot.data) {
-                null => scheme.primary.withValues(alpha: 0.3),
-                true => scheme.primary,
-                false => Colors.red,
-              },
-            ),
+          return Icon(
+            PhosphorIconsRegular.wallet,
+            size: mediumIconSize,
+            color: switch (snapshot.data) {
+              null => scheme.primary.withValues(alpha: 0.3),
+              true => scheme.primary,
+              false => Colors.red,
+            },
           );
         },
       ),
