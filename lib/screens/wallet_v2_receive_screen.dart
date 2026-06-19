@@ -4,7 +4,8 @@ import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
-import 'package:pico/widgets/shareable_data_widget.dart';
+import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/shareable_row_widget.dart';
 
 class WalletV2ReceiveScreen extends StatefulWidget {
   final PicoClient client;
@@ -53,7 +54,11 @@ class _WalletV2ReceiveScreenState extends State<WalletV2ReceiveScreen> {
             if (_address case final address?) ...[
               QrCodeWidget(data: address),
               const SizedBox(height: 16),
-              ShareableData(data: address),
+              BorderedList.column(
+                children: [
+                  ShareableRow(data: address, label: 'Bitcoin Address'),
+                ],
+              ),
             ] else
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 64),

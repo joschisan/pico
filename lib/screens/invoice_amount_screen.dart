@@ -6,7 +6,6 @@ import 'package:pico/screens/display_invoice_screen.dart';
 import 'package:pico/screens/display_lnurl_screen.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/widgets/async_icon_button_widget.dart';
-import 'package:pico/widgets/fee_preview_widget.dart';
 
 class InvoiceAmountScreen extends StatefulWidget {
   final PicoClient client;
@@ -25,8 +24,6 @@ class InvoiceAmountScreen extends StatefulWidget {
 class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   late final PicoClient _client = widget.client;
   GatewayInfoWrapper? _gateway;
-  bool _gatewayFailed = false;
-  int _amountSats = 0;
 
   @override
   void initState() {
@@ -35,15 +32,11 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   }
 
   void _kickoffGatewaySelection() {
-    _gateway = null;
-    _gatewayFailed = false;
     _client.lnSelectAnyGateway().then(
       (g) {
-        if (mounted) setState(() => _gateway = g);
+        if (mounted) _gateway = g;
       },
-      onError: (_) {
-        if (mounted) setState(() => _gatewayFailed = true);
-      },
+      onError: (_) {},
     );
   }
 
@@ -61,6 +54,8 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
     final gateway = _gateway;
     if (gateway == null) throw 'Querying gateway fee…';
 
+    final feeSats = gateway.gatewayFeeForReceiveAmount(amountSats: amountSats);
+
     final invoice = await _client.lnReceive(
       gateway: gateway,
       amountSat: amountSats,
@@ -70,19 +65,13 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder:
-            (_) => DisplayInvoiceScreen(invoice: invoice, amount: amountSats),
+        builder: (_) => DisplayInvoiceScreen(
+          client: _client,
+          invoice: invoice,
+          amount: amountSats,
+          feeSats: feeSats,
+        ),
       ),
-    );
-  }
-
-  Widget _buildFeePreview() {
-    if (_gatewayFailed) return const FeePreview.error(label: 'gateway fee');
-    final gateway = _gateway;
-    if (gateway == null) return const FeePreview.loading(label: 'gateway fee');
-    return FeePreview.value(
-      gateway.gatewayFeeForReceiveAmount(amountSats: _amountSats),
-      label: 'gateway fee',
     );
   }
 
@@ -99,22 +88,11 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: _buildFeePreview(),
-            ),
-            Expanded(
-              child: AmountEntryWidget(
-                key: ValueKey(_client.federationId()),
-                client: _client,
-                onConfirm: _handleConfirm,
-                onAmountChanged:
-                    (sats) => setState(() => _amountSats = sats),
-              ),
-            ),
-          ],
+        child: AmountEntryWidget(
+          key: ValueKey(_client.federationId()),
+          client: _client,
+          onConfirm: _handleConfirm,
+          buttonText: 'Continue',
         ),
       ),
     );

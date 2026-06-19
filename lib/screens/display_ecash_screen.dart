@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/fountain.dart';
-import 'package:pico/widgets/amount_display_widget.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
-import 'package:pico/widgets/shareable_data_widget.dart';
+import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/shareable_row_widget.dart';
+import 'package:pico/widgets/detail_row_widget.dart';
+import 'package:pico/widgets/amount_rows.dart';
 import 'package:pico/drawers/cancel_ecash_drawer.dart';
 
 Stream<String> _createFrameStream(ECashEncoder encoder) async* {
@@ -69,8 +72,20 @@ class DisplayEcashScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 16),
-              ShareableData(data: ecash.toString()),
-              Expanded(child: Center(child: AmountDisplay(ecash.amountSats()))),
+              BorderedList.column(
+                children: [
+                  ShareableRow(data: ecash.toString(), label: 'eCash'),
+                  if (client != null)
+                    ...amountRows(client: client, amountSats: ecash.amountSats())
+                  else
+                    DetailRow(
+                      icon: PhosphorIconsRegular.currencyBtc,
+                      label: 'Amount in Bitcoin',
+                      value:
+                          '${NumberFormat('#,###').format(ecash.amountSats())} sat',
+                    ),
+                ],
+              ),
             ],
           ),
         ),
