@@ -82,6 +82,12 @@ class _HomeScreenState extends State<HomeScreen> {
               clients.isEmpty ? null : clients.first.federationId();
         }
       });
+      // Warm each federation's exchange-rate cache in the background so the
+      // fiat amount rows on the send/receive screens render from cache
+      // without blocking on a fetch.
+      for (final client in clients) {
+        client.prefetchExchangeRates();
+      }
       // Wait for the first emission to actually paint, then flip the
       // flag so subsequent joins animate. Scheduling in initState was
       // too eager — the stream emits after the first frame, so by the

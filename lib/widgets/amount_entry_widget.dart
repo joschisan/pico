@@ -31,6 +31,15 @@ class _AmountEntryWidgetState extends State<AmountEntryWidget> {
   int _currentAmount = 0;
   bool _enterFiat = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Refresh the exchange-rate cache on entry so the fiat amount rows on the
+    // following confirm/display screen stay populated even if the rate cached
+    // at home start has since expired.
+    widget.client.prefetchExchangeRates();
+  }
+
   FiatCurrency get _currency {
     return findFiatCurrency(code: widget.client.currencyCode())!;
   }
