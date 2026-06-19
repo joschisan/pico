@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.10.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -541486853;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1609846849;
 
 // Section: executor
 
@@ -3301,6 +3301,56 @@ fn wire__crate__client__PicoClient_prefetch_exchange_rates_impl(
         },
     )
 }
+fn wire__crate__client__PicoClient_sats_to_fiat_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PicoClient_sats_to_fiat",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
+            >>::sse_decode(&mut deserializer);
+            let api_amount_sats = <i64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = Result::<_, ()>::Ok(crate::client::PicoClient::sats_to_fiat(
+                    &*api_that_guard,
+                    api_amount_sats,
+                ))?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__client__PicoClient_shutdown_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -4767,6 +4817,17 @@ impl SseDecode for Option<PicoClientFactory> {
     }
 }
 
+impl SseDecode for Option<f64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<f64>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::currency::FiatCurrency> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -5195,24 +5256,24 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        56 => wire__crate__client__PicoClient_shutdown_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__client__PicoClient_subscribe_balance_impl(
+        57 => wire__crate__client__PicoClient_shutdown_impl(port, ptr, rust_vec_len, data_len),
+        58 => wire__crate__client__PicoClient_subscribe_balance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        58 => wire__crate__client__PicoClient_subscribe_recovery_progress_impl(
+        59 => wire__crate__client__PicoClient_subscribe_recovery_progress_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        63 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-        65 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
-        66 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
-        68 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
-        74 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        64 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        66 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
+        67 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
+        69 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
+        75 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -5255,18 +5316,19 @@ fn pde_ffi_dispatcher_sync_impl(
         15 => wire__crate__lnurl__PayResponseWrapper_min_sats_impl(ptr, rust_vec_len, data_len),
         36 => wire__crate__client__PicoClient_currency_code_impl(ptr, rust_vec_len, data_len),
         41 => wire__crate__client__PicoClient_federation_id_impl(ptr, rust_vec_len, data_len),
-        59 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
-        60 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
-        61 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
-        62 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
-        64 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
-        67 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
-        69 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
-        70 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
-        71 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
-        72 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
-        73 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
-        75 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
+        56 => wire__crate__client__PicoClient_sats_to_fiat_impl(ptr, rust_vec_len, data_len),
+        60 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
+        61 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
+        62 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
+        63 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
+        65 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
+        68 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
+        70 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
+        71 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
+        72 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
+        73 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
+        74 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
+        76 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -6328,6 +6390,16 @@ impl SseEncode for Option<PicoClientFactory> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <PicoClientFactory>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<f64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <f64>::sse_encode(value, serializer);
         }
     }
 }

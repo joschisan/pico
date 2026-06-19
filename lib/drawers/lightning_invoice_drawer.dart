@@ -4,10 +4,10 @@ import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/amount_display_widget.dart';
-import 'package:pico/widgets/fee_preview_widget.dart';
+import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/amount_rows.dart';
 import 'package:pico/widgets/async_button_widget.dart';
-import 'package:pico/utils/auth_utils.dart';
+import 'package:pico/drawers/confirm_lightning_send_drawer.dart';
 import 'package:pico/utils/drawer_utils.dart';
 
 class LightningInvoiceDrawer extends StatefulWidget {
@@ -43,49 +43,26 @@ class LightningInvoiceDrawer extends StatefulWidget {
 }
 
 class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
-  late final PicoClient _client = widget.client;
-  GatewayInfoWrapper? _gateway;
-  bool _gatewayFailed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _kickoffGatewaySelection();
-  }
-
-  void _kickoffGatewaySelection() {
-    _gateway = null;
-    _gatewayFailed = false;
-    _client.lnSelectGatewayForInvoice(invoice: widget.invoice).then(
-      (g) {
-        if (mounted) setState(() => _gateway = g);
-      },
-      onError: (_) {
-        if (mounted) setState(() => _gatewayFailed = true);
-      },
+  /// Selects the gateway and quotes its fee, then hands off to the
+  /// confirmation drawer. The gateway is only chosen here, once the user opts
+  /// to continue, and is passed through so [PicoClient.lnSend] uses the gateway
+  /// the fee was quoted against.
+  Future<void> _handleContinue() async {
+    final gateway = await widget.client.lnSelectGatewayForInvoice(
+      invoice: widget.invoice,
     );
-  }
 
-  Future<void> _handleConfirm() async {
-    final gateway = _gateway;
-    if (gateway == null) throw 'Querying network fee…';
-
-    await requireBiometricAuth(context);
-
-    await _client.lnSend(gateway: gateway, invoice: widget.invoice);
+    final feeSats = gateway.gatewayFeeForInvoice(invoice: widget.invoice);
 
     if (!mounted) return;
 
     Navigator.of(context).pop();
-  }
-
-  Widget _buildFeePreview() {
-    if (_gatewayFailed) return const FeePreview.error(label: 'gateway fee');
-    final gateway = _gateway;
-    if (gateway == null) return const FeePreview.loading(label: 'gateway fee');
-    return FeePreview.value(
-      gateway.gatewayFeeForInvoice(invoice: widget.invoice),
-      label: 'gateway fee',
+    ConfirmLightningSendDrawer.show(
+      context,
+      client: widget.client,
+      invoice: widget.invoice,
+      gateway: gateway,
+      feeSats: feeSats,
     );
   }
 
@@ -95,11 +72,16 @@ class _LightningInvoiceDrawerState extends State<LightningInvoiceDrawer> {
       icon: PhosphorIconsRegular.lightning,
       title: 'Send Lightning',
       children: [
-        _buildFeePreview(),
-        const SizedBox(height: 64),
-        AmountDisplay(widget.invoice.amountSats()),
-        const SizedBox(height: 64),
-        AsyncButton(text: 'Confirm', onPressed: _handleConfirm),
+        BorderedList.column(
+          children: [
+            ...amountRows(
+              client: widget.client,
+              amountSats: widget.invoice.amountSats(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        AsyncButton(text: 'Continue', onPressed: _handleContinue),
       ],
     );
   }

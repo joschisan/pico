@@ -4,10 +4,9 @@ import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/screens/contact_name_entry_screen.dart';
-import 'package:pico/utils/auth_utils.dart';
+import 'package:pico/screens/confirm_lnurl_send_screen.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
-import 'package:pico/widgets/fee_preview_widget.dart';
 import 'package:share_plus/share_plus.dart';
 
 class LnurlAmountScreen extends StatefulWidget {
@@ -31,49 +30,37 @@ class LnurlAmountScreen extends StatefulWidget {
 }
 
 class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
-  late final PicoClient _client = widget.client;
   late String? _contactName = widget.contactName;
-  GatewayInfoWrapper? _gateway;
-  bool _gatewayFailed = false;
-  int _amountSats = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _kickoffGatewaySelection();
-  }
-
-  void _kickoffGatewaySelection() {
-    _gateway = null;
-    _gatewayFailed = false;
-    _client.lnSelectAnyGateway().then(
-      (g) {
-        if (mounted) setState(() => _gateway = g);
-      },
-      onError: (_) {
-        if (mounted) setState(() => _gatewayFailed = true);
-      },
-    );
-  }
-
+  /// Resolves the invoice for the entered amount, selects the gateway for that
+  /// specific invoice (exact fee, with the direct-swap shortcut applied), then
+  /// hands both off to the confirmation screen.
   Future<void> _handleConfirm(int amountSats) async {
-    final gateway = _gateway;
-    if (gateway == null) throw 'Querying network fee…';
-
     final invoice = await lnurlResolve(
       payResponse: widget.payResponse,
       amountSats: amountSats,
     );
 
+    final gateway = await widget.client.lnSelectGatewayForInvoice(
+      invoice: invoice,
+    );
+
+    final feeSats = gateway.gatewayFeeForInvoice(invoice: invoice);
+
     if (!mounted) return;
 
-    await requireBiometricAuth(context);
-
-    await _client.lnSend(gateway: gateway, invoice: invoice);
-
-    if (!mounted) return;
-
-    Navigator.of(context).pop();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ConfirmLnurlSendScreen(
+          client: widget.client,
+          invoice: invoice,
+          amountSats: amountSats,
+          gateway: gateway,
+          feeSats: feeSats,
+          contactName: _contactName,
+        ),
+      ),
+    );
   }
 
   Future<void> _handleSaveContact() async {
@@ -94,16 +81,6 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
 
   void _handleShare() {
     SharePlus.instance.share(ShareParams(text: widget.lnurl.encode()));
-  }
-
-  Widget _buildFeePreview() {
-    if (_gatewayFailed) return const FeePreview.error(label: 'gateway fee');
-    final gateway = _gateway;
-    if (gateway == null) return const FeePreview.loading(label: 'gateway fee');
-    return FeePreview.value(
-      gateway.gatewayFeeForAmount(amountSats: _amountSats),
-      label: 'gateway fee',
-    );
   }
 
   @override
@@ -130,22 +107,11 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
       ),
       body: SafeArea(
         maintainBottomViewPadding: true,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: _buildFeePreview(),
-            ),
-            Expanded(
-              child: AmountEntryWidget(
-                key: ValueKey(_client.federationId()),
-                client: _client,
-                onConfirm: _handleConfirm,
-                onAmountChanged:
-                    (sats) => setState(() => _amountSats = sats),
-              ),
-            ),
-          ],
+        child: AmountEntryWidget(
+          key: ValueKey(widget.client.federationId()),
+          client: widget.client,
+          onConfirm: _handleConfirm,
+          buttonText: 'Continue',
         ),
       ),
     );

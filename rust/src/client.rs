@@ -109,6 +109,21 @@ impl PicoClient {
             .map(|r| ((amount_fiat / r) * 100_000_000.0).round() as i64)
     }
 
+    /// Converts `amount_sats` to the user's fiat currency using the cached
+    /// exchange rate, without triggering a network fetch. Returns `None` when
+    /// no fresh rate is cached, so callers can omit the fiat row rather than
+    /// block on the network.
+    #[frb(sync)]
+    pub fn sats_to_fiat(&self, amount_sats: i64) -> Option<f64> {
+        let guard = self.exchange_rate_cache.try_lock().ok()?;
+        let (rate, timestamp) = guard.as_ref()?;
+        if timestamp.elapsed() < std::time::Duration::from_secs(600) {
+            Some((amount_sats as f64 / 100_000_000.0) * rate)
+        } else {
+            None
+        }
+    }
+
     #[frb]
     pub async fn subscribe_balance(&self, sink: StreamSink<i64>) {
         let mut stream = self.client.subscribe_balance_changes().await;
