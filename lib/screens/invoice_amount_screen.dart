@@ -23,22 +23,6 @@ class InvoiceAmountScreen extends StatefulWidget {
 
 class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   late final PicoClient _client = widget.client;
-  GatewayInfoWrapper? _gateway;
-
-  @override
-  void initState() {
-    super.initState();
-    _kickoffGatewaySelection();
-  }
-
-  void _kickoffGatewaySelection() {
-    _client.lnSelectAnyGateway().then(
-      (g) {
-        if (mounted) _gateway = g;
-      },
-      onError: (_) {},
-    );
-  }
 
   Future<void> _handleLnurlTap() async {
     final lnurl = await _client.lnurl();
@@ -51,8 +35,7 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   }
 
   Future<void> _handleConfirm(int amountSats) async {
-    final gateway = _gateway;
-    if (gateway == null) throw 'Querying gateway fee…';
+    final gateway = await _client.lnSelectAnyGateway();
 
     final feeSats = gateway.gatewayFeeForReceiveAmount(amountSats: amountSats);
 
