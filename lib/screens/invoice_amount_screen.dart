@@ -75,7 +75,6 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
           key: ValueKey(_client.federationId()),
           client: _client,
           onConfirm: _handleConfirm,
-          buttonText: 'Continue',
         ),
       ),
     );
