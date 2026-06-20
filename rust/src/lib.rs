@@ -26,6 +26,17 @@ pub use factory::{PicoClientFactory, PicoContact};
 pub use fountain::{ECashDecoder, ECashEncoder};
 pub use lnurl::{LnurlWrapper, PayResponseWrapper, lnurl_fetch_limits, lnurl_resolve, parse_lnurl};
 
+/// Runs once when the Rust library is initialized (before any API call).
+/// rustls 0.23 refuses to pick a `CryptoProvider` automatically when more
+/// than one backend is linked, and panics on the first TLS handshake
+/// ("no crypto provider configured"). Install ring's provider so outbound
+/// HTTPS (LNURL, exchange rates, the gateway API) works.
+#[frb(init)]
+pub fn init_app() {
+    flutter_rust_bridge::setup_default_user_utils();
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 #[frb(sync)]
 pub fn word_list() -> Vec<String> {
     bip39::Language::English
