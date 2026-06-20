@@ -51,9 +51,8 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   }
 
   Future<void> _handleConfirm(int amountSats) async {
-    // Use the gateway warmed in initState, or select one now — surfacing the
-    // real error (e.g. no gateways synced yet) instead of a placeholder.
-    final gateway = _gateway ?? await _client.lnSelectAnyGateway();
+    final gateway = _gateway;
+    if (gateway == null) throw 'Querying gateway fee…';
 
     final feeSats = gateway.gatewayFeeForReceiveAmount(amountSats: amountSats);
 
