@@ -496,20 +496,7 @@ class _FederationRow extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       contentPadding: listTilePadding,
-      leading: StreamBuilder<bool>(
-        stream: client.liveness(),
-        builder: (_, snapshot) {
-          return Icon(
-            PhosphorIconsRegular.wallet,
-            size: mediumIconSize,
-            color: switch (snapshot.data) {
-              null => scheme.primary.withValues(alpha: 0.3),
-              true => scheme.primary,
-              false => Colors.red,
-            },
-          );
-        },
-      ),
+      leading: _GuardianRing(client: client),
       // Both texts go in the title slot so ListTile sees a single-line
       // tile (56dp min) instead of the 72dp two-line tile a populated
       // `subtitle` would force. Keeps the row height consistent with
@@ -560,6 +547,76 @@ class _FederationRow extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Leading indicator for a federation row: a ring filled to the fraction of
+/// guardians currently reachable. Sized to [mediumIconSize] so it occupies the
+/// same footprint as the phosphor icons used elsewhere in the leading slot.
+class _GuardianRing extends StatefulWidget {
+  final PicoClient client;
+
+  const _GuardianRing({required this.client});
+
+  @override
+  State<_GuardianRing> createState() => _GuardianRingState();
+}
+
+class _GuardianRingState extends State<_GuardianRing> {
+  final List<StreamSubscription<bool>> _subscriptions = [];
+  // One slot per guardian: null = unknown, true = online, false = offline.
+  List<bool?> _status = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribe();
+  }
+
+  Future<void> _subscribe() async {
+    final peers = await widget.client.peers();
+    if (!mounted) return;
+
+    setState(() => _status = List<bool?>.filled(peers.length, null));
+
+    for (var i = 0; i < peers.length; i++) {
+      final index = i;
+      final (peerId, _) = peers[i];
+      _subscriptions.add(
+        widget.client.livenessPeer(peerId: peerId).listen((online) {
+          if (!mounted) return;
+          setState(() => _status[index] = online);
+        }),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final total = _status.length;
+    final connected = _status.where((online) => online == true).length;
+
+    return SizedBox(
+      width: mediumIconSize,
+      height: mediumIconSize,
+      child: CircularProgressIndicator(
+        // Indeterminate spin until the guardian list resolves, then fill to
+        // the fraction online.
+        value: total == 0 ? null : connected / total,
+        strokeWidth: 3,
+        color: scheme.primary,
+        backgroundColor: scheme.primary.withValues(alpha: 0.15),
       ),
     );
   }
