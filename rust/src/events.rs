@@ -201,7 +201,7 @@ pub(crate) fn parse_summary(
             operation_id,
             incoming: false,
             payment_type: PaymentType::Ecash,
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
             timestamp,
             federation_name,
         });
@@ -211,7 +211,7 @@ pub(crate) fn parse_summary(
             operation_id,
             incoming: true,
             payment_type: PaymentType::Ecash,
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
             timestamp,
             federation_name,
         });
@@ -221,7 +221,7 @@ pub(crate) fn parse_summary(
             operation_id,
             incoming: false,
             payment_type: PaymentType::Lightning,
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
             timestamp,
             federation_name,
         });
@@ -231,7 +231,7 @@ pub(crate) fn parse_summary(
             operation_id,
             incoming: true,
             payment_type: PaymentType::Lightning,
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
             timestamp,
             federation_name,
         });
@@ -264,7 +264,7 @@ pub(crate) fn parse_summary(
             operation_id,
             incoming: true,
             payment_type: PaymentType::Ecash,
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
             timestamp,
             federation_name,
         });
@@ -279,7 +279,7 @@ pub(crate) fn parse_summary(
 pub(crate) fn parse_notification(entry: &EventLogEntry) -> Option<Notification> {
     if let Some(e) = entry.to_event::<LnReceive>() {
         return Some(Notification::LightningReceived {
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<WalletReceive>() {
@@ -289,7 +289,7 @@ pub(crate) fn parse_notification(entry: &EventLogEntry) -> Option<Notification> 
     }
     if let Some(e) = entry.to_event::<RecoveryEvent>() {
         return Some(Notification::EcashRecovered {
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
     if entry.to_event::<SendRefundEvent>().is_some() {
@@ -312,8 +312,8 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::TxCreate {
             timestamp,
             txid: e.txid.to_string(),
-            change_sats: (e.remint.msats / 1000) as i64,
-            fee_sats: (e.fee.msats / 1000) as i64,
+            change_sats: (e.remint.msat / 1000) as i64,
+            fee_sats: (e.fee.msat / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<TxAcceptEvent>() {
@@ -335,8 +335,8 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::LnSend {
             timestamp,
             txid: e.txid.to_string(),
-            amount_sats: (e.amount.msats / 1000) as i64,
-            fee_sats: (e.fee.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
+            fee_sats: (e.fee.msat / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<SendSuccessEvent>() {
@@ -359,8 +359,8 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::LnReceive {
             timestamp,
             txid: e.txid.to_string(),
-            amount_sats: (e.amount.msats / 1000) as i64,
-            fee_sats: (e.fee.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
+            fee_sats: (e.fee.msat / 1000) as i64,
         });
     }
 
@@ -368,7 +368,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     if let Some(e) = entry.to_event::<MintSend>() {
         return Some(PaymentEvent::MintSend {
             timestamp,
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<MintSendSuccessEvent>() {
@@ -390,14 +390,14 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::MintReceive {
             timestamp,
             txid: e.txid.to_string(),
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<MintSuccessEvent>() {
         return Some(PaymentEvent::MintSuccess {
             timestamp,
             txid: e.txid.to_string(),
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
     if entry.to_event::<MintFailureEvent>().is_some() {
@@ -406,7 +406,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     if let Some(e) = entry.to_event::<RecoveryEvent>() {
         return Some(PaymentEvent::MintRecovery {
             timestamp,
-            amount_sats: (e.amount.msats / 1000) as i64,
+            amount_sats: (e.amount.msat / 1000) as i64,
             txid: e.txid.map(|t| t.to_string()),
         });
     }

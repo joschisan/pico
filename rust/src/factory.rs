@@ -220,7 +220,7 @@ impl PicoClientFactory {
 
         dbtx.insert(&ClientConfig, &federation_id, &config);
 
-        Client::init_recovery(&dbtx.as_ref(), federation_id);
+        Client::init_recovery(&dbtx, federation_id);
 
         dbtx.commit();
 
@@ -281,7 +281,7 @@ impl PicoClientFactory {
         client.client.shutdown().await;
 
         let dbtx = self.db.begin_write();
-        client.client.wipe(&dbtx.as_ref());
+        client.client.wipe(&dbtx);
         dbtx.remove(&ClientConfig, &fed_id);
         dbtx.commit();
 
@@ -335,7 +335,7 @@ impl PicoClientFactory {
                     .client
                     .subscribe_balance_changes()
                     .await
-                    .map(move |amt| (fed_id, (amt.msats / 1000) as i64));
+                    .map(move |amt| (fed_id, (amt.msat / 1000) as i64));
                 tagged.push(stream.boxed());
             }
             let mut merged = stream::select_all(tagged);
@@ -588,7 +588,7 @@ async fn build_pico_client(
     federation_id: FederationId,
     currency_code: String,
 ) -> PicoClient {
-    let federation_name = client.config().await.name;
+    let federation_name = client.config().name.clone();
     PicoClient {
         client,
         federation_id,

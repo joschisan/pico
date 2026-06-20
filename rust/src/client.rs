@@ -7,7 +7,7 @@ use futures::StreamExt;
 use picomint_client::Client;
 use picomint_core::Amount;
 use picomint_core::config::FederationId;
-use picomint_core::ln::gateway_api::{GatewayInfo, GatewayPk};
+use picomint_core::ln::gateway::{GatewayInfo, GatewayPk};
 
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
@@ -36,9 +36,9 @@ impl GatewayInfoWrapper {
         let ln_msats = if is_direct {
             0
         } else {
-            self.gateway_info.ln_fee.fee(amount_msats).msats
+            self.gateway_info.ln_fee.fee(amount_msats).msat
         };
-        let send_msats = self.gateway_info.send_fee.fee(amount_msats).msats;
+        let send_msats = self.gateway_info.send_fee.fee(amount_msats).msat;
         ((ln_msats + send_msats) / 1000) as i64
     }
 
@@ -47,8 +47,8 @@ impl GatewayInfoWrapper {
     #[frb(sync)]
     pub fn gateway_fee_for_amount(&self, amount_sats: i64) -> i64 {
         let msats = (amount_sats as u64).saturating_mul(1000);
-        let ln_msats = self.gateway_info.ln_fee.fee(msats).msats;
-        let send_msats = self.gateway_info.send_fee.fee(msats).msats;
+        let ln_msats = self.gateway_info.ln_fee.fee(msats).msat;
+        let send_msats = self.gateway_info.send_fee.fee(msats).msat;
         ((ln_msats + send_msats) / 1000) as i64
     }
 
@@ -57,7 +57,7 @@ impl GatewayInfoWrapper {
     #[frb(sync)]
     pub fn gateway_fee_for_receive_amount(&self, amount_sats: i64) -> i64 {
         let msats = (amount_sats as u64).saturating_mul(1000);
-        (self.gateway_info.receive_fee.fee(msats).msats / 1000) as i64
+        (self.gateway_info.receive_fee.fee(msats).msat / 1000) as i64
     }
 }
 
@@ -129,7 +129,7 @@ impl PicoClient {
         let mut stream = self.client.subscribe_balance_changes().await;
 
         while let Some(amount) = stream.next().await {
-            if sink.add((amount.msats / 1000) as i64).is_err() {
+            if sink.add((amount.msat / 1000) as i64).is_err() {
                 break;
             }
         }
@@ -157,7 +157,6 @@ impl PicoClient {
     pub async fn peers(&self) -> Vec<(u8, String)> {
         self.client
             .config()
-            .await
             .peers
             .iter()
             .map(|(id, peer)| (u8::from(*id), peer.name.clone()))
@@ -227,7 +226,7 @@ impl PicoClient {
     pub async fn ecash_send(&self, amount_sat: i64) -> Result<ECashWrapper, String> {
         self.client
             .mint()
-            .send(Amount::from_sats(amount_sat as u64))
+            .send(Amount::from_sat(amount_sat as u64))
             .await
             .map(ECashWrapper)
             .map_err(|e| e.to_string())
@@ -254,7 +253,7 @@ impl PicoClient {
             .receive(
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
-                Amount::from_sats(amount_sat as u64),
+                Amount::from_sat(amount_sat as u64),
                 60 * 60 * 24,
             )
             .await

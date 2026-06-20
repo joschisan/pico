@@ -82,7 +82,7 @@ pub struct ECashWrapper(pub(crate) ECash);
 impl ECashWrapper {
     #[frb(sync)]
     pub fn amount_sats(&self) -> i64 {
-        (self.0.amount().msats / 1000) as i64
+        (self.0.amount().msat / 1000) as i64
     }
 
     /// Federation that minted these notes — needed to look up the
