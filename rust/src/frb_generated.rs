@@ -3314,7 +3314,7 @@ fn wire__crate__client__PicoClient_subscribe_connection_status_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
             >>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
-                Vec<(String, Option<bool>)>,
+                Vec<(String, Option<f64>)>,
                 flutter_rust_bridge::for_generated::SseCodec,
             >>::sse_decode(&mut deserializer);
             deserializer.end();
@@ -4416,7 +4416,7 @@ impl SseDecode
 }
 
 impl SseDecode
-    for StreamSink<Vec<(String, Option<bool>)>, flutter_rust_bridge::for_generated::SseCodec>
+    for StreamSink<Vec<(String, Option<f64>)>, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4569,13 +4569,13 @@ impl SseDecode for Vec<u8> {
     }
 }
 
-impl SseDecode for Vec<(String, Option<bool>)> {
+impl SseDecode for Vec<(String, Option<f64>)> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut len_ = <i32>::sse_decode(deserializer);
         let mut ans_ = vec![];
         for idx_ in 0..len_ {
-            ans_.push(<(String, Option<bool>)>::sse_decode(deserializer));
+            ans_.push(<(String, Option<f64>)>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -4727,17 +4727,6 @@ impl SseDecode for Option<PicoClientFactory> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<PicoClientFactory>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
-impl SseDecode for Option<bool> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<bool>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -4995,11 +4984,11 @@ impl SseDecode for crate::events::PaymentType {
     }
 }
 
-impl SseDecode for (String, Option<bool>) {
+impl SseDecode for (String, Option<f64>) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_field0 = <String>::sse_decode(deserializer);
-        let mut var_field1 = <Option<bool>>::sse_decode(deserializer);
+        let mut var_field1 = <Option<f64>>::sse_decode(deserializer);
         return (var_field0, var_field1);
     }
 }
@@ -6058,7 +6047,7 @@ impl SseEncode
 }
 
 impl SseEncode
-    for StreamSink<Vec<(String, Option<bool>)>, flutter_rust_bridge::for_generated::SseCodec>
+    for StreamSink<Vec<(String, Option<f64>)>, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6189,12 +6178,12 @@ impl SseEncode for Vec<u8> {
     }
 }
 
-impl SseEncode for Vec<(String, Option<bool>)> {
+impl SseEncode for Vec<(String, Option<f64>)> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
-            <(String, Option<bool>)>::sse_encode(item, serializer);
+            <(String, Option<f64>)>::sse_encode(item, serializer);
         }
     }
 }
@@ -6323,16 +6312,6 @@ impl SseEncode for Option<PicoClientFactory> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <PicoClientFactory>::sse_encode(value, serializer);
-        }
-    }
-}
-
-impl SseEncode for Option<bool> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <bool>::sse_encode(value, serializer);
         }
     }
 }
@@ -6567,11 +6546,11 @@ impl SseEncode for crate::events::PaymentType {
     }
 }
 
-impl SseEncode for (String, Option<bool>) {
+impl SseEncode for (String, Option<f64>) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.0, serializer);
-        <Option<bool>>::sse_encode(self.1, serializer);
+        <Option<f64>>::sse_encode(self.1, serializer);
     }
 }
 

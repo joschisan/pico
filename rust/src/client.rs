@@ -1,13 +1,14 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use bitcoin::Amount as BtcAmount;
 use flutter_rust_bridge::frb;
 use futures::StreamExt;
-use picomint_client::Client;
+use picomint_client::{Client, ConnStatus};
 use picomint_core::Amount;
+use picomint_core::PeerId;
 use picomint_core::config::FederationId;
 use picomint_core::ln::gateway::{GatewayInfo, GatewayPk};
-use tokio::sync::watch;
 
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
@@ -71,17 +72,6 @@ pub struct PicoClient {
     pub(crate) federation_name: String,
     pub(crate) currency_code: String,
     pub(crate) exchange_rate_cache: ExchangeRateCache,
-    /// Latest per-guardian reachability, one slot per guardian in
-    /// `config().peers` order: `(name, None)` until that guardian's first
-    /// poll resolves, then `(name, Some(online))`. Driven by the persistent
-    /// monitor spawned in `build_pico_client`, so the home ring and the
-    /// connection-status screen read identical state and a freshly-opened
-    /// screen gets the current snapshot with no cold-start flicker.
-    pub(crate) connection_status: watch::Receiver<Vec<(String, Option<bool>)>>,
-    /// Supervisor handle for the per-guardian poll loops. Held so `leave`
-    /// can abort the whole monitor (releasing its `Arc<Client>` clone) in
-    /// one call. `Arc` because `PicoClient` is `Clone`.
-    pub(crate) connection_monitor: Arc<tokio::task::JoinHandle<()>>,
 }
 
 impl PicoClient {
@@ -161,25 +151,42 @@ impl PicoClient {
         }
     }
 
-    /// Live `(name, online)` status for every guardian, sourced from the
-    /// persistent monitor's shared cache. Emits the current snapshot
-    /// immediately on subscribe — so a freshly-opened screen never shows a
-    /// cold-start flicker — then re-emits whenever any guardian's status
-    /// changes. Multiple subscribers (home ring + connection-status screen)
-    /// share the one monitor; subscribing here starts no new polling.
+    /// Live per-guardian reachability, one entry per guardian in
+    /// `config().peers` (PeerId) order: `(name, rtt_ms)` where `rtt_ms` is
+    /// `Some(round-trip millis)` while connected and `None` while
+    /// disconnected. Sourced from the client's `connection_status_stream`,
+    /// which is backed by the same kept-alive connections requests travel
+    /// over and emits the current snapshot first — so a freshly-opened
+    /// screen never shows a cold-start flicker. Multiple subscribers (home
+    /// ring + connection-status screen) each get their own cheap view of
+    /// the shared connections; subscribing starts no new polling.
     #[frb]
-    pub async fn subscribe_connection_status(
-        &self,
-        sink: StreamSink<Vec<(String, Option<bool>)>>,
-    ) {
-        let mut rx = self.connection_status.clone();
+    pub async fn subscribe_connection_status(&self, sink: StreamSink<Vec<(String, Option<f64>)>>) {
+        // Guardian names keyed by PeerId so every emission renders all
+        // guardians (even before their first status lands) in a stable order.
+        let names: BTreeMap<PeerId, String> = self
+            .client
+            .config()
+            .peers
+            .iter()
+            .map(|(id, peer)| (*id, peer.name.clone()))
+            .collect();
 
-        if sink.add(rx.borrow().clone()).is_err() {
-            return;
-        }
+        let mut stream = self.client.connection_status_stream();
 
-        while rx.changed().await.is_ok() {
-            if sink.add(rx.borrow().clone()).is_err() {
+        while let Some(status_map) = stream.next().await {
+            let statuses: Vec<(String, Option<f64>)> = names
+                .iter()
+                .map(|(peer, name)| {
+                    let rtt_ms = match status_map.get(peer) {
+                        Some(ConnStatus::Connected(rtt)) => Some(rtt.as_secs_f64() * 1000.0),
+                        _ => None,
+                    };
+                    (name.clone(), rtt_ms)
+                })
+                .collect();
+
+            if sink.add(statuses).is_err() {
                 break;
             }
         }

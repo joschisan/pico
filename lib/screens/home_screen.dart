@@ -569,8 +569,9 @@ class _GuardianRing extends StatefulWidget {
 }
 
 class _GuardianRingState extends State<_GuardianRing> {
-  // Cache the stream so rebuilds don't re-subscribe on every frame.
-  late final Stream<List<(String, bool?)>> _stream =
+  // Cache the stream so rebuilds don't re-subscribe on every frame. Each
+  // entry is `(name, rttMs)`: a non-null RTT means that guardian is connected.
+  late final Stream<List<(String, double?)>> _stream =
       widget.client.subscribeConnectionStatus();
 
   @override
@@ -580,7 +581,7 @@ class _GuardianRingState extends State<_GuardianRing> {
     return SizedBox(
       width: mediumIconSize,
       height: mediumIconSize,
-      child: StreamBuilder<List<(String, bool?)>>(
+      child: StreamBuilder<List<(String, double?)>>(
         stream: _stream,
         builder: (context, snapshot) {
           final statuses = snapshot.data;
@@ -594,7 +595,7 @@ class _GuardianRingState extends State<_GuardianRing> {
             );
           }
 
-          final online = statuses.where((s) => s.$2 == true).length;
+          final online = statuses.where((s) => s.$2 != null).length;
           final fraction = online / statuses.length;
 
           // Tween the fill between fractions as guardians come and go,

@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use flutter_rust_bridge::frb;
 use futures::StreamExt;
@@ -14,7 +13,7 @@ use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
 use picomint_eventlog::{EventLogId, EventLogger};
 use picomint_redb::Database;
-use tokio::sync::{Mutex, Notify, RwLock, watch};
+use tokio::sync::{Mutex, Notify, RwLock};
 
 use crate::client::PicoClient;
 use crate::db::{
@@ -278,11 +277,6 @@ impl PicoClientFactory {
         let Some(client) = self.clients.write().await.remove(&fed_id) else {
             return Ok(());
         };
-
-        // Stop the per-guardian poll loops first; otherwise their
-        // `Arc<Client>` clones would keep the client alive past shutdown and
-        // poll a wiped federation forever.
-        client.connection_monitor.abort();
 
         client.client.shutdown().await;
 
@@ -594,47 +588,7 @@ async fn build_pico_client(
     federation_id: FederationId,
     currency_code: String,
 ) -> PicoClient {
-    let config = client.config();
-    let federation_name = config.name.clone();
-
-    // Guardians in `PeerId` order — the index into this vec is the slot each
-    // guardian's poll loop writes back into the shared status vector.
-    let peers: Vec<(picomint_core::PeerId, String)> = config
-        .peers
-        .iter()
-        .map(|(id, peer)| (*id, peer.name.clone()))
-        .collect();
-
-    // `None` per slot until that guardian's first poll resolves, so the UI
-    // can render a neutral "checking" dot rather than a flash of red.
-    let initial: Vec<(String, Option<bool>)> =
-        peers.iter().map(|(_, name)| (name.clone(), None)).collect();
-
-    let (tx, connection_status) = watch::channel(initial);
-    let tx = Arc::new(tx);
-
-    // One independent poll loop per guardian, all driven concurrently on a
-    // single supervised task so `leave` can abort the whole monitor with one
-    // handle. Each loop polls only its own guardian and writes only its own
-    // slot, so a dot flips the instant that guardian's poll resolves —
-    // guardians aren't gated on a shared sweep.
-    let monitor_client = client.clone();
-    let connection_monitor = tokio::spawn(async move {
-        let polls = peers.into_iter().enumerate().map(|(index, (peer_id, _))| {
-            let client = monitor_client.clone();
-            let tx = tx.clone();
-            async move {
-                loop {
-                    let ok = client.api().liveness_peer(peer_id).await.is_ok();
-
-                    tx.send_modify(|statuses| statuses[index].1 = Some(ok));
-
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                }
-            }
-        });
-        futures::future::join_all(polls).await;
-    });
+    let federation_name = client.config().name.clone();
 
     PicoClient {
         client,
@@ -642,8 +596,6 @@ async fn build_pico_client(
         federation_name,
         currency_code,
         exchange_rate_cache: Arc::new(Mutex::new(None)),
-        connection_status,
-        connection_monitor: Arc::new(connection_monitor),
     }
 }
 

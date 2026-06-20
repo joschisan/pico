@@ -21,10 +21,17 @@ class ConnectionStatusScreen extends StatefulWidget {
 }
 
 class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
-  // The same shared stream the home ring reads — opening this screen serves
-  // the monitor's cached snapshot immediately, so dots don't flicker in.
-  late final Stream<List<(String, bool?)>> _stream =
+  // The same stream the home ring reads — backed by the client's kept-alive
+  // connections and emitting the current snapshot first, so dots don't
+  // flicker in. Each entry is `(name, rttMs)`: a non-null RTT means that
+  // guardian is connected, and carries its round-trip time in milliseconds.
+  late final Stream<List<(String, double?)>> _stream =
       widget.client.subscribeConnectionStatus();
+
+  // Round-trip time, sampled at connect. Sub-10ms links keep one decimal so
+  // a fast guardian doesn't collapse to a misleading "0 ms".
+  String _formatRtt(double ms) =>
+      '${ms < 10 ? ms.toStringAsFixed(1) : ms.round()} ms';
 
   Future<void> _onLeave(BuildContext context) async {
     LeaveFederationDrawer.show(
@@ -59,7 +66,7 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<List<(String, bool?)>>(
+      body: StreamBuilder<List<(String, double?)>>(
         stream: _stream,
         builder: (context, snapshot) {
           final statuses = snapshot.data;
@@ -71,7 +78,7 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
             padding: const EdgeInsets.all(16),
             child: BorderedList.column(
               children: [
-                for (final (name, online) in statuses)
+                for (final (name, rttMs) in statuses)
                   ListTile(
                     contentPadding: listTilePadding,
                     leading: Container(
@@ -79,24 +86,19 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
                       height: 14,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: switch (online) {
-                          null => color.withValues(alpha: 0.3),
-                          true => color,
-                          false => Colors.red,
-                        },
+                        color: rttMs != null ? color : Colors.red,
                       ),
                     ),
                     title: Text(name, style: mediumStyle),
-                    trailing: Text(
-                      switch (online) {
-                        null => '',
-                        true => 'Online',
-                        false => 'Offline',
-                      },
+                    subtitle: Text(
+                      rttMs != null ? 'Connected' : 'Disconnected',
                       style: smallStyle.copyWith(
-                        color: online == true ? color : null,
+                        color: rttMs != null ? color : Colors.red,
                       ),
                     ),
+                    trailing: rttMs != null
+                        ? Text(_formatRtt(rttMs), style: smallStyle)
+                        : null,
                   ),
               ],
             ),
