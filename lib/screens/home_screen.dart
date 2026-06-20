@@ -555,6 +555,10 @@ class _FederationRow extends StatelessWidget {
 /// Leading indicator for a federation row: a ring filled to the fraction of
 /// guardians currently reachable. Sized to [mediumIconSize] so it occupies the
 /// same footprint as the phosphor icons used elsewhere in the leading slot.
+///
+/// Reads the client's shared connection-status stream — the same source the
+/// connection-status screen uses — so the ring and the detail dots never
+/// disagree, and the cached snapshot means no cold-start flicker.
 class _GuardianRing extends StatefulWidget {
   final PicoClient client;
 
@@ -565,77 +569,48 @@ class _GuardianRing extends StatefulWidget {
 }
 
 class _GuardianRingState extends State<_GuardianRing> {
-  final List<StreamSubscription<bool>> _subscriptions = [];
-  // One slot per guardian: null = unknown, true = online, false = offline.
-  List<bool?> _status = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _subscribe();
-  }
-
-  Future<void> _subscribe() async {
-    final peers = await widget.client.peers();
-    if (!mounted) return;
-
-    setState(() => _status = List<bool?>.filled(peers.length, null));
-
-    for (var i = 0; i < peers.length; i++) {
-      final index = i;
-      final (peerId, _) = peers[i];
-      _subscriptions.add(
-        widget.client.livenessPeer(peerId: peerId).listen((online) {
-          if (!mounted) return;
-          setState(() => _status[index] = online);
-        }),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final subscription in _subscriptions) {
-      subscription.cancel();
-    }
-    super.dispose();
-  }
+  // Cache the stream so rebuilds don't re-subscribe on every frame.
+  late final Stream<List<(String, bool?)>> _stream =
+      widget.client.subscribeConnectionStatus();
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final total = _status.length;
-
-    // Indeterminate spin until the guardian list resolves.
-    if (total == 0) {
-      return SizedBox(
-        width: mediumIconSize,
-        height: mediumIconSize,
-        child: CircularProgressIndicator(
-          strokeWidth: 3,
-          color: scheme.primary,
-          backgroundColor: scheme.primary.withValues(alpha: 0.15),
-        ),
-      );
-    }
-
-    final fraction = _status.where((online) => online == true).length / total;
 
     return SizedBox(
       width: mediumIconSize,
       height: mediumIconSize,
-      // Tween the fill between fractions as guardians come and go, matching
-      // conduit's connectivity bar.
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(end: fraction),
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        builder: (context, value, _) {
-          return CircularProgressIndicator(
-            value: value,
-            strokeWidth: 3,
-            color: scheme.primary,
-            backgroundColor: scheme.primary.withValues(alpha: 0.15),
+      child: StreamBuilder<List<(String, bool?)>>(
+        stream: _stream,
+        builder: (context, snapshot) {
+          final statuses = snapshot.data;
+
+          // Indeterminate spin until the first snapshot arrives.
+          if (statuses == null || statuses.isEmpty) {
+            return CircularProgressIndicator(
+              strokeWidth: 3,
+              color: scheme.primary,
+              backgroundColor: scheme.primary.withValues(alpha: 0.15),
+            );
+          }
+
+          final online = statuses.where((s) => s.$2 == true).length;
+          final fraction = online / statuses.length;
+
+          // Tween the fill between fractions as guardians come and go,
+          // matching conduit's connectivity bar.
+          return TweenAnimationBuilder<double>(
+            tween: Tween(end: fraction),
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            builder: (context, value, _) {
+              return CircularProgressIndicator(
+                value: value,
+                strokeWidth: 3,
+                color: scheme.primary,
+                backgroundColor: scheme.primary.withValues(alpha: 0.15),
+              );
+            },
           );
         },
       ),

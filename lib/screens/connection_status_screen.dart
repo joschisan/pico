@@ -6,7 +6,7 @@ import 'package:pico/drawers/leave_federation_drawer.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 
-class ConnectionStatusScreen extends StatelessWidget {
+class ConnectionStatusScreen extends StatefulWidget {
   final PicoClient client;
   final PicoClientFactory clientFactory;
 
@@ -16,11 +16,21 @@ class ConnectionStatusScreen extends StatelessWidget {
     required this.clientFactory,
   });
 
+  @override
+  State<ConnectionStatusScreen> createState() => _ConnectionStatusScreenState();
+}
+
+class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
+  // The same shared stream the home ring reads — opening this screen serves
+  // the monitor's cached snapshot immediately, so dots don't flicker in.
+  late final Stream<List<(String, bool?)>> _stream =
+      widget.client.subscribeConnectionStatus();
+
   Future<void> _onLeave(BuildContext context) async {
     LeaveFederationDrawer.show(
       context,
-      client: client,
-      clientFactory: clientFactory,
+      client: widget.client,
+      clientFactory: widget.clientFactory,
       onSuccess: () {
         // The leave drawer pops itself; once it's gone, pop the
         // connection-status screen too so the user lands back on
@@ -37,7 +47,7 @@ class ConnectionStatusScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: FutureBuilder<String?>(
-          future: client.federationName(),
+          future: widget.client.federationName(),
           builder: (context, snapshot) {
             return Text(snapshot.data ?? 'Federation');
           },
@@ -49,51 +59,44 @@ class ConnectionStatusScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: FutureBuilder<List<(int, String)>>(
-        future: client.peers(),
+      body: StreamBuilder<List<(String, bool?)>>(
+        stream: _stream,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          final statuses = snapshot.data;
+          if (statuses == null) {
             return const Center(child: CircularProgressIndicator());
           }
-
-          final peers = snapshot.data!;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: BorderedList.column(
               children: [
-                for (final (peerId, name) in peers)
-                  StreamBuilder<bool>(
-                    stream: client.livenessPeer(peerId: peerId),
-                    builder: (_, peerSnap) {
-                      final online = peerSnap.data;
-                      return ListTile(
-                        contentPadding: listTilePadding,
-                        leading: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: switch (online) {
-                              null => color.withValues(alpha: 0.3),
-                              true => color,
-                              false => Colors.red,
-                            },
-                          ),
-                        ),
-                        title: Text(name, style: mediumStyle),
-                        trailing: Text(
-                          switch (online) {
-                            null => '',
-                            true => 'Online',
-                            false => 'Offline',
-                          },
-                          style: smallStyle.copyWith(
-                            color: online == true ? color : null,
-                          ),
-                        ),
-                      );
-                    },
+                for (final (name, online) in statuses)
+                  ListTile(
+                    contentPadding: listTilePadding,
+                    leading: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: switch (online) {
+                          null => color.withValues(alpha: 0.3),
+                          true => color,
+                          false => Colors.red,
+                        },
+                      ),
+                    ),
+                    title: Text(name, style: mediumStyle),
+                    trailing: Text(
+                      switch (online) {
+                        null => '',
+                        true => 'Online',
+                        false => 'Offline',
+                      },
+                      style: smallStyle.copyWith(
+                        color: online == true ? color : null,
+                      ),
+                    ),
                   ),
               ],
             ),

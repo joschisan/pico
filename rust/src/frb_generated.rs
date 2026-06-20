@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.10.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1269977992;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1024190126;
 
 // Section: executor
 
@@ -2493,134 +2493,6 @@ fn wire__crate__client__PicoClient_fiat_to_sats_impl(
         },
     )
 }
-fn wire__crate__client__PicoClient_liveness_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "PicoClient_liveness",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
-            >>::sse_decode(&mut deserializer);
-            let api_sink =
-                <StreamSink<bool, flutter_rust_bridge::for_generated::SseCodec>>::sse_decode(
-                    &mut deserializer,
-                );
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let mut api_that_guard = None;
-                        let decode_indices_ =
-                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
-                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                    &api_that, 0, false,
-                                )],
-                            );
-                        for i in decode_indices_ {
-                            match i {
-                                0 => {
-                                    api_that_guard =
-                                        Some(api_that.lockable_decode_async_ref().await)
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
-                        let api_that_guard = api_that_guard.unwrap();
-                        let output_ok = Result::<_, ()>::Ok({
-                            crate::client::PicoClient::liveness(&*api_that_guard, api_sink).await;
-                        })?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
-fn wire__crate__client__PicoClient_liveness_peer_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "PicoClient_liveness_peer",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
-            >>::sse_decode(&mut deserializer);
-            let api_peer_id = <u8>::sse_decode(&mut deserializer);
-            let api_sink =
-                <StreamSink<bool, flutter_rust_bridge::for_generated::SseCodec>>::sse_decode(
-                    &mut deserializer,
-                );
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let mut api_that_guard = None;
-                        let decode_indices_ =
-                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
-                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                    &api_that, 0, false,
-                                )],
-                            );
-                        for i in decode_indices_ {
-                            match i {
-                                0 => {
-                                    api_that_guard =
-                                        Some(api_that.lockable_decode_async_ref().await)
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
-                        let api_that_guard = api_that_guard.unwrap();
-                        let output_ok = Result::<_, ()>::Ok({
-                            crate::client::PicoClient::liveness_peer(
-                                &*api_that_guard,
-                                api_peer_id,
-                                api_sink,
-                            )
-                            .await;
-                        })?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
 fn wire__crate__client__PicoClient_ln_receive_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3186,63 +3058,6 @@ fn wire__crate__client__PicoClient_onchain_send_impl(
         },
     )
 }
-fn wire__crate__client__PicoClient_peers_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "PicoClient_peers",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
-            >>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, ()>(
-                    (move || async move {
-                        let mut api_that_guard = None;
-                        let decode_indices_ =
-                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
-                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                    &api_that, 0, false,
-                                )],
-                            );
-                        for i in decode_indices_ {
-                            match i {
-                                0 => {
-                                    api_that_guard =
-                                        Some(api_that.lockable_decode_async_ref().await)
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
-                        let api_that_guard = api_that_guard.unwrap();
-                        let output_ok = Result::<_, ()>::Ok(
-                            crate::client::PicoClient::peers(&*api_that_guard).await,
-                        )?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
 fn wire__crate__client__PicoClient_prefetch_exchange_rates_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3460,6 +3275,71 @@ fn wire__crate__client__PicoClient_subscribe_balance_impl(
                         let api_that_guard = api_that_guard.unwrap();
                         let output_ok = Result::<_, ()>::Ok({
                             crate::client::PicoClient::subscribe_balance(
+                                &*api_that_guard,
+                                api_sink,
+                            )
+                            .await;
+                        })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__client__PicoClient_subscribe_connection_status_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PicoClient_subscribe_connection_status",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PicoClient>,
+            >>::sse_decode(&mut deserializer);
+            let api_sink = <StreamSink<
+                Vec<(String, Option<bool>)>,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::client::PicoClient::subscribe_connection_status(
                                 &*api_that_guard,
                                 api_sink,
                             )
@@ -4498,14 +4378,6 @@ impl SseDecode
     }
 }
 
-impl SseDecode for StreamSink<bool, flutter_rust_bridge::for_generated::SseCodec> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut inner = <String>::sse_decode(deserializer);
-        return StreamSink::deserialize(inner);
-    }
-}
-
 impl SseDecode for StreamSink<f64, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4535,6 +4407,16 @@ impl SseDecode
         Vec<crate::events::OperationSummary>,
         flutter_rust_bridge::for_generated::SseCodec,
     >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
+    }
+}
+
+impl SseDecode
+    for StreamSink<Vec<(String, Option<bool>)>, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4687,13 +4569,13 @@ impl SseDecode for Vec<u8> {
     }
 }
 
-impl SseDecode for Vec<(u8, String)> {
+impl SseDecode for Vec<(String, Option<bool>)> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut len_ = <i32>::sse_decode(deserializer);
         let mut ans_ = vec![];
         for idx_ in 0..len_ {
-            ans_.push(<(u8, String)>::sse_decode(deserializer));
+            ans_.push(<(String, Option<bool>)>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -4845,6 +4727,17 @@ impl SseDecode for Option<PicoClientFactory> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<PicoClientFactory>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<bool>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -5102,11 +4995,11 @@ impl SseDecode for crate::events::PaymentType {
     }
 }
 
-impl SseDecode for (u8, String) {
+impl SseDecode for (String, Option<bool>) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_field0 = <u8>::sse_decode(deserializer);
-        let mut var_field1 = <String>::sse_decode(deserializer);
+        let mut var_field0 = <String>::sse_decode(deserializer);
+        let mut var_field1 = <Option<bool>>::sse_decode(deserializer);
         return (var_field0, var_field1);
     }
 }
@@ -5253,62 +5146,65 @@ fn pde_ffi_dispatcher_primary_impl(
             wire__crate__client__PicoClient_federation_name_impl(port, ptr, rust_vec_len, data_len)
         }
         43 => wire__crate__client__PicoClient_fiat_to_sats_impl(port, ptr, rust_vec_len, data_len),
-        44 => wire__crate__client__PicoClient_liveness_impl(port, ptr, rust_vec_len, data_len),
-        45 => wire__crate__client__PicoClient_liveness_peer_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__client__PicoClient_ln_receive_impl(port, ptr, rust_vec_len, data_len),
-        47 => wire__crate__client__PicoClient_ln_select_any_gateway_impl(
+        44 => wire__crate__client__PicoClient_ln_receive_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__client__PicoClient_ln_select_any_gateway_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        48 => wire__crate__client__PicoClient_ln_select_gateway_for_invoice_impl(
+        46 => wire__crate__client__PicoClient_ln_select_gateway_for_invoice_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        49 => wire__crate__client__PicoClient_ln_send_impl(port, ptr, rust_vec_len, data_len),
-        50 => wire__crate__client__PicoClient_lnurl_impl(port, ptr, rust_vec_len, data_len),
-        51 => wire__crate__client__PicoClient_onchain_calculate_fees_impl(
+        47 => wire__crate__client__PicoClient_ln_send_impl(port, ptr, rust_vec_len, data_len),
+        48 => wire__crate__client__PicoClient_lnurl_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__client__PicoClient_onchain_calculate_fees_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        52 => wire__crate__client__PicoClient_onchain_receive_address_impl(
+        50 => wire__crate__client__PicoClient_onchain_receive_address_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        53 => wire__crate__client__PicoClient_onchain_send_impl(port, ptr, rust_vec_len, data_len),
-        54 => wire__crate__client__PicoClient_peers_impl(port, ptr, rust_vec_len, data_len),
-        55 => wire__crate__client__PicoClient_prefetch_exchange_rates_impl(
+        51 => wire__crate__client__PicoClient_onchain_send_impl(port, ptr, rust_vec_len, data_len),
+        52 => wire__crate__client__PicoClient_prefetch_exchange_rates_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        57 => wire__crate__client__PicoClient_shutdown_impl(port, ptr, rust_vec_len, data_len),
-        58 => wire__crate__client__PicoClient_subscribe_balance_impl(
+        54 => wire__crate__client__PicoClient_shutdown_impl(port, ptr, rust_vec_len, data_len),
+        55 => wire__crate__client__PicoClient_subscribe_balance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        59 => wire__crate__client__PicoClient_subscribe_recovery_progress_impl(
+        56 => wire__crate__client__PicoClient_subscribe_connection_status_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        64 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-        65 => wire__crate__init_app_impl(port, ptr, rust_vec_len, data_len),
-        67 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
-        68 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
-        70 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
-        76 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__client__PicoClient_subscribe_recovery_progress_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        62 => wire__crate__generate_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+        63 => wire__crate__init_app_impl(port, ptr, rust_vec_len, data_len),
+        65 => wire__crate__lnurl__lnurl_fetch_limits_impl(port, ptr, rust_vec_len, data_len),
+        66 => wire__crate__lnurl__lnurl_resolve_impl(port, ptr, rust_vec_len, data_len),
+        68 => wire__crate__open_database_impl(port, ptr, rust_vec_len, data_len),
+        74 => wire__crate__parse_mnemonic_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -5351,19 +5247,19 @@ fn pde_ffi_dispatcher_sync_impl(
         15 => wire__crate__lnurl__PayResponseWrapper_min_sats_impl(ptr, rust_vec_len, data_len),
         36 => wire__crate__client__PicoClient_currency_code_impl(ptr, rust_vec_len, data_len),
         41 => wire__crate__client__PicoClient_federation_id_impl(ptr, rust_vec_len, data_len),
-        56 => wire__crate__client__PicoClient_sats_to_fiat_impl(ptr, rust_vec_len, data_len),
-        60 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
-        61 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
-        62 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
-        63 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
-        66 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
-        69 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
-        71 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
-        72 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
-        73 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
-        74 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
-        75 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
-        77 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
+        53 => wire__crate__client__PicoClient_sats_to_fiat_impl(ptr, rust_vec_len, data_len),
+        58 => wire__crate__factory__PicoContact_lnurl_impl(ptr, rust_vec_len, data_len),
+        59 => wire__crate__factory__PicoContact_match_query_impl(ptr, rust_vec_len, data_len),
+        60 => wire__crate__factory__PicoContact_name_impl(ptr, rust_vec_len, data_len),
+        61 => wire__crate__currency__find_fiat_currency_impl(ptr, rust_vec_len, data_len),
+        64 => wire__crate__currency__list_fiat_currencies_impl(ptr, rust_vec_len, data_len),
+        67 => wire__crate__lnurl__lnurl_wrapper_encode_impl(ptr, rust_vec_len, data_len),
+        69 => wire__crate__parse_bitcoin_address_impl(ptr, rust_vec_len, data_len),
+        70 => wire__crate__parse_bolt11_invoice_impl(ptr, rust_vec_len, data_len),
+        71 => wire__crate__parse_ecash_impl(ptr, rust_vec_len, data_len),
+        72 => wire__crate__parse_invite_code_impl(ptr, rust_vec_len, data_len),
+        73 => wire__crate__lnurl__parse_lnurl_impl(ptr, rust_vec_len, data_len),
+        75 => wire__crate__word_list_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -6128,13 +6024,6 @@ impl SseEncode
     }
 }
 
-impl SseEncode for StreamSink<bool, flutter_rust_bridge::for_generated::SseCodec> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        unimplemented!("")
-    }
-}
-
 impl SseEncode for StreamSink<f64, flutter_rust_bridge::for_generated::SseCodec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6161,6 +6050,15 @@ impl SseEncode
         Vec<crate::events::OperationSummary>,
         flutter_rust_bridge::for_generated::SseCodec,
     >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
+    }
+}
+
+impl SseEncode
+    for StreamSink<Vec<(String, Option<bool>)>, flutter_rust_bridge::for_generated::SseCodec>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6291,12 +6189,12 @@ impl SseEncode for Vec<u8> {
     }
 }
 
-impl SseEncode for Vec<(u8, String)> {
+impl SseEncode for Vec<(String, Option<bool>)> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
-            <(u8, String)>::sse_encode(item, serializer);
+            <(String, Option<bool>)>::sse_encode(item, serializer);
         }
     }
 }
@@ -6425,6 +6323,16 @@ impl SseEncode for Option<PicoClientFactory> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <PicoClientFactory>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <bool>::sse_encode(value, serializer);
         }
     }
 }
@@ -6659,11 +6567,11 @@ impl SseEncode for crate::events::PaymentType {
     }
 }
 
-impl SseEncode for (u8, String) {
+impl SseEncode for (String, Option<bool>) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <u8>::sse_encode(self.0, serializer);
-        <String>::sse_encode(self.1, serializer);
+        <String>::sse_encode(self.0, serializer);
+        <Option<bool>>::sse_encode(self.1, serializer);
     }
 }
 

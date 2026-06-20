@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::time::Duration;
 
 use bitcoin::Amount as BtcAmount;
 use flutter_rust_bridge::frb;
@@ -8,6 +7,7 @@ use picomint_client::Client;
 use picomint_core::Amount;
 use picomint_core::config::FederationId;
 use picomint_core::ln::gateway::{GatewayInfo, GatewayPk};
+use tokio::sync::watch;
 
 use crate::exchange::{ExchangeRateCache, fetch_exchange_rate};
 use crate::frb_generated::StreamSink;
@@ -71,6 +71,17 @@ pub struct PicoClient {
     pub(crate) federation_name: String,
     pub(crate) currency_code: String,
     pub(crate) exchange_rate_cache: ExchangeRateCache,
+    /// Latest per-guardian reachability, one slot per guardian in
+    /// `config().peers` order: `(name, None)` until that guardian's first
+    /// poll resolves, then `(name, Some(online))`. Driven by the persistent
+    /// monitor spawned in `build_pico_client`, so the home ring and the
+    /// connection-status screen read identical state and a freshly-opened
+    /// screen gets the current snapshot with no cold-start flicker.
+    pub(crate) connection_status: watch::Receiver<Vec<(String, Option<bool>)>>,
+    /// Supervisor handle for the per-guardian poll loops. Held so `leave`
+    /// can abort the whole monitor (releasing its `Arc<Client>` clone) in
+    /// one call. `Arc` because `PicoClient` is `Clone`.
+    pub(crate) connection_monitor: Arc<tokio::task::JoinHandle<()>>,
 }
 
 impl PicoClient {
@@ -150,61 +161,27 @@ impl PicoClient {
         }
     }
 
-    /// `(peer_id, name)` pairs for every guardian in the federation, in
-     /// `PeerId` order. Used by [`Self::liveness_peer`] callers to enumerate
-    /// rows on the connection-status screen.
+    /// Live `(name, online)` status for every guardian, sourced from the
+    /// persistent monitor's shared cache. Emits the current snapshot
+    /// immediately on subscribe — so a freshly-opened screen never shows a
+    /// cold-start flicker — then re-emits whenever any guardian's status
+    /// changes. Multiple subscribers (home ring + connection-status screen)
+    /// share the one monitor; subscribing here starts no new polling.
     #[frb]
-    pub async fn peers(&self) -> Vec<(u8, String)> {
-        self.client
-            .config()
-            .peers
-            .iter()
-            .map(|(id, peer)| (u8::from(*id), peer.name.clone()))
-            .collect()
-    }
+    pub async fn subscribe_connection_status(
+        &self,
+        sink: StreamSink<Vec<(String, Option<bool>)>>,
+    ) {
+        let mut rx = self.connection_status.clone();
 
-    /// Federation-level reachability. Polls the threshold-consensus
-    /// liveness endpoint every 3s; emits `true` when the federation
-    /// answers, `false` on error.
-    #[frb]
-    pub async fn liveness(&self, sink: StreamSink<bool>) {
-        loop {
-            let ok = tokio::time::timeout(
-                Duration::from_secs(3),
-                self.client.api().liveness(),
-            )
-            .await
-            .map(|r| r.is_ok())
-            .unwrap_or(false);
-
-            if sink.add(ok).is_err() {
-                break;
-            }
-
-            tokio::time::sleep(Duration::from_secs(3)).await;
+        if sink.add(rx.borrow().clone()).is_err() {
+            return;
         }
-    }
 
-    /// Single-peer reachability. Polls one guardian's liveness endpoint
-    /// every 3s; emits `true` on success, `false` on error or 3s timeout.
-    #[frb]
-    pub async fn liveness_peer(&self, peer_id: u8, sink: StreamSink<bool>) {
-        let peer_id = picomint_core::PeerId::from(peer_id);
-
-        loop {
-            let ok = tokio::time::timeout(
-                Duration::from_secs(3),
-                self.client.api().liveness_peer(peer_id),
-            )
-            .await
-            .map(|r| r.is_ok())
-            .unwrap_or(false);
-
-            if sink.add(ok).is_err() {
+        while rx.changed().await.is_ok() {
+            if sink.add(rx.borrow().clone()).is_err() {
                 break;
             }
-
-            tokio::time::sleep(Duration::from_secs(3)).await;
         }
     }
 
