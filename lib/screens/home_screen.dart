@@ -605,18 +605,39 @@ class _GuardianRingState extends State<_GuardianRing> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final total = _status.length;
-    final connected = _status.where((online) => online == true).length;
+
+    // Indeterminate spin until the guardian list resolves.
+    if (total == 0) {
+      return SizedBox(
+        width: mediumIconSize,
+        height: mediumIconSize,
+        child: CircularProgressIndicator(
+          strokeWidth: 3,
+          color: scheme.primary,
+          backgroundColor: scheme.primary.withValues(alpha: 0.15),
+        ),
+      );
+    }
+
+    final fraction = _status.where((online) => online == true).length / total;
 
     return SizedBox(
       width: mediumIconSize,
       height: mediumIconSize,
-      child: CircularProgressIndicator(
-        // Indeterminate spin until the guardian list resolves, then fill to
-        // the fraction online.
-        value: total == 0 ? null : connected / total,
-        strokeWidth: 3,
-        color: scheme.primary,
-        backgroundColor: scheme.primary.withValues(alpha: 0.15),
+      // Tween the fill between fractions as guardians come and go, matching
+      // conduit's connectivity bar.
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: fraction),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        builder: (context, value, _) {
+          return CircularProgressIndicator(
+            value: value,
+            strokeWidth: 3,
+            color: scheme.primary,
+            backgroundColor: scheme.primary.withValues(alpha: 0.15),
+          );
+        },
       ),
     );
   }
