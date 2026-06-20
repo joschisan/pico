@@ -625,13 +625,7 @@ async fn build_pico_client(
             let tx = tx.clone();
             async move {
                 loop {
-                    let ok = tokio::time::timeout(
-                        Duration::from_secs(1),
-                        client.api().liveness_peer(peer_id),
-                    )
-                    .await
-                    .map(|r| r.is_ok())
-                    .unwrap_or(false);
+                    let ok = client.api().liveness_peer(peer_id).await.is_ok();
 
                     tx.send_modify(|statuses| statuses[index].1 = Some(ok));
 
