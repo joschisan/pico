@@ -77,6 +77,7 @@ class _PaymentCardState extends State<PaymentCard> {
       '#,###',
     ).format(widget.event.amountSats);
     final sign = widget.event.incoming ? '+' : '-';
+    final federationName = widget.event.federationName;
 
     final (iconData, iconColor, titleColor) = switch (_status) {
       _Status.error => (
@@ -100,9 +101,24 @@ class _PaymentCardState extends State<PaymentCard> {
       onTap: widget.onTap,
       contentPadding: listTilePadding,
       leading: Icon(iconData, size: mediumIconSize, color: iconColor),
-      title: Text(
-        '$sign$formattedAmount sat',
-        style: mediumStyle.copyWith(color: titleColor),
+      // Amount over federation name in the title slot (rather than
+      // `subtitle`) so the tile keeps the single-line height of the other
+      // bordered rows — matching `DetailRow`. The name is dropped when the
+      // federation has been left (`federationName == null`).
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$sign$formattedAmount sat',
+            style: mediumStyle.copyWith(color: titleColor),
+          ),
+          if (federationName != null)
+            Text(
+              federationName,
+              style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
+            ),
+        ],
       ),
       trailing: Text(
         _formatTime(date),
