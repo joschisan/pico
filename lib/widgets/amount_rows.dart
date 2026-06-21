@@ -11,9 +11,10 @@ import 'package:pico/widgets/detail_row_widget.dart';
 ///
 /// The fiat row is converted from the cached rate without triggering a network
 /// fetch, and is omitted entirely (rather than left as an empty cell) when no
-/// rate has been cached yet.
+/// rate has been cached yet — or when [client] is null (e.g. the issuing
+/// federation is unknown), in which case only the Bitcoin row is shown.
 List<Widget> amountRows({
-  required PicoClient client,
+  required PicoClient? client,
   required int amountSats,
 }) {
   final rows = <Widget>[
@@ -24,7 +25,7 @@ List<Widget> amountRows({
     ),
   ];
 
-  final fiat = cachedFiatAmount(client, amountSats);
+  final fiat = client == null ? null : cachedFiatAmount(client, amountSats);
   if (fiat != null) {
     rows.add(
       DetailRow(

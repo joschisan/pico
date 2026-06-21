@@ -4,7 +4,8 @@ import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/amount_display_widget.dart';
+import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/amount_rows.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
 
@@ -56,10 +57,22 @@ class _EcashDrawerState extends State<EcashDrawer> {
       icon: PhosphorIconsRegular.coinVertical,
       title: 'Receive eCash',
       children: [
-        const SizedBox(height: 64),
-        AmountDisplay(widget.ecash.amountSats()),
-        const SizedBox(height: 64),
-        AsyncButton(text: 'Receive', onPressed: _handleReceive),
+        // The fiat row needs the issuing federation's cached rate, resolved
+        // async — until it lands (or if the federation is unknown) only the
+        // Bitcoin amount shows.
+        FutureBuilder<PicoClient?>(
+          future: _issuer,
+          builder: (context, snapshot) {
+            return BorderedList.column(
+              children: amountRows(
+                client: snapshot.data,
+                amountSats: widget.ecash.amountSats(),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        AsyncButton(text: 'Confirm', onPressed: _handleReceive),
       ],
     );
   }
