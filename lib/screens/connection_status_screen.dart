@@ -86,9 +86,7 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
                       height: 14,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: rttMs != null
-                            ? color
-                            : color.withValues(alpha: 0.3),
+                        color: color,
                       ),
                     ),
                     // Name over state lives in `title` (not `subtitle`) so the

@@ -496,7 +496,7 @@ class _FederationRow extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       contentPadding: listTilePadding,
-      leading: _GuardianRing(client: client),
+      leading: _GuardianRing(client: client, selected: selected),
       // Both texts go in the title slot so ListTile sees a single-line
       // tile (56dp min) instead of the 72dp two-line tile a populated
       // `subtitle` would force. Keeps the row height consistent with
@@ -533,14 +533,11 @@ class _FederationRow extends StatelessWidget {
                       inProgress
                           ? '$name · ${progressSnap.data!.round()}%'
                           : name;
-                  // The selected federation drives every action — flag it
-                  // by tinting its name in the primary color.
+                  // Selection is shown by the primary dot in the guardian
+                  // ring, so the name stays in the muted variant colour.
                   return Text(
                     text,
-                    style: smallStyle.copyWith(
-                      color:
-                          selected ? scheme.primary : scheme.onSurfaceVariant,
-                    ),
+                    style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
                   );
                 },
               );
@@ -561,8 +558,11 @@ class _FederationRow extends StatelessWidget {
 /// disagree, and the cached snapshot means no cold-start flicker.
 class _GuardianRing extends StatefulWidget {
   final PicoClient client;
+  // The active federation is marked by a filled primary dot in the ring's
+  // centre, rather than tinting the row text.
+  final bool selected;
 
-  const _GuardianRing({required this.client});
+  const _GuardianRing({required this.client, required this.selected});
 
   @override
   State<_GuardianRing> createState() => _GuardianRingState();
@@ -581,39 +581,53 @@ class _GuardianRingState extends State<_GuardianRing> {
     return SizedBox(
       width: mediumIconSize,
       height: mediumIconSize,
-      child: StreamBuilder<List<(String, double?)>>(
-        stream: _stream,
-        builder: (context, snapshot) {
-          final statuses = snapshot.data;
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          StreamBuilder<List<(String, double?)>>(
+            stream: _stream,
+            builder: (context, snapshot) {
+              final statuses = snapshot.data;
 
-          // Indeterminate spin until the first snapshot arrives.
-          if (statuses == null || statuses.isEmpty) {
-            return CircularProgressIndicator(
-              strokeWidth: 3,
-              color: scheme.primary,
-              backgroundColor: scheme.primary.withValues(alpha: 0.15),
-            );
-          }
+              // Indeterminate spin until the first snapshot arrives.
+              if (statuses == null || statuses.isEmpty) {
+                return CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: scheme.primary,
+                  backgroundColor: scheme.primary.withValues(alpha: 0.15),
+                );
+              }
 
-          final online = statuses.where((s) => s.$2 != null).length;
-          final fraction = online / statuses.length;
+              final online = statuses.where((s) => s.$2 != null).length;
+              final fraction = online / statuses.length;
 
-          // Tween the fill between fractions as guardians come and go,
-          // matching conduit's connectivity bar.
-          return TweenAnimationBuilder<double>(
-            tween: Tween(end: fraction),
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            builder: (context, value, _) {
-              return CircularProgressIndicator(
-                value: value,
-                strokeWidth: 3,
-                color: scheme.primary,
-                backgroundColor: scheme.primary.withValues(alpha: 0.15),
+              // Tween the fill between fractions as guardians come and go,
+              // matching conduit's connectivity bar.
+              return TweenAnimationBuilder<double>(
+                tween: Tween(end: fraction),
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                builder: (context, value, _) {
+                  return CircularProgressIndicator(
+                    value: value,
+                    strokeWidth: 3,
+                    color: scheme.primary,
+                    backgroundColor: scheme.primary.withValues(alpha: 0.15),
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+          if (widget.selected)
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: scheme.primary,
+              ),
+            ),
+        ],
       ),
     );
   }
