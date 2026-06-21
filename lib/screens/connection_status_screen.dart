@@ -86,15 +86,30 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
                       height: 14,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: rttMs != null ? color : Colors.red,
+                        color: rttMs != null
+                            ? color
+                            : color.withValues(alpha: 0.3),
                       ),
                     ),
-                    title: Text(name, style: mediumStyle),
-                    subtitle: Text(
-                      rttMs != null ? 'Connected' : 'Disconnected',
-                      style: smallStyle.copyWith(
-                        color: rttMs != null ? color : Colors.red,
-                      ),
+                    // Name over state lives in `title` (not `subtitle`) so the
+                    // tile keeps the single-line height of the other bordered
+                    // rows — matching `DetailRow`.
+                    title: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: mediumStyle),
+                        Text(
+                          rttMs != null ? 'Connected' : 'Disconnected',
+                          style: smallStyle.copyWith(
+                            color: rttMs != null
+                                ? color
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                     trailing: rttMs != null
                         ? Text(_formatRtt(rttMs), style: smallStyle)
