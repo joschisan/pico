@@ -160,9 +160,9 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _clients = clients;
         final ids = clients.map((c) => c.federationId()).toSet();
-        // A federation that wasn't in the previous list was just joined or
-        // recovered, so page to it — the user acted on it, and recovery
-        // progress only surfaces on the page in view. Its first page is its
+        // A federation that wasn't in the previous list was just joined, so
+        // page to it — the user acted on it, and a join that restored funds
+        // arrives with them already on its balances. Its first page is its
         // first account, since the factory orders by federation then account.
         // A federation that left needs no counterpart: the pager clamps onto
         // a page that still exists, and whatever it lands on is the
@@ -242,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final parsers = [
       (
-        // Invite codes route to the join/recover drawer, which owns the whole
+        // Invite codes route to the join drawer, which owns the whole
         // lifecycle — pasting an invite is a first-class way to join.
         parseInviteCode(invite: input),
         (dynamic result) => InviteDrawer.show(

@@ -192,9 +192,11 @@ pub enum PaymentEvent {
 /// and `is_summary_trigger` so the snapshot recorder and the card parser
 /// never disagree on which operations count.
 ///
-/// Recovery needs no entry of its own: it hands its restored notes to the
-/// ordinary receive path, so `MintReceive` below already materializes its
-/// card.
+/// A join's restored notes need no entry of its own, and get none: they are
+/// written straight into the wallet beside the counter marks, before the
+/// client that would log anything exists. A restore surfaces as balance
+/// rather than as history — the transactions that earned those notes belong
+/// to the session that was lost.
 fn trigger_fields(entry: &EventLogEntry) -> Option<(bool, PaymentType, i64)> {
     if !is_user_account(entry) {
         return None;
