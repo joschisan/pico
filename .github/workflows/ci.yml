@@ -45,6 +45,10 @@ jobs:
     - run: cargo machete
       working-directory: rust
 
+  # Flutter is pinned everywhere below rather than tracking latest stable:
+  # both `dart format` and `flutter analyze` change behaviour between
+  # releases, so an unpinned toolchain turns CI red with no repo change.
+  # Bump this in step with the local SDK.
   format:
     name: Dart Format
     runs-on: ubuntu-latest
@@ -52,6 +56,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: subosito/flutter-action@v2
       with:
+        flutter-version: 3.38.7
         cache: true
     - run: dart format --set-exit-if-changed --output=none lib
 
@@ -81,6 +86,7 @@ jobs:
 
     - uses: subosito/flutter-action@v2
       with:
+        flutter-version: 3.38.7
         cache: true
 
     - run: flutter pub get
@@ -123,6 +129,7 @@ jobs:
 
     - uses: subosito/flutter-action@v2
       with:
+        flutter-version: 3.38.7
         cache: true
 
     - run: flutter pub get
