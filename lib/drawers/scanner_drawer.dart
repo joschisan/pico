@@ -57,8 +57,8 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
 
     // Invite codes always win and don't need a warm client — that's
     // how the user joins their first federation. InviteDrawer owns the
-    // join/recover lifecycle so its own (still-mounted) context drives
-    // the pop and toast.
+    // join lifecycle so its own (still-mounted) context drives the pop
+    // and toast.
     final invite = parseInviteCode(invite: input);
     if (invite != null) {
       _isScanning = false;

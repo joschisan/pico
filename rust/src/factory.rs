@@ -8,7 +8,7 @@ use futures::stream::{self, BoxStream};
 use iroh::Endpoint;
 use iroh::endpoint::presets::N0;
 use iroh_mdns_address_lookup::MdnsAddressLookup;
-use picomint_client::{Account, Client, Mnemonic, OperationId, commit_restore, download, restore};
+use picomint_client::{Account, Client, Mnemonic, OperationId};
 use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
 use picomint_eventlog::{EventLogId, EventLogger};
@@ -29,20 +29,6 @@ use crate::frb_generated::StreamSink;
 use crate::lnurl::LnurlWrapper;
 use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
 
-/// Every account a restore has to walk. `Account::USER_ACCOUNTS` is the set a
-/// counterparty can pay into, which is the question the address and contract
-/// scanners ask; a seed restore asks a different one. The fee account holds
-/// notes like any other — cuts collected but not yet swept when the wallet was
-/// lost — and a counter mark it never writes is a counter space the new client
-/// walks again from zero, re-deriving nonces the federation has already
-/// signed.
-const RESTORE_ACCOUNTS: [Account; 4] = [
-    Account::PRIMARY,
-    Account::SECONDARY,
-    Account::TERTIARY,
-    Account::AppFee,
-];
-
 #[frb(opaque)]
 pub struct PicoClientFactory {
     db: Database,
@@ -57,7 +43,7 @@ pub struct PicoClientFactory {
     /// All warm clients, keyed by `(FederationId, Account)` — one entry per
     /// account, three per joined federation, all three sharing that
     /// federation's single `Arc<Client>`. Constructed at startup from
-    /// `ClientConfig`; `join` / `recover` insert a federation's whole row of
+    /// `ClientConfig`; `join` inserts a federation's whole row of
     /// accounts, `leave` removes it. The key order is federation-major and
     /// account-minor, which is the order the home pager swipes in.
     ///
@@ -207,36 +193,66 @@ impl PicoClientFactory {
             .cloned()
     }
 
+    /// Adds a federation, rebuilding whatever this seed already owns there.
+    ///
+    /// One path, whether or not the seed has been here before: `join` scans
+    /// every account before anything is opened or written, and a seed that
+    /// never held anything scans to nothing. There is no question to put to
+    /// the user and so nothing for them to get wrong — answering "new mint"
+    /// for a federation this seed has used would write counter zero over an
+    /// account that has issued and strand every note behind the nonces it
+    /// re-derives.
+    ///
+    /// Returns only once the notes are back, so there is no progress to
+    /// report and no half-joined federation to detect on the next launch.
     #[frb]
     pub async fn join(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
-        let config = download(&self.endpoint, &invite.0)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let federation_id = config.calculate_federation_id();
-
-        if let Some(existing) = self
+        // Rejected before the scan rather than after it. The invite code
+        // commits to the federation id — `join` below refuses a config that
+        // computes to any other — so a duplicate is knowable up front, and
+        // there is no reason to make the user wait out four account scans to
+        // be told what the code alone already said.
+        if self
             .clients
             .read()
             .await
-            .get(&(federation_id, Account::PRIMARY))
+            .contains_key(&(invite.0.federation, Account::PRIMARY))
         {
-            return Ok(existing.clone());
+            return Err("This mint is already added".to_string());
         }
+
+        // Reads nothing and writes nothing locally, so a failure here leaves
+        // the wallet exactly as it was — the federation stays unjoined.
+        let join = picomint_client::join(&self.endpoint, &self.mnemonic, &invite.0)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let config = join.config().clone();
+
+        let federation_id = config.calculate_federation_id();
 
         let dbtx = self.db.begin_write();
 
-        // The in-memory map checked above is built from exactly these rows and
-        // kept in step by join/leave, so a row already here means the two
-        // diverged. Insert reports whatever it displaced, and returning drops
-        // the dbtx uncommitted — which aborts it, so the row we overwrote is
-        // left exactly as it was.
+        // The check above is only as fresh as the read that took it, and the
+        // scan is a long await for a second join of the same invite to land
+        // in; this one is atomic with the write, so it is the authority.
+        // Rejecting rather than handing back what is already there matters
+        // most here: the counter marks below describe how far this seed's
+        // counter space was walked, and writing them over a live federation
+        // would rewind it. Insert reports whatever it displaced, and
+        // returning drops the dbtx uncommitted — which aborts it, so the row
+        // we overwrote is left exactly as it was.
         if dbtx
             .insert(&ClientConfig, &federation_id, &config)
             .is_some()
         {
             return Err("This mint is already added".to_string());
         }
+
+        // Counter marks and restored notes, riding the same commit as the
+        // join itself: either the federation is joined with every counter in
+        // place and its balance already there, or it isn't joined at all.
+        join.commit(&dbtx);
 
         dbtx.commit();
 
@@ -259,108 +275,6 @@ impl PicoClientFactory {
         // Primary is what a caller that just joined gets handed: it is the
         // account the pager lands on, and the only one a screen holding a
         // single client can mean.
-        let pico = accounts[&(federation_id, Account::PRIMARY)].clone();
-
-        self.clients.write().await.extend(accounts);
-        self.set_changed.notify_waiters();
-
-        Ok(pico)
-    }
-
-    /// Rebuilds a wallet from the seed and joins in one step. The scan runs
-    /// before anything is opened or written, so this returns only once the
-    /// notes are back — there is no progress to report and no half-recovered
-    /// federation to detect on the next launch.
-    ///
-    /// A restore covers one account, so a federation takes one scan per
-    /// `RESTORE_ACCOUNTS` entry. They walk disjoint counter spaces and share
-    /// nothing, so they run concurrently and the wait is the slowest scan
-    /// rather than their sum.
-    #[frb]
-    pub async fn recover(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
-        let config = download(&self.endpoint, &invite.0)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let federation_id = config.calculate_federation_id();
-
-        if let Some(existing) = self
-            .clients
-            .read()
-            .await
-            .get(&(federation_id, Account::PRIMARY))
-        {
-            return Ok(existing.clone());
-        }
-
-        // Reads nothing and writes nothing locally, so a failure here leaves
-        // the wallet exactly as it was — the federation stays unjoined. All
-        // or nothing across the set: one scan failing aborts the join, so
-        // the wallet is never left with some accounts restored and others
-        // silently starting from zero.
-        let restores = futures::future::try_join_all(
-            RESTORE_ACCOUNTS
-                .into_iter()
-                .map(|account| restore(&self.endpoint, &self.mnemonic, &config, account)),
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-
-        let dbtx = self.db.begin_write();
-
-        // As in `join`, but the stakes are higher: the counter mark below
-        // describes how far this seed's counter space was walked, and writing
-        // it over a federation that is already joined would rewind a live
-        // wallet. The scan above wrote nothing either, so bailing leaves the
-        // wallet untouched.
-        if dbtx
-            .insert(&ClientConfig, &federation_id, &config)
-            .is_some()
-        {
-            return Err("This mint is already added".to_string());
-        }
-
-        // The counter marks are the whole of what a restore writes, and they
-        // ride the same commit as the join: either the federation is joined
-        // with every counter in place, or it isn't joined at all. A
-        // wallet resuming from zero would re-derive nonces the federation has
-        // already signed, stranding every note behind them.
-        for (account, restore) in RESTORE_ACCOUNTS.into_iter().zip(&restores) {
-            commit_restore(&dbtx, account, restore);
-        }
-
-        dbtx.commit();
-
-        let client = Client::new(
-            self.endpoint.clone(),
-            self.db.clone(),
-            self.logger.clone(),
-            &self.mnemonic,
-            config,
-            Some(crate::payout::fee_config()),
-        );
-
-        // The restored notes come back as an ordinary out-of-band bundle per
-        // account: the federation was asked about every one of these nonces by
-        // name during the scan, so reissuing is what makes the balance the
-        // wallet's own.
-        //
-        // Dropped rather than propagated. A seed that never held anything
-        // scans to an empty bundle, which is a successful recovery of nothing;
-        // the remaining rejections turn on the federation's fee config, which
-        // no retry of ours would change. Either way the mint is joined with
-        // its counter marks, which is what had to be right.
-        for (account, restore) in RESTORE_ACCOUNTS.into_iter().zip(&restores) {
-            client.mint().receive(account, &restore.ecash()).ok();
-        }
-
-        let accounts = build_accounts(
-            client,
-            federation_id,
-            self.db.clone(),
-            self.exchange_rate_cache.clone(),
-        );
-
         let pico = accounts[&(federation_id, Account::PRIMARY)].clone();
 
         self.clients.write().await.extend(accounts);
@@ -425,7 +339,7 @@ impl PicoClientFactory {
     }
 
     /// Live snapshot of every warm client; re-emits on every set change
-    /// (`join`/`leave`/`recover`). Subscribers re-render passively
+    /// (`join`/`leave`). Subscribers re-render passively
     /// instead of re-fetching `clients()` after each navigation pop.
     #[frb]
     pub async fn subscribe_clients(&self, sink: StreamSink<Vec<PicoClient>>) {
@@ -442,7 +356,7 @@ impl PicoClientFactory {
 
     /// Aggregated balance across every warm client, in sats. Re-emits on
     /// any per-client balance change AND on client-set changes
-    /// (`join`/`leave`/`recover`). The totals map survives rebuilds so a
+    /// (`join`/`leave`). The totals map survives rebuilds so a
     /// join/leave doesn't reset the running sum to zero.
     #[frb]
     pub async fn subscribe_global_balance(&self, sink: StreamSink<i64>) {
