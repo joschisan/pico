@@ -58,6 +58,11 @@ jobs:
       with:
         flutter-version: 3.38.7
         cache: true
+
+    # Without package_config.json the formatter cannot read the package's
+    # language version and falls back to the newest, which reformats.
+    - run: flutter pub get
+
     - run: dart format --set-exit-if-changed --output=none lib
 
   check:
