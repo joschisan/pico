@@ -357,15 +357,12 @@ impl PicoClient {
             .map_err(|e| e.to_string())
     }
 
-    /// Reads the locally mirrored gateway set, so it never touches the
-    /// network — a mint that has never completed its first gateway sync is
-    /// the only way this fails.
+    /// Reads the locally mirrored gateway set, so it never touches the network.
     #[frb(sync)]
-    pub fn lnurl(&self) -> Result<String, String> {
+    pub fn lnurl(&self) -> String {
         self.client
             .ln()
             .generate_lnurl(self.account, "http://159.223.25.182:8082/".to_string())
-            .map_err(|e| e.to_string())
     }
 
     #[frb]

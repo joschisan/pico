@@ -442,19 +442,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Receive Lightning leads with the reusable code. The lnurl is read from
-  /// the mint's locally mirrored gateway set, so this needs no round trip —
-  /// only a mint whose first gateway sync hasn't landed yet has nothing to
-  /// name, and that surfaces as an error rather than a wait.
+  /// the mint's locally mirrored gateway set, so this needs no round trip.
   void _onReceiveLightning() {
     final client = _selectedClient();
-
-    final String lnurl;
-    try {
-      lnurl = client.lnurl();
-    } catch (e) {
-      NotificationUtils.showError(context, e.toString());
-      return;
-    }
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -462,7 +452,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (_) => DisplayLnurlScreen(
               client: client,
               clientFactory: widget.clientFactory,
-              lnurl: lnurl,
+              lnurl: client.lnurl(),
               currencyCode: client.currencyCode(),
             ),
       ),

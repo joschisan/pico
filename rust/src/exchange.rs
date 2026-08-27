@@ -44,10 +44,10 @@ pub(crate) fn btc_price(prices: &BTreeMap<String, f64>, currency_code: &str) -> 
 pub(crate) async fn fetch_exchange_rates(cache: ExchangeRateCache) -> Result<(), String> {
     let mut guard = cache.lock().await;
 
-    if let Some((_, timestamp)) = guard.as_ref() {
-        if timestamp.elapsed() < FRESHNESS {
-            return Ok(());
-        }
+    if let Some((_, timestamp)) = guard.as_ref()
+        && timestamp.elapsed() < FRESHNESS
+    {
+        return Ok(());
     }
 
     let response = reqwest::get("https://price-feed.dev.fedibtc.com/latest")
