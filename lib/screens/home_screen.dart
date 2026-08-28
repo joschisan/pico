@@ -374,6 +374,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// [_pageTo] by account rather than by position, for the callers that know
+  /// which account they mean and would otherwise each look its index up. The
+  /// account may have no page — a balance can move in one the pager isn't
+  /// carrying — in which case there is nowhere to slide to.
+  void _pageToClient(String key, {bool animate = false}) {
+    final index = _visible.indexWhere((c) => _clientKey(c) == key);
+
+    if (index >= 0) _pageTo(index, animate: animate);
+  }
+
   /// Brings [_sessions] into step with the client set: an account that
   /// arrived gets its streams opened, one that went gets them closed. A join
   /// brings three at once and a leave takes three, since a federation's
@@ -386,6 +396,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_sessions.containsKey(key)) continue;
 
       final session = _FederationSession(client);
+      // The balance as it stood the last time the listener below ran, so the
+      // first value can be told from the ones after it: the first is the
+      // account being read, and only a move past it is money arriving or
+      // leaving.
+      int? previous;
       // Money earns the account its page: the balance going positive adds it
       // to [_opened] rather than being read live by [_isVisible], so a max
       // send that empties the account leaves the page standing at zero
@@ -393,9 +408,23 @@ class _HomeScreenState extends State<HomeScreen> {
       // the balance decides afresh. The listener goes with the session when
       // it is disposed.
       session.balance.addListener(() {
-        if ((session.balance.value ?? 0) > 0) _opened.add(key);
+        final sats = session.balance.value;
+
+        if (sats == null) return;
+
+        if (sats > 0) _opened.add(key);
 
         _refreshVisible();
+
+        final moved = previous != null && previous != sats;
+        previous = sats;
+
+        // A balance that moved is the one worth looking at, so its page comes
+        // into view on the same slide the picker gives it. Registered after
+        // the jump [_refreshVisible] may have queued, so an account that just
+        // earned its page slides over from where the user was rather than
+        // being landed on.
+        if (moved) _pageToClient(key, animate: true);
       });
       _sessions[key] = session;
     }
@@ -587,14 +616,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _refreshVisible();
 
-    final index = _visible.indexWhere(
-      (c) => _clientKey(c) == _clientKey(account),
-    );
-
     // Registered after the jump [_refreshVisible] may have queued, so the
     // slide starts from the page that was in view rather than from wherever
     // the new page pushed it.
-    if (index >= 0) _pageTo(index, animate: true);
+    _pageToClient(_clientKey(account), animate: true);
   }
 
   /// Lists every page the pager carries, across federations, and swipes to
@@ -621,11 +646,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Swipes to [client]'s page. It already has one — the picker only lists
   /// pages — so there is nothing to make visible first.
   void _selectPage(PicoClient client) {
-    final index = _visible.indexWhere(
-      (c) => _clientKey(c) == _clientKey(client),
-    );
-
-    if (index >= 0) _pageTo(index, animate: true);
+    _pageToClient(_clientKey(client), animate: true);
   }
 
   Future<void> _openRecoveryPhrase() async {
