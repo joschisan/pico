@@ -19,6 +19,10 @@ class ConfirmLnurlSendScreen extends StatefulWidget {
   final GatewayInfoWrapper gateway;
   final int feeSats;
   final String? contactName;
+  // Whether this empties the account. The invoice above was sized against
+  // this gateway for exactly that, so the send funds from every note and
+  // leaves none.
+  final bool isMax;
 
   const ConfirmLnurlSendScreen({
     super.key,
@@ -28,6 +32,7 @@ class ConfirmLnurlSendScreen extends StatefulWidget {
     required this.gateway,
     required this.feeSats,
     this.contactName,
+    this.isMax = false,
   });
 
   @override
@@ -38,10 +43,17 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
   Future<void> _handleConfirm() async {
     await requireBiometricAuth(context);
 
-    await widget.client.lnSend(
-      gateway: widget.gateway,
-      invoice: widget.invoice,
-    );
+    if (widget.isMax) {
+      await widget.client.lnSendMax(
+        gateway: widget.gateway,
+        invoice: widget.invoice,
+      );
+    } else {
+      await widget.client.lnSend(
+        gateway: widget.gateway,
+        invoice: widget.invoice,
+      );
+    }
 
     if (!mounted) return;
 

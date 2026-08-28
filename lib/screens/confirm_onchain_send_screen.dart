@@ -18,6 +18,10 @@ class ConfirmOnchainSendScreen extends StatefulWidget {
   final BitcoinAddressWrapper address;
   final int amountSats;
   final int feeSats;
+  // Whether this empties the account. The amount above is what it was quoted
+  // at — the send itself re-prices, since it funds from every note and sizes
+  // the output to what they cover.
+  final bool isMax;
 
   const ConfirmOnchainSendScreen({
     super.key,
@@ -25,6 +29,7 @@ class ConfirmOnchainSendScreen extends StatefulWidget {
     required this.address,
     required this.amountSats,
     required this.feeSats,
+    this.isMax = false,
   });
 
   @override
@@ -36,10 +41,14 @@ class _ConfirmOnchainSendScreenState extends State<ConfirmOnchainSendScreen> {
   Future<void> _handleConfirm() async {
     await requireBiometricAuth(context);
 
-    await widget.client.onchainSend(
-      address: widget.address,
-      amountSats: widget.amountSats,
-    );
+    if (widget.isMax) {
+      await widget.client.onchainSendMax(address: widget.address);
+    } else {
+      await widget.client.onchainSend(
+        address: widget.address,
+        amountSats: widget.amountSats,
+      );
+    }
 
     if (!mounted) return;
 

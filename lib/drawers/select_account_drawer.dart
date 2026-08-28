@@ -58,7 +58,9 @@ class SelectAccountDrawer extends StatelessWidget {
       valueListenable: account.balance,
       builder: (context, sats, _) {
         return SettingsCard(
-          icon: PhosphorIconsRegular.wallet,
+          // The same chip the home row and the page list carry, so an account
+          // reads as an account wherever it is listed.
+          icon: PhosphorIconsRegular.stack,
           title: account.client.accountName(),
           // Null until the first value lands, which leaves the row single-line
           // rather than claiming a balance of zero it hasn't read yet.

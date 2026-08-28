@@ -236,6 +236,26 @@ impl PicoClient {
             .map_err(|e| e.to_string())
     }
 
+    /// Everything this account holds, as one note bundle.
+    ///
+    /// Not `ecash_send` with the balance as its amount: `send` rounds up to a
+    /// whole denomination and takes its fast path only when the account's
+    /// notes sum to that amount exactly, which a figure in whole sats
+    /// generally isn't — denominations are powers of two millisats, and the
+    /// balance the UI shows is millisats floored to sats besides. Missing the
+    /// fast path drops the send onto the path that builds a real transaction,
+    /// which covers its fees out of the account being emptied, so asking for
+    /// everything fails on a balance the user is looking at. See
+    /// [`Self::transfer_to_primary`], which sends the same way for the same
+    /// reason.
+    ///
+    /// Infallible: `None` is an account holding no notes, which is the empty
+    /// wallet the caller shouldn't have offered this on.
+    #[frb]
+    pub async fn ecash_send_max(&self) -> Option<ECashWrapper> {
+        self.client.mint().send_max(self.account).map(ECashWrapper)
+    }
+
     #[frb]
     pub async fn ecash_receive(&self, ecash: &ECashWrapper) -> Result<(), String> {
         self.client
@@ -357,6 +377,54 @@ impl PicoClient {
             .map_err(|e| e.to_string())
     }
 
+    /// The largest whole-sat payment this account can make through `gateway`
+    /// to `invoice`'s payee: what its notes deliver when spent in full, less
+    /// the gateway's cut, the transaction fee and the app's cut. Priced
+    /// against an invoice because the payee decides the routing fee, and any
+    /// of the payee's invoices will do — which is how the amount screen
+    /// prices a max before the one it will pay exists.
+    ///
+    /// Picomint's figure, not ours: a max send funds from every note and
+    /// refuses an amount that doesn't empty the account, so the sizing has
+    /// to live where the spending does.
+    #[frb]
+    pub async fn ln_max_amount_for_invoice(
+        &self,
+        gateway: &GatewayInfoWrapper,
+        invoice: &Bolt11InvoiceWrapper,
+    ) -> i64 {
+        let amount =
+            self.client
+                .ln()
+                .send_max_amount(self.account, &gateway.gateway_info, &invoice.0);
+
+        (amount.msat / 1000) as i64
+    }
+
+    /// Pays an invoice sized by [`Self::ln_max_amount_for_invoice`] against
+    /// this same gateway, emptying the account: every note goes in and no
+    /// change comes back. An amount gone stale against a moved balance
+    /// degrades to an ordinary send that leaves change behind — which is why
+    /// the confirm flow re-prices before resolving the invoice it pays.
+    #[frb]
+    pub async fn ln_send_max(
+        &self,
+        gateway: &GatewayInfoWrapper,
+        invoice: &Bolt11InvoiceWrapper,
+    ) -> Result<String, String> {
+        self.client
+            .ln()
+            .send_max(
+                self.account,
+                gateway.gateway_pk,
+                gateway.gateway_info.clone(),
+                invoice.0.clone(),
+            )
+            .await
+            .map(|op| op.to_string())
+            .map_err(|e| e.to_string())
+    }
+
     /// Reads the locally mirrored gateway set, so it never touches the network.
     #[frb(sync)]
     pub fn lnurl(&self) -> String {
@@ -396,6 +464,37 @@ impl PicoClient {
                 BtcAmount::from_sat(amount_sats as u64),
                 None,
             )
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    /// The largest whole-sat amount this account can send onchain: what its
+    /// notes deliver when spent in full, less the onchain fee at the current
+    /// consensus feerate, the transaction fee and the app's cut.
+    ///
+    /// Picomint's quote, from the same code [`Self::onchain_send_max`] sizes
+    /// with. The two can differ by a feerate that moved in between — the
+    /// send recomputes at the moment it is submitted, and that figure is the
+    /// one that goes out.
+    #[frb]
+    pub async fn onchain_max_amount(&self) -> Result<i64, String> {
+        self.client
+            .wallet()
+            .send_max_amount(self.account)
+            .await
+            .map(|amount| amount.to_sat() as i64)
+            .map_err(|e| e.to_string())
+    }
+
+    /// Sends everything to `address`, leaving the account empty. The amount is
+    /// picomint's to compute — it funds from every note and sizes the output
+    /// to what they cover — so nothing is passed in but where it goes.
+    #[frb]
+    pub async fn onchain_send_max(&self, address: &BitcoinAddressWrapper) -> Result<(), String> {
+        self.client
+            .wallet()
+            .send_max(self.account, address.0.clone())
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())

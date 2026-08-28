@@ -4,6 +4,7 @@ import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/text_entry_body_widget.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ContactNameEntryScreen extends StatefulWidget {
   final PicoClientFactory clientFactory;
@@ -62,6 +63,10 @@ class _ContactNameEntryScreenState extends State<ContactNameEntryScreen> {
     Navigator.of(context).pop();
   }
 
+  void _handleShare() {
+    SharePlus.instance.share(ShareParams(text: widget.lnurl.encode()));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,6 +74,10 @@ class _ContactNameEntryScreenState extends State<ContactNameEntryScreen> {
       appBar: AppBar(
         title: const Text('Contact Name'),
         actions: [
+          IconButton(
+            icon: const Icon(PhosphorIconsRegular.copy, size: smallIconSize),
+            onPressed: _handleShare,
+          ),
           if (widget.onDelete != null)
             IconButton(
               icon: const Icon(PhosphorIconsRegular.trash, size: smallIconSize),

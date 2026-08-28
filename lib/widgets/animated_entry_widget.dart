@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Vertically expands its child on mount when `animate` is true; snaps
-/// open instantly otherwise. Hosting screens flip an `_initialBuildDone`
-/// flag in a post-frame callback so the first batch of items render
-/// statically and only later insertions get the entry animation.
+/// Vertically expands and fades in its child on mount when `animate` is
+/// true; snaps open instantly otherwise. Hosting screens flip an
+/// `_initialBuildDone` flag in a post-frame callback so the first batch of
+/// items render statically and only later insertions get the entry
+/// animation.
 class AnimatedEntry extends StatefulWidget {
   final Widget child;
   final bool animate;
@@ -47,6 +48,9 @@ class _AnimatedEntryState extends State<AnimatedEntry>
 
   @override
   Widget build(BuildContext context) {
-    return SizeTransition(sizeFactor: _animation, child: widget.child);
+    return FadeTransition(
+      opacity: _animation,
+      child: SizeTransition(sizeFactor: _animation, child: widget.child),
+    );
   }
 }
