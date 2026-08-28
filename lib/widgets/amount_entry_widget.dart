@@ -1,9 +1,7 @@
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
@@ -16,18 +14,6 @@ class AmountEntryWidget extends StatefulWidget {
   final Future<void> Function(int amountSats) onConfirm;
   final void Function(int currentAmount)? onAmountChanged;
   final String buttonText;
-  // The largest amount this screen can send: the balance on ecash, which
-  // pays no fee, and the balance less the rail's fees everywhere else. Null
-  // on the flows with no max to offer — a receive has no ceiling, and the
-  // rails that do have one need a moment to price it. Read when max mode is
-  // entered from the app bar's Max action, and to refill the figure across a
-  // currency switch.
-  final ValueListenable<int?>? maxAmount;
-  // Sends everything, as its own call rather than [onConfirm] with the max as
-  // its amount: emptying an account funds from every note and mints no
-  // change, which is a different operation downstream, not a large payment.
-  // Offered only alongside [maxAmount].
-  final Future<void> Function()? onConfirmMax;
 
   const AmountEntryWidget({
     super.key,
@@ -35,24 +21,15 @@ class AmountEntryWidget extends StatefulWidget {
     required this.onConfirm,
     this.onAmountChanged,
     this.buttonText = 'Confirm',
-    this.maxAmount,
-    this.onConfirmMax,
   });
 
   @override
-  State<AmountEntryWidget> createState() => AmountEntryWidgetState();
+  State<AmountEntryWidget> createState() => _AmountEntryWidgetState();
 }
 
-class AmountEntryWidgetState extends State<AmountEntryWidget> {
+class _AmountEntryWidgetState extends State<AmountEntryWidget> {
   int _currentAmount = 0;
   bool _enterFiat = false;
-  // Whether the figure on screen is the max because the user asked for
-  // everything, rather than a number they typed that happens to equal it.
-  // Confirm routes on this, so it is cleared by anything that makes the
-  // figure the user's own again — a digit, a backspace, a clear. Switching
-  // currency keeps it: the same max in the other unit is still the max, so
-  // the figure is refilled rather than reinterpreted.
-  bool _isMax = false;
   // Snapshot the selected currency once on entry. The user can't change
   // currency from this flow, so a fixed string is correct and spares a db read
   // per keystroke — the home screen, which must track live switches, reads it
@@ -79,7 +56,6 @@ class AmountEntryWidgetState extends State<AmountEntryWidget> {
 
     setState(() {
       _currentAmount = _currentAmount * 10 + int.parse(value);
-      _isMax = false;
     });
 
     // Notify parent about amount change (always in sat)
@@ -90,7 +66,6 @@ class AmountEntryWidgetState extends State<AmountEntryWidget> {
     if (_currentAmount > 0) {
       setState(() {
         _currentAmount = _currentAmount ~/ 10;
-        _isMax = false;
       });
 
       // Notify parent about amount change (always in sat)
@@ -101,7 +76,6 @@ class AmountEntryWidgetState extends State<AmountEntryWidget> {
   void _onClear() {
     setState(() {
       _currentAmount = 0;
-      _isMax = false;
     });
 
     // Notify parent about amount change
@@ -127,75 +101,11 @@ class AmountEntryWidgetState extends State<AmountEntryWidget> {
 
   String _formatFiatAmount() => formatFiat(_currency, _fiatAmount);
 
-  /// The digit buffer that shows [sats] in the unit the display is currently
-  /// in: sats as they are, or the fiat value in minor units. Null in fiat
-  /// with no rate cached, which is the one case that can't be shown as money.
-  int? _bufferFor(int sats, {required bool enterFiat}) {
-    if (!enterFiat) return sats;
-
-    final fiat = widget.client.satsToFiat(
-      amountSats: sats,
-      currencyCode: _currencyCode,
-    );
-
-    if (fiat == null) return null;
-
-    return (fiat * pow(10, _currency.decimalDigits)).round();
-  }
-
-  /// Fills the figure with the max and arms max mode — the app bar's Max
-  /// action reaches this through a [GlobalKey], since the action lives in
-  /// the hosting screen's app bar and the figure lives here. Comes with the
-  /// haptic every commitment in the app gets: it rewrites an amount that may
-  /// already be typed, and a tap that silently did that would read as a slip
-  /// of the finger. A no-op until a max has been priced, though the action
-  /// stays untappable until then anyway.
-  void enterMax() {
-    final sats = widget.maxAmount?.value;
-
-    if (sats == null || sats == 0) return;
-
-    HapticFeedback.lightImpact();
-
-    _onMax(sats);
-  }
-
-  /// Fills the display with the max, in whichever unit is on screen. The
-  /// figure is only ever the display: what confirm sends is its own max
-  /// operation, so the cent the conversion rounds off costs nothing. Falls
-  /// back to sats when no rate has been cached, which is the only honest way
-  /// to show the figure there.
-  void _onMax(int sats) {
-    final buffer = _bufferFor(sats, enterFiat: _enterFiat);
-
-    setState(() {
-      _currentAmount = buffer ?? sats;
-      _enterFiat = buffer != null && _enterFiat;
-      _isMax = true;
-    });
-
-    // The parent prices in sats, so it gets the max itself rather than the
-    // figure standing in for it.
-    widget.onAmountChanged?.call(sats);
-  }
-
   /// Swaps the unit the figure is read in. The digits stay put and change
-  /// meaning — a deliberate reinterpretation, since they are the user's — but
-  /// a max figure is refilled instead: it stands for the balance, and the
-  /// balance is the same money in either unit.
+  /// meaning — a deliberate reinterpretation, since they are the user's.
   void _toggleCurrency() {
-    final maxSats = _isMax ? widget.maxAmount?.value : null;
-    final buffer =
-        maxSats == null ? null : _bufferFor(maxSats, enterFiat: !_enterFiat);
-
     setState(() {
       _enterFiat = !_enterFiat;
-      // No rate cached, so the balance can't be shown as money: the figure
-      // becomes whatever the digits now read as, which is no longer a claim
-      // about the balance.
-      _isMax = maxSats != null && buffer != null;
-
-      if (buffer != null) _currentAmount = buffer;
     });
 
     // Prefetch exchange rates when switching to fiat mode
@@ -203,26 +113,12 @@ class AmountEntryWidgetState extends State<AmountEntryWidget> {
       widget.client.prefetchExchangeRates();
     }
 
-    if (maxSats != null && buffer != null) {
-      widget.onAmountChanged?.call(maxSats);
-    } else {
-      // Same digits, different sat value — parent's fee preview would
-      // otherwise stay frozen on the old interpretation.
-      _notifyParentAmountChanged();
-    }
+    // Same digits, different sat value — parent's fee preview would
+    // otherwise stay frozen on the old interpretation.
+    _notifyParentAmountChanged();
   }
 
   Future<void> _handleConfirm() async {
-    // Everything goes by its own call, which spends the notes the account
-    // holds rather than an amount named in sats that they may not add up to.
-    // Ahead of the empty check: a balance worth less than a cent shows as
-    // zero in fiat, and it is still a balance to send.
-    if (_isMax) {
-      await widget.onConfirmMax!();
-
-      return;
-    }
-
     if (_currentAmount == 0) {
       throw 'Please enter an amount';
     }

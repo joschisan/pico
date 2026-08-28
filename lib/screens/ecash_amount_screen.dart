@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
@@ -12,15 +11,11 @@ import 'package:pico/widgets/max_action_widget.dart';
 class EcashAmountScreen extends StatefulWidget {
   final PicoClient client;
   final PicoClientFactory clientFactory;
-  // The account's balance, carried in from the home screen's subscription
-  // rather than opened again here — it is only what the max button names.
-  final ValueListenable<int?> balance;
 
   const EcashAmountScreen({
     super.key,
     required this.client,
     required this.clientFactory,
-    required this.balance,
   });
 
   @override
@@ -29,9 +24,6 @@ class EcashAmountScreen extends StatefulWidget {
 
 class _EcashAmountScreenState extends State<EcashAmountScreen> {
   late final PicoClient _client = widget.client;
-  // Reaches the entry widget's figure from the app bar's Max action; the
-  // client never changes under this screen, so the key carries no reset duty.
-  final _entryKey = GlobalKey<AmountEntryWidgetState>();
 
   Future<void> _handleConfirm(int amountSats) async {
     await requireBiometricAuth(context);
@@ -76,20 +68,15 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Send eCash'),
-        actions: [MaxAction(maxAmount: widget.balance, entry: _entryKey)],
+        actions: [MaxAction(onPressed: _handleConfirmMax)],
       ),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
               child: AmountEntryWidget(
-                key: _entryKey,
                 client: _client,
                 onConfirm: _handleConfirm,
-                // Ecash pays no fee, so everything the account holds is
-                // sendable and the balance is the max.
-                maxAmount: widget.balance,
-                onConfirmMax: _handleConfirmMax,
               ),
             ),
           ],

@@ -524,7 +524,6 @@ class _HomeScreenState extends State<HomeScreen> {
             (_) => EcashAmountScreen(
               client: client,
               clientFactory: widget.clientFactory,
-              balance: _sessions[_clientKey(client)]!.balance,
             ),
       ),
     );

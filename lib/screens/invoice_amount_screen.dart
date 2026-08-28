@@ -22,7 +22,7 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   late final PicoClient _client = widget.client;
 
   Future<void> _handleConfirm(int amountSats) async {
-    final gateway = await _client.lnSelectAnyGateway();
+    final gateway = await _client.lnSelectGateway();
 
     final feeSats = gateway.gatewayFeeForReceiveAmount(amountSats: amountSats);
 

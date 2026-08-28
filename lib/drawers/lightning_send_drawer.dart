@@ -61,9 +61,7 @@ class _LightningSendDrawerState extends State<LightningSendDrawer> {
 
   Future<void> _loadQuote() async {
     try {
-      final gateway = await widget.client.lnSelectGatewayForInvoice(
-        invoice: widget.invoice,
-      );
+      final gateway = await widget.client.lnSelectGateway();
 
       final feeSats = gateway.gatewayFeeForInvoice(invoice: widget.invoice);
 
