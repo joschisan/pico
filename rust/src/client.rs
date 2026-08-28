@@ -28,30 +28,22 @@ pub struct GatewayInfoWrapper {
 }
 
 impl GatewayInfoWrapper {
-    /// Exact fee (sats) for paying this invoice through this gateway —
-    /// `send_fee + ln_fee`, with `ln_fee` zeroed when the gateway is the
-    /// invoice's payee (direct ecash swap).
+    /// Exact fee (sats) for paying this invoice through this gateway. One
+    /// flat price however the payment settles — routed over Lightning or
+    /// swapped internally by the invoice's own issuer — so nothing about the
+    /// invoice changes what it costs.
     #[frb(sync)]
     pub fn gateway_fee_for_invoice(&self, invoice: &Bolt11InvoiceWrapper) -> i64 {
-        let amount_msats = invoice.0.amount_milli_satoshis().unwrap_or(0);
-        let is_direct = invoice.0.recover_payee_pub_key() == self.gateway_info.lightning_public_key;
-        let ln_msats = if is_direct {
-            0
-        } else {
-            self.gateway_info.ln_fee.fee(amount_msats).msat
-        };
-        let send_msats = self.gateway_info.send_fee.fee(amount_msats).msat;
-        ((ln_msats + send_msats) / 1000) as i64
+        self.gateway_fee_for_amount((invoice.0.amount_milli_satoshis().unwrap_or(0) / 1000) as i64)
     }
 
-    /// Worst-case fee (sats) for paying `amount_sats` through this gateway —
-    /// no direct-swap shortcut since we don't have an invoice yet.
+    /// Exact fee (sats) for paying `amount_sats` through this gateway — the
+    /// same flat price an invoice for the amount will be quoted.
     #[frb(sync)]
     pub fn gateway_fee_for_amount(&self, amount_sats: i64) -> i64 {
         let msats = (amount_sats as u64).saturating_mul(1000);
-        let ln_msats = self.gateway_info.ln_fee.fee(msats).msat;
-        let send_msats = self.gateway_info.send_fee.fee(msats).msat;
-        ((ln_msats + send_msats) / 1000) as i64
+
+        (self.gateway_info.send_fee.fee(msats).msat / 1000) as i64
     }
 
     /// Fee (sats) the gateway deducts from a `amount_sats` incoming
@@ -322,34 +314,15 @@ impl PicoClient {
         Ok(invoice.to_string())
     }
 
-    /// Pre-select a gateway biased toward the invoice's payee — picomint
-    /// picks the same gateway that issued the invoice when available, so
-    /// the payment becomes a direct ecash swap with zero LN fee.
+    /// Pre-select an online gateway. Any will do for any payment: a gateway
+    /// charges the same fee however a payment settles, so there is nothing
+    /// about an invoice to select one by.
     #[frb]
-    pub async fn ln_select_gateway_for_invoice(
-        &self,
-        invoice: &Bolt11InvoiceWrapper,
-    ) -> Result<GatewayInfoWrapper, String> {
+    pub async fn ln_select_gateway(&self) -> Result<GatewayInfoWrapper, String> {
         let (gateway_pk, gateway_info) = self
             .client
             .ln()
-            .select_gateway(Some(&invoice.0))
-            .map_err(|e| e.to_string())?;
-
-        Ok(GatewayInfoWrapper {
-            gateway_pk,
-            gateway_info,
-        })
-    }
-
-    /// Pre-select any online gateway — for amount-entry flows like lnurl
-    /// where we don't have an invoice yet.
-    #[frb]
-    pub async fn ln_select_any_gateway(&self) -> Result<GatewayInfoWrapper, String> {
-        let (gateway_pk, gateway_info) = self
-            .client
-            .ln()
-            .select_gateway(None)
+            .select_gateway()
             .map_err(|e| e.to_string())?;
 
         Ok(GatewayInfoWrapper {
@@ -377,40 +350,36 @@ impl PicoClient {
             .map_err(|e| e.to_string())
     }
 
-    /// The largest whole-sat payment this account can make through `gateway`
-    /// to `invoice`'s payee: what its notes deliver when spent in full, less
-    /// the gateway's cut, the transaction fee and the app's cut. Priced
-    /// against an invoice because the payee decides the routing fee, and any
-    /// of the payee's invoices will do — which is how the amount screen
-    /// prices a max before the one it will pay exists.
+    /// The largest whole-sat payment this account can make through `gateway`:
+    /// what its notes deliver when spent in full, less the gateway's flat
+    /// fee, the transaction fee and the app's cut. Needs no invoice — the
+    /// gateway's fee is the same however a payment settles, so the figure
+    /// holds for whatever invoice is later resolved for it.
     ///
     /// Picomint's figure, not ours: a max send funds from every note and
-    /// refuses an amount that doesn't empty the account, so the sizing has
-    /// to live where the spending does.
+    /// mints no change at exactly this amount, so the sizing has to live
+    /// where the spending does.
     #[frb]
-    pub async fn ln_max_amount_for_invoice(
-        &self,
-        gateway: &GatewayInfoWrapper,
-        invoice: &Bolt11InvoiceWrapper,
-    ) -> i64 {
-        let amount =
-            self.client
-                .ln()
-                .send_max_amount(self.account, &gateway.gateway_info, &invoice.0);
+    pub async fn ln_max_amount(&self, gateway: &GatewayInfoWrapper) -> i64 {
+        let amount = self
+            .client
+            .ln()
+            .send_max_amount(self.account, &gateway.gateway_info);
 
         (amount.msat / 1000) as i64
     }
 
-    /// Pays an invoice sized by [`Self::ln_max_amount_for_invoice`] against
-    /// this same gateway, emptying the account: every note goes in and no
-    /// change comes back. An amount gone stale against a moved balance
-    /// degrades to an ordinary send that leaves change behind — which is why
-    /// the confirm flow re-prices before resolving the invoice it pays.
+    /// Empties the account to `lnurl` through `gateway`: picomint resolves
+    /// the one invoice it pays, sized fresh by the same code that spends it,
+    /// so every note goes in and no change comes back. The figure
+    /// [`Self::ln_max_amount`] previewed through this gateway is the figure
+    /// paid, short of the balance moving in between — which moves the
+    /// payment with it.
     #[frb]
     pub async fn ln_send_max(
         &self,
         gateway: &GatewayInfoWrapper,
-        invoice: &Bolt11InvoiceWrapper,
+        lnurl: String,
     ) -> Result<String, String> {
         self.client
             .ln()
@@ -418,7 +387,7 @@ impl PicoClient {
                 self.account,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
-                invoice.0.clone(),
+                &lnurl,
             )
             .await
             .map(|op| op.to_string())
