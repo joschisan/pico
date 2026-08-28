@@ -3,7 +3,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
 import 'package:pico/bridge_generated.dart/factory.dart';
-import 'package:pico/utils/account_utils.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/federation_utils.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
@@ -11,8 +10,8 @@ import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
 /// Bottom-sheet settings: app-wide rows (recovery phrase, currency) above the
-/// selected account's own (which account, connectivity, and the two
-/// removals). Each row pops the drawer
+/// selected account's own (which account, connectivity, and leaving the
+/// mint). Each row pops the drawer
 /// and hands off to a caller callback, whose stable context owns the
 /// navigation — this drawer's own context dies with the pop.
 class SettingsDrawer extends StatefulWidget {
@@ -22,9 +21,6 @@ class SettingsDrawer extends StatefulWidget {
   final VoidCallback onSelectCurrency;
   final VoidCallback onSelectAccount;
   final VoidCallback onSelectConnectivity;
-  // Null on the primary account, which is where a removal moves the balance
-  // to and so has nowhere of its own to go.
-  final VoidCallback? onSelectRemoveAccount;
   // Null with only one federation joined: leaving the last one would strand
   // the wallet on onboarding, so the row is left out entirely.
   final VoidCallback? onSelectLeave;
@@ -37,7 +33,6 @@ class SettingsDrawer extends StatefulWidget {
     required this.onSelectCurrency,
     required this.onSelectAccount,
     required this.onSelectConnectivity,
-    required this.onSelectRemoveAccount,
     required this.onSelectLeave,
   });
 
@@ -49,7 +44,6 @@ class SettingsDrawer extends StatefulWidget {
     required VoidCallback onSelectCurrency,
     required VoidCallback onSelectAccount,
     required VoidCallback onSelectConnectivity,
-    required VoidCallback? onSelectRemoveAccount,
     required VoidCallback? onSelectLeave,
   }) {
     return DrawerUtils.show(
@@ -61,7 +55,6 @@ class SettingsDrawer extends StatefulWidget {
         onSelectCurrency: onSelectCurrency,
         onSelectAccount: onSelectAccount,
         onSelectConnectivity: onSelectConnectivity,
-        onSelectRemoveAccount: onSelectRemoveAccount,
         onSelectLeave: onSelectLeave,
       ),
     );
@@ -107,7 +100,6 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    final onSelectRemoveAccount = widget.onSelectRemoveAccount;
     final onSelectLeave = widget.onSelectLeave;
 
     return DrawerShell(
@@ -127,7 +119,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
               onTap: () => _select(widget.onSelectCurrency),
             ),
             SettingsCard(
-              icon: PhosphorIconsRegular.wallet,
+              icon: PhosphorIconsRegular.stack,
               title: 'Select Account',
               // Sync, unlike the two rows above: which account is in view is
               // decided by the page the drawer opened over.
@@ -135,16 +127,8 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
               onTap: () => _select(widget.onSelectAccount),
             ),
             _buildConnectivityCard(),
-            // Removing an account moves money and keeps the mint; removing
-            // the mint destroys what is left. The gentler one goes first, and
-            // both sit at the bottom away from the rows that only navigate.
-            if (onSelectRemoveAccount != null)
-              SettingsCard(
-                icon: PhosphorIconsRegular.signOut,
-                title: 'Remove ${widget.client.accountName()} Account',
-                subtitle: 'Transfer eCash to $primaryAccount Account',
-                onTap: () => _select(onSelectRemoveAccount),
-              ),
+            // Destroys what the mint still holds, so it sits at the bottom
+            // away from the rows that only navigate.
             if (onSelectLeave != null)
               SettingsCard(
                 icon: PhosphorIconsRegular.signOut,

@@ -16,9 +16,9 @@ import 'package:pico/drawers/lnurl_drawer.dart';
 import 'package:pico/drawers/invite_drawer.dart';
 import 'package:pico/drawers/leave_federation_drawer.dart';
 import 'package:pico/drawers/payment_details_drawer.dart';
-import 'package:pico/drawers/remove_account_drawer.dart';
 import 'package:pico/drawers/scanner_drawer.dart';
 import 'package:pico/drawers/select_account_drawer.dart';
+import 'package:pico/drawers/select_page_drawer.dart';
 import 'package:pico/drawers/settings_drawer.dart';
 import 'package:pico/screens/connection_status_screen.dart';
 import 'package:pico/screens/display_contacts_screen.dart';
@@ -45,6 +45,13 @@ import 'package:pico/utils/federation_utils.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
 import 'package:pico/screens/onchain_amount_screen.dart';
 
+/// How the pager slides onto a page it was sent to rather than swiped to.
+/// Long enough to read as travel across the pages in between — which is the
+/// point of animating it — and eased so it drifts to a stop instead of
+/// snapping: the move wasn't a flick, so it shouldn't land like one.
+const _pageSlideDuration = Duration(milliseconds: 500);
+const _pageSlideCurve = Curves.easeInOutSine;
+
 /// Identifies one entry in the factory's client map. A federation id alone
 /// no longer does: a federation contributes one client per account, and the
 /// pager swipes through all of them.
@@ -58,7 +65,7 @@ String _clientKey(PicoClient client) =>
 /// worth showing get pages, so a swipe crosses whichever accounts are in use
 /// and then on to the next mint. The page you land on is the balance every
 /// action spends from. The leading gear opens the settings drawer, which is
-/// where the account picker and both removals live. The picomint
+/// where the account picker and leaving a mint live. The picomint
 /// eventlog is daemon-wide so recent ops and notifications come from a single
 /// factory-level stream — no per-client merging needed.
 ///
@@ -180,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (arrived.isNotEmpty) {
           _pageTo(
             _visible.indexWhere((c) => arrived.contains(c.federationId())),
+            animate: true,
           );
         }
       });
@@ -343,13 +351,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Moves the pager onto [index], deferred a frame so it has rebuilt with
-  /// the new page count first. A jump rather than an animation: the list
-  /// changed while the user was on another screen, so there is no swipe to
-  /// finish.
-  void _pageTo(int index) {
+  /// the new page count first.
+  ///
+  /// Jumps by default: the move is bookkeeping — holding the selection as
+  /// pages appear beside it — and there is no swipe to finish. [animate] is
+  /// for the moves the user asked for, joining a federation or picking an
+  /// account, where sliding over to the new page shows where it landed among
+  /// the others instead of teleporting onto it.
+  void _pageTo(int index, {bool animate = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_pageController.hasClients) return;
-      _pageController.jumpToPage(index);
+
+      if (animate) {
+        _pageController.animateToPage(
+          index,
+          duration: _pageSlideDuration,
+          curve: _pageSlideCurve,
+        );
+      } else {
+        _pageController.jumpToPage(index);
+      }
     });
   }
 
@@ -365,10 +386,17 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_sessions.containsKey(key)) continue;
 
       final session = _FederationSession(client);
-      // An account holding money always has a page, so its balance is an
-      // input to [_visible] and not only to what the page renders. The
-      // listener goes with the session when it is disposed.
-      session.balance.addListener(_refreshVisible);
+      // Money earns the account its page: the balance going positive adds it
+      // to [_opened] rather than being read live by [_isVisible], so a max
+      // send that empties the account leaves the page standing at zero
+      // instead of yanking it out from under the user mid-flow. On restart
+      // the balance decides afresh. The listener goes with the session when
+      // it is disposed.
+      session.balance.addListener(() {
+        if ((session.balance.value ?? 0) > 0) _opened.add(key);
+
+        _refreshVisible();
+      });
       _sessions[key] = session;
     }
 
@@ -383,16 +411,15 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Three accounts each is more pages than a wallet with two mints wants to
   /// swipe through when it is using one of them, so an account earns its page
   /// rather than being given one. Primary always has one — it is where a join
-  /// lands and where a removal transfers to. The rest are there because they
-  /// were opened from the picker, or because they hold money: a balance is
-  /// never hidden, which is what makes a restore that finds funds in an
-  /// account nobody ever opened surface them instead of swallowing them.
+  /// lands. The rest earned theirs into [_opened], by being opened from the
+  /// picker or by money turning up in them: a balance is never hidden, which
+  /// is what makes a restore that finds funds in an account nobody ever
+  /// opened surface them instead of swallowing them. Either way the page is
+  /// held for the session — spending the account empty doesn't take it.
   bool _isVisible(PicoClient client) {
     if (client.accountName() == primaryAccount) return true;
 
-    if (_opened.contains(_clientKey(client))) return true;
-
-    return (_sessions[_clientKey(client)]?.balance.value ?? 0) > 0;
+    return _opened.contains(_clientKey(client));
   }
 
   List<PicoClient> _computeVisible() {
@@ -423,9 +450,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final index = keys.indexOf(selected);
 
-    // The page in view is the one that just went, which only happens to the
-    // account being removed. Its balance is now primary's, so that is where
-    // the pager belongs.
+    // The page in view is one that just went — pages are held for the
+    // session, so only its federation leaving takes it. Its federation's
+    // primary is the nearest page to it, and when that left too, the
+    // fallback lands on the first page.
     _pageTo(index >= 0 ? index : _primaryIndexOf(selected, next));
   }
 
@@ -467,6 +495,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (_) => EcashAmountScreen(
               client: client,
               clientFactory: widget.clientFactory,
+              balance: _sessions[_clientKey(client)]!.balance,
             ),
       ),
     );
@@ -528,12 +557,6 @@ class _HomeScreenState extends State<HomeScreen> {
       onSelectCurrency: _openCurrency,
       onSelectAccount: _openSelectAccount,
       onSelectConnectivity: _openConnectivity,
-      // Primary is where a removal moves the balance, so it has nowhere to go
-      // and the row is left out on it.
-      onSelectRemoveAccount:
-          _selectedClient().accountName() == primaryAccount
-              ? null
-              : _openRemoveAccount,
       // Leaving the last federation would strand the wallet on onboarding, so
       // the row only appears once there is another to fall back to.
       onSelectLeave: _knownFederationIds.length > 1 ? _openLeave : null,
@@ -568,27 +591,41 @@ class _HomeScreenState extends State<HomeScreen> {
       (c) => _clientKey(c) == _clientKey(account),
     );
 
-    if (index >= 0) _pageTo(index);
+    // Registered after the jump [_refreshVisible] may have queued, so the
+    // slide starts from the page that was in view rather than from wherever
+    // the new page pushed it.
+    if (index >= 0) _pageTo(index, animate: true);
   }
 
-  void _openRemoveAccount() {
-    final account = _selectedClient();
-
-    RemoveAccountDrawer.show(
+  /// Lists every page the pager carries, across federations, and swipes to
+  /// the one chosen. Opened from the row naming the page in view: at three
+  /// mints the balance you want is several swipes away, and this is the swipe
+  /// as a list. Adds no pages of its own — that is [_openSelectAccount]'s job.
+  void _openSelectPage() {
+    SelectPageDrawer.show(
       context,
-      account: account,
-      balance: _sessions[_clientKey(account)]!.balance,
-      // The transfer leaves the account empty, so forgetting it was opened is
-      // all that is left — and the balance falling to zero would have taken
-      // its page anyway had it never been opened.
-      onSuccess: () => _hideAccount(account),
+      pages: [
+        for (final client in _visible)
+          (
+            client: client,
+            name: _sessions[_clientKey(client)]!.name,
+            balance: _sessions[_clientKey(client)]!.balance,
+          ),
+      ],
+      selectedKey: _clientKey(_selectedClient()),
+      keyOf: _clientKey,
+      onSelect: _selectPage,
     );
   }
 
-  void _hideAccount(PicoClient account) {
-    _opened.remove(_clientKey(account));
+  /// Swipes to [client]'s page. It already has one — the picker only lists
+  /// pages — so there is nothing to make visible first.
+  void _selectPage(PicoClient client) {
+    final index = _visible.indexWhere(
+      (c) => _clientKey(c) == _clientKey(client),
+    );
 
-    _refreshVisible();
+    if (index >= 0) _pageTo(index, animate: true);
   }
 
   Future<void> _openRecoveryPhrase() async {
@@ -691,20 +728,17 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 // Leads the block: the only affordance that it swipes, and
                 // above the balance it reads as a header for what follows
-                // rather than a footnote under the account row. Left out with
-                // a single account on a single mint, where it would promise a
-                // swipe that goes nowhere.
-                if (_visible.length > 1)
-                  _PageDots(
-                    count: _visible.length,
-                    controller: _pageController,
-                  ),
+                // rather than a footnote under the account row. Kept at a
+                // single account too, so the balance block sits at the same
+                // height however many accounts there are.
+                _PageDots(count: _visible.length, controller: _pageController),
                 _FederationPager(
                   clients: _visible,
                   sessions: _sessions,
                   controller: _pageController,
                   display: _balanceDisplay,
                   onBalanceTap: _cycleBalanceDisplay,
+                  onAccountTap: _openSelectPage,
                 ),
                 const SizedBox(height: 16),
                 Container(
@@ -891,16 +925,20 @@ class _BalanceHero extends StatelessWidget {
 /// belongs to rather than from an app-bar icon. The detail behind it is a tap
 /// away on the connection screen.
 ///
-/// Inert: the pager selects, so there is nothing here to tap.
+/// Tapping it opens the list of the pager's pages: the row names the page in
+/// view, so it is where you would look to go to another one, and a list beats
+/// a swipe once the balance you are after is several pages away.
 class _FederationRow extends StatelessWidget {
   final ValueListenable<String?> name;
   final String account;
   final ValueListenable<List<(String, double?)>?> connection;
+  final VoidCallback onTap;
 
   const _FederationRow({
     required this.name,
     required this.account,
     required this.connection,
+    required this.onTap,
   });
 
   @override
@@ -919,6 +957,7 @@ class _FederationRow extends StatelessWidget {
 
         return ListTile(
           contentPadding: listTilePadding,
+          onTap: onTap,
           leading: IconChip(
             icon: PhosphorIconsRegular.stack,
             // Untinted until the first status lands, so amber only ever means
@@ -965,12 +1004,14 @@ class _FederationPage extends StatelessWidget {
   final _FederationSession session;
   final BalanceDisplay display;
   final VoidCallback onBalanceTap;
+  final VoidCallback onAccountTap;
 
   const _FederationPage({
     required this.client,
     required this.session,
     required this.display,
     required this.onBalanceTap,
+    required this.onAccountTap,
   });
 
   @override
@@ -1001,6 +1042,7 @@ class _FederationPage extends StatelessWidget {
               name: session.name,
               account: client.accountName(),
               connection: session.connection,
+              onTap: onAccountTap,
             ),
           ],
         ),
@@ -1026,6 +1068,7 @@ class _FederationPager extends StatelessWidget implements Bleeds {
   final PageController controller;
   final BalanceDisplay display;
   final VoidCallback onBalanceTap;
+  final VoidCallback onAccountTap;
 
   const _FederationPager({
     required this.clients,
@@ -1033,6 +1076,7 @@ class _FederationPager extends StatelessWidget implements Bleeds {
     required this.controller,
     required this.display,
     required this.onBalanceTap,
+    required this.onAccountTap,
   });
 
   Widget _page(PicoClient client) => _FederationPage(
@@ -1040,6 +1084,7 @@ class _FederationPager extends StatelessWidget implements Bleeds {
     session: sessions[_clientKey(client)]!,
     display: display,
     onBalanceTap: onBalanceTap,
+    onAccountTap: onAccountTap,
   );
 
   @override
