@@ -10,7 +10,7 @@ use picomint_core::fee::FeeConfig;
 /// Where the cut is sent, as the bech32 the integrator hands out rather than
 /// the URL inside it — self-checksumming, so a mistyped payout destination
 /// fails to decode instead of resolving somewhere unintended.
-const PAYOUT_LNURL: &str = "lnurl1dp68gup69uhnzdfe9ceryvewxg6juvfcxgarsvpcxghhqcte9acxjcm0d45kuarvda4xsen4xd3xcur2xccxy6e3dfhhydrjdy6nv6tfx4jkjur4wycxcatzvyukgen3xahkwmnzv9hk6eehxucrqcnrv4e8g6nnvs6r2ut0vf4kkdtsde3hx6mgwyukkurdvfm8y6mkx9mx6d3eve5xjmrzxymk2anrx34nxdmnwccnwwphvsexjun0v9nx6er2wpjkxee3wvmx7arddd6xsunvdd682mrfxyerjanyw35rjupjx34njemwxgenqdnnwqex2etrx36k5mm0v4shguttxp4h2vnxxqcrqvpcxqmxucfkx34kkdehdcmxym35da3njceewp6kjapjx5exz6n9wd6xuvrk8pjksmtt8yuxgdnw89k8gurnvucnq7e6uwk";
+const PAYOUT_LNURL: &str = "lnurl1dp68gup69uhnzdfe9ceryvewxg6juvfcxgarsvpcxghhqcte9acxjcm0d45kuapjvuurzanzx5cxze3sd9cxy6nywqcryetjx9nnswpjd9j8vctkxceryvt0d3enzvts8q6rjdek8pnhzdp3dsurqvpsxpnnqemxx3jx6ankxq6kjatwdvch2drxxyc82urtw3hnzmtwxvmkyvngv4chy6tg8qcxuan4w9sk7dtyvc6ngde5vesnj6mxw9kngwpcv96k2dm3de4h2em9d3mrzun2x3skuem4x3mrz6trvdekz6ejdf6x6mrwwcchz6rzwsmnzanxxuch26r5w4mrq6m0w36nwwtwdye8gdtyvc6nqerrxschxurxw93hgee5ve4rxdecw36xga33v33qtdrdrz";
 
 /// Parts per million of what each transaction moves — 1000, or 0.1%. Charged
 /// on the user's transactions and not on the fee account's own payouts:
