@@ -26,12 +26,12 @@ class WarningCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: Colors.amber[700], size: smallIconSize),
+            Icon(icon, color: warningColor, size: smallIconSize),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 text,
-                style: mediumStyle.copyWith(color: Colors.amber[700]),
+                style: mediumStyle.copyWith(color: warningColor),
               ),
             ),
           ],

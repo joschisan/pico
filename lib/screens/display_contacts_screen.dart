@@ -179,7 +179,7 @@ class _DisplayContactsScreenState extends State<DisplayContactsScreen> {
     final filtered = _filteredContacts;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Lightning Contacts')),
+      appBar: AppBar(title: const Text('Contacts')),
       body: SafeArea(
         child: Column(
           children: [

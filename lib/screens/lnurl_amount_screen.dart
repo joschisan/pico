@@ -97,6 +97,7 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
         builder:
             (_) => ConfirmLnurlSendScreen(
               client: widget.client,
+              clientFactory: widget.clientFactory,
               invoice: invoice,
               lnurl: widget.lnurl,
               amountSats: amountSats,

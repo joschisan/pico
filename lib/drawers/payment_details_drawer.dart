@@ -272,7 +272,7 @@ _Description _describe(
   final neutral = scheme.onSurfaceVariant;
   final success = scheme.primary;
   final failure = Colors.red;
-  final warning = Colors.amber.shade700;
+  final warning = warningColor;
 
   // Renders amounts in sats, fiat, or masked per the active toggle.
   final amount = _amountFormatter(context, summary);

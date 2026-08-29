@@ -89,7 +89,7 @@ class _PaymentCardState extends State<PaymentCard> {
     // tint the chip and the amount rather than swapping the icon out.
     final (iconColor, amountColor) = switch (_status) {
       _Status.error => (Colors.red, Colors.red),
-      _Status.warning => (Colors.amber.shade700, Colors.amber.shade700),
+      _Status.warning => (warningColor, warningColor),
       _Status.ok => (null, widget.event.incoming ? scheme.primary : null),
     };
 

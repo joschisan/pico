@@ -131,9 +131,9 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             // away from the rows that only navigate.
             if (onSelectLeave != null)
               SettingsCard(
-                icon: PhosphorIconsRegular.signOut,
-                title: 'Remove ${_federationName ?? 'Mint'}',
-                subtitle: 'Delete eCash',
+                icon: PhosphorIconsRegular.trash,
+                title: 'Remove Mint',
+                subtitle: _federationName,
                 onTap: () => _select(onSelectLeave),
               ),
           ],
