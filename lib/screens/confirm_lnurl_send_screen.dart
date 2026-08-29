@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
+import 'package:pico/screens/contact_name_entry_screen.dart';
+import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/detail_row_widget.dart';
@@ -15,6 +18,7 @@ import 'package:pico/widgets/scrollable_body_widget.dart';
 
 class ConfirmLnurlSendScreen extends StatefulWidget {
   final PicoClient client;
+  final PicoClientFactory clientFactory;
   // Resolved ahead for an ordinary send, so the number reviewed is pinned
   // into the invoice paid. Null on a max send, which resolves its own: the
   // amount is picomint's to size fresh at pay time, and pinning a figure
@@ -32,6 +36,7 @@ class ConfirmLnurlSendScreen extends StatefulWidget {
   const ConfirmLnurlSendScreen({
     super.key,
     required this.client,
+    required this.clientFactory,
     required this.invoice,
     required this.lnurl,
     required this.amountSats,
@@ -46,6 +51,24 @@ class ConfirmLnurlSendScreen extends StatefulWidget {
 }
 
 class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
+  late String? _contactName = widget.contactName;
+
+  Future<void> _handleSaveContact() async {
+    final name = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder:
+            (_) => ContactNameEntryScreen(
+              clientFactory: widget.clientFactory,
+              lnurl: widget.lnurl,
+            ),
+      ),
+    );
+
+    if (mounted && name != null) {
+      setState(() => _contactName = name);
+    }
+  }
+
   Future<void> _handleConfirm() async {
     await requireBiometricAuth(context);
 
@@ -69,7 +92,19 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.contactName ?? 'Send Lightning')),
+      appBar: AppBar(
+        title: Text(_contactName ?? 'Send Lightning'),
+        actions: [
+          if (_contactName == null)
+            IconButton(
+              icon: const Icon(
+                PhosphorIconsRegular.userPlus,
+                size: smallIconSize,
+              ),
+              onPressed: _handleSaveContact,
+            ),
+        ],
+      ),
       body: ScrollableBody(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),

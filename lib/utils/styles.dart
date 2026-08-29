@@ -18,6 +18,11 @@ const heroIconSize = 56.0;
 
 const listTilePadding = EdgeInsets.symmetric(horizontal: 16, vertical: 8);
 
+/// The single amber (Material's amber 700) every caution surface shares: a
+/// payment that needs attention, and the warning card. Distinct from the red
+/// kept for outright failure.
+const warningColor = Color(0xFFFFA000);
+
 /// The single spinner shared by every loading indicator in the app.
 const smallSpinner = SizedBox(
   width: 14,
