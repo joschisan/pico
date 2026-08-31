@@ -86,10 +86,12 @@ class _PaymentCardState extends State<PaymentCard> {
 
     // The rail names the row, so the leading chip carries direction instead —
     // otherwise the rail would be stated twice and direction nowhere. Failures
-    // tint the chip and the amount rather than swapping the icon out.
+    // tint the chip only, rather than swapping the icon out; the amount stays
+    // neutral — no failure red, and no incoming tint either, since money that
+    // didn't move shouldn't read as received.
     final (iconColor, amountColor) = switch (_status) {
-      _Status.error => (Colors.red, Colors.red),
-      _Status.warning => (warningColor, warningColor),
+      _Status.error => (Colors.red, null),
+      _Status.warning => (warningColor, null),
       _Status.ok => (null, widget.event.incoming ? scheme.primary : null),
     };
 
