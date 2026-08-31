@@ -39,7 +39,7 @@ void main() async {
   // can't transact, so it starts on onboarding. The home screen is only ever
   // mounted with a federation in hand, which is what lets it assume it has
   // one.
-  final accounts = await pico.accounts();
+  final accounts = pico.accounts();
 
   runApp(
     PicoApp(

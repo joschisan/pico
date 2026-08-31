@@ -75,7 +75,7 @@ class _LightningAddressEntryScreenState
 
     final payResponse = await lnurlFetchLimits(lnurl: lnurl);
 
-    final contactName = await widget.pico.getContactName(lnurl: lnurl);
+    final contactName = widget.pico.getContactName(lnurl: lnurl);
 
     if (!mounted) return;
 

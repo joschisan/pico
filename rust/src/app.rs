@@ -142,14 +142,14 @@ impl Pico {
             .collect()
     }
 
-    #[frb]
-    pub async fn seed_phrase(&self) -> Vec<String> {
+    #[frb(sync)]
+    pub fn seed_phrase(&self) -> Vec<String> {
         self.mnemonic.words().map(|s| s.to_string()).collect()
     }
 
     /// Every joined `(federation, account)` pair, as plain data.
-    #[frb]
-    pub async fn accounts(&self) -> Vec<PicoAccount> {
+    #[frb(sync)]
+    pub fn accounts(&self) -> Vec<PicoAccount> {
         self.rows()
     }
 
@@ -162,8 +162,8 @@ impl Pico {
     /// not the usual path: the drawer receives into the account on screen
     /// when the bundle belongs to its federation, and only asks here when it
     /// doesn't.
-    #[frb]
-    pub async fn account(&self, federation_id: &str) -> Option<PicoAccount> {
+    #[frb(sync)]
+    pub fn account(&self, federation_id: &str) -> Option<PicoAccount> {
         let id = FederationId::from_str(federation_id).ok()?;
 
         let config = self.client.config(id)?;
@@ -227,8 +227,8 @@ impl Pico {
         ))
     }
 
-    #[frb]
-    pub async fn set_currency(&self, currency_code: &str) {
+    #[frb(sync)]
+    pub fn set_currency(&self, currency_code: &str) {
         let dbtx = self.db.begin_write();
 
         dbtx.insert(&SelectedCurrency, &(), &currency_code.to_string());
@@ -395,8 +395,29 @@ impl Pico {
     /// chronological order (oldest first — Dart reverses for display).
     /// Cards rendered from this snapshot stay static; live status is
     /// reachable only by opening the per-op drawer.
-    #[frb]
-    pub async fn list_operations(&self) -> Vec<OperationSummary> {
+    #[frb(sync)]
+    pub fn list_operations(&self) -> Vec<OperationSummary> {
+        self.drain_summaries().0
+    }
+
+    /// The last three operations, oldest first — the synchronous initial
+    /// value for the recent-payments list, so its first frame renders the
+    /// truth; `subscribe_recent_operations` then carries every change.
+    #[frb(sync)]
+    pub fn recent_operations(&self) -> Vec<OperationSummary> {
+        self.drain_summaries()
+            .0
+            .into_iter()
+            .rev()
+            .take(3)
+            .rev()
+            .collect()
+    }
+
+    /// Drain the full event log into summaries, returning them with the
+    /// log position the drain reached — the tail point a live subscription
+    /// continues from.
+    fn drain_summaries(&self) -> (Vec<OperationSummary>, EventLogId) {
         let names = self.federation_names_snapshot();
         let mut position = EventLogId::LOG_START;
         let mut summaries: Vec<OperationSummary> = Vec::new();
@@ -422,7 +443,7 @@ impl Pico {
             }
         }
 
-        summaries
+        (summaries, position)
     }
 
     /// Live ordered list of operation summaries (newest first) across
@@ -433,33 +454,14 @@ impl Pico {
     /// user opens the drawer.
     #[frb]
     pub async fn subscribe_recent_operations(&self, sink: StreamSink<Vec<OperationSummary>>) {
-        // Phase 1: drain history into the full summaries vector. No emits.
-        let mut summaries: Vec<OperationSummary> = Vec::new();
-        let mut position = EventLogId::LOG_START;
-        let names = self.federation_names_snapshot();
+        // Phase 1: drain history. Still emitted despite the widget seeding
+        // itself synchronously via `recent_operations` — an event landing
+        // between that seed and this drain would otherwise sit unemitted
+        // until the next one after it.
+        let (drained, mut position) = self.drain_summaries();
 
-        loop {
-            let batch = self.client.get_event_log(position, 1000);
-
-            for entry in &batch {
-                let fiat = self
-                    .db
-                    .begin_read()
-                    .get(&OperationFiat, &entry.1.operation)
-                    .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
-                if let Some(summary) = parse_summary(&entry.1, &names, fiat) {
-                    summaries.push(summary);
-                }
-            }
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                break;
-            }
-        }
-
-        summaries = summaries.into_iter().rev().take(3).rev().collect();
+        let mut summaries: Vec<OperationSummary> =
+            drained.into_iter().rev().take(3).rev().collect();
 
         if sink.add(summaries.clone()).is_err() {
             return;
@@ -605,8 +607,8 @@ impl Pico {
         }
     }
 
-    #[frb]
-    pub async fn save_contact(&self, lnurl: &LnurlWrapper, name: &str) {
+    #[frb(sync)]
+    pub fn save_contact(&self, lnurl: &LnurlWrapper, name: &str) {
         let dbtx = self.db.begin_write();
 
         dbtx.insert(&CONTACT, &lnurl.0, &name.to_string());
@@ -614,13 +616,13 @@ impl Pico {
         dbtx.commit();
     }
 
-    #[frb]
-    pub async fn get_contact_name(&self, lnurl: &LnurlWrapper) -> Option<String> {
+    #[frb(sync)]
+    pub fn get_contact_name(&self, lnurl: &LnurlWrapper) -> Option<String> {
         self.db.begin_read().get(&CONTACT, &lnurl.0)
     }
 
-    #[frb]
-    pub async fn list_contacts(&self) -> Vec<PicoContact> {
+    #[frb(sync)]
+    pub fn list_contacts(&self) -> Vec<PicoContact> {
         let mut contacts: Vec<_> = self.db.begin_read().iter(&CONTACT, |it| {
             it.map(|(lnurl, name)| PicoContact {
                 lnurl: LnurlWrapper(lnurl),
@@ -634,8 +636,8 @@ impl Pico {
         contacts
     }
 
-    #[frb]
-    pub async fn delete_contact(&self, lnurl: &LnurlWrapper) {
+    #[frb(sync)]
+    pub fn delete_contact(&self, lnurl: &LnurlWrapper) {
         let dbtx = self.db.begin_write();
 
         dbtx.remove(&CONTACT, &lnurl.0);

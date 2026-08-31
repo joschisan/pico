@@ -11,7 +11,7 @@ class ContactNameEntryScreen extends StatefulWidget {
   final Pico pico;
   final LnurlWrapper lnurl;
   final String? initialName;
-  final Future<void> Function()? onDelete;
+  final VoidCallback? onDelete;
 
   const ContactNameEntryScreen({
     super.key,
@@ -49,9 +49,7 @@ class _ContactNameEntryScreenState extends State<ContactNameEntryScreen> {
       throw 'Please enter a name';
     }
 
-    await widget.pico.saveContact(lnurl: widget.lnurl, name: name);
-
-    if (!mounted) return;
+    widget.pico.saveContact(lnurl: widget.lnurl, name: name);
 
     Navigator.of(context).pop(name);
   }

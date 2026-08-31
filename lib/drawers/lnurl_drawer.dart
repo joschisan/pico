@@ -61,7 +61,7 @@ class _LnurlDrawerState extends State<LnurlDrawer> {
         invoice: invoice,
       );
     } else {
-      final contactName = await widget.pico.getContactName(lnurl: widget.lnurl);
+      final contactName = widget.pico.getContactName(lnurl: widget.lnurl);
 
       if (!mounted) return;
 

@@ -10,7 +10,7 @@ import 'package:pico/widgets/settings_card_widget.dart';
 /// on. Same shape as the leave-federation drawer.
 class DeleteContactDrawer extends StatefulWidget {
   final String? name;
-  final Future<void> Function() onDelete;
+  final VoidCallback onDelete;
   final VoidCallback onSuccess;
 
   const DeleteContactDrawer({
@@ -23,7 +23,7 @@ class DeleteContactDrawer extends StatefulWidget {
   static Future<void> show(
     BuildContext context, {
     required String? name,
-    required Future<void> Function() onDelete,
+    required VoidCallback onDelete,
     required VoidCallback onSuccess,
   }) {
     return DrawerUtils.show(
@@ -41,10 +41,9 @@ class DeleteContactDrawer extends StatefulWidget {
 }
 
 class _DeleteContactDrawerState extends State<DeleteContactDrawer> {
+  // Async only to satisfy [AsyncButton]'s contract — deleting is sync.
   Future<void> _handleDelete() async {
-    await widget.onDelete();
-
-    if (!mounted) return;
+    widget.onDelete();
 
     Navigator.of(context).pop();
     widget.onSuccess();

@@ -28,30 +28,28 @@ class RecentPayments extends StatefulWidget implements Bleeds {
 }
 
 class _RecentPaymentsState extends State<RecentPayments> {
-  /// Null until the stream's first snapshot: rendering nothing then keeps
-  /// the empty-state text from flashing on every mount before the answer
-  /// arrives — an empty list is a fact, not a default.
-  List<OperationSummary>? _payments;
+  late List<OperationSummary> _payments;
   StreamSubscription<List<OperationSummary>>? _subscription;
 
-  /// Payments in the first snapshot render without the entry animation; only
+  /// Payments present at seed time render without the entry animation; only
   /// payments appearing after the screen opened grow in.
-  Set<String>? _initialIds;
+  late final Set<String> _initialIds;
 
   @override
   void initState() {
     super.initState();
+    // Seeded synchronously so the first frame renders the truth — list and
+    // empty state alike are facts, not defaults rendered while the
+    // stream's first snapshot is in flight.
+    _payments = widget.pico.recentOperations().reversed.toList();
+    _initialIds = _payments.map((p) => p.operation.display()).toSet();
     _subscription = widget.stream.listen(_onSnapshot);
   }
 
   void _onSnapshot(List<OperationSummary> snapshot) {
     if (!mounted) return;
 
-    setState(() {
-      final payments = snapshot.reversed.toList();
-      _payments = payments;
-      _initialIds ??= payments.map((p) => p.operation.display()).toSet();
-    });
+    setState(() => _payments = snapshot.reversed.toList());
   }
 
   @override
@@ -60,17 +58,13 @@ class _RecentPaymentsState extends State<RecentPayments> {
     super.dispose();
   }
 
-  Future<void> _openHistory() async {
-    final operations = await widget.pico.listOperations();
-
-    if (!mounted) return;
-
+  void _openHistory() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
             (_) => PaymentHistoryScreen(
               pico: widget.pico,
-              operations: operations.reversed.toList(),
+              operations: widget.pico.listOperations().reversed.toList(),
             ),
       ),
     );
@@ -79,10 +73,6 @@ class _RecentPaymentsState extends State<RecentPayments> {
   @override
   Widget build(BuildContext context) {
     final payments = _payments;
-
-    if (payments == null) {
-      return const SizedBox.shrink();
-    }
 
     // A BleedColumn so a hosting BleedColumn passes this through uninset:
     // the rows carry their own content padding and must reach the screen
@@ -117,7 +107,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
               KeyedSubtree(
                 key: ValueKey(payment.operation.display()),
                 child: AnimatedEntry(
-                  animate: !_initialIds!.contains(payment.operation.display()),
+                  animate: !_initialIds.contains(payment.operation.display()),
                   child: PaymentCard(
                     pico: widget.pico,
                     event: payment,

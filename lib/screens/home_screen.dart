@@ -639,9 +639,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      final seedPhrase = await widget.pico.seedPhrase();
-
-      if (!mounted) return;
+      final seedPhrase = widget.pico.seedPhrase();
 
       Navigator.of(context).push(
         MaterialPageRoute(
