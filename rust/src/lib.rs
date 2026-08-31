@@ -1,9 +1,9 @@
+mod app;
 mod client;
 mod currency;
 mod db;
 mod events;
 mod exchange;
-mod factory;
 mod fountain;
 mod frb_generated;
 mod lnurl;
@@ -20,10 +20,10 @@ use picomint_client::mint::ECash;
 use picomint_core::invite::InviteCode;
 use picomint_sqlite::Database;
 
-pub use client::{GatewayInfoWrapper, PicoClient};
+pub use app::{Pico, PicoContact};
+pub use client::{GatewayInfoWrapper, PicoAccount};
 pub use currency::{FiatCurrency, find_fiat_currency, list_fiat_currencies};
 pub use events::{Notification, OperationSummary, PaymentEvent, PaymentType};
-pub use factory::{PicoClientFactory, PicoContact};
 pub use fountain::{ECashDecoder, ECashEncoder};
 pub use lnurl::{LnurlWrapper, PayResponseWrapper, lnurl_fetch_limits, lnurl_resolve, parse_lnurl};
 

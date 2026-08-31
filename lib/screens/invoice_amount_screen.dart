@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/screens/display_invoice_screen.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 
 class InvoiceAmountScreen extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
 
   const InvoiceAmountScreen({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
   });
 
   @override
@@ -19,14 +19,16 @@ class InvoiceAmountScreen extends StatefulWidget {
 }
 
 class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
-  late final PicoClient _client = widget.client;
-
   Future<void> _handleConfirm(int amountSats) async {
-    final gateway = await _client.lnSelectGateway();
+    final gateway = await widget.pico.lnSelectGateway(
+      federationId: widget.account.federationId,
+    );
 
     final feeSats = gateway.gatewayFeeForReceiveAmount(amountSats: amountSats);
 
-    final invoice = await _client.lnReceive(
+    final invoice = await widget.pico.lnReceive(
+      federationId: widget.account.federationId,
+      account: widget.account.account,
       gateway: gateway,
       amountSat: amountSats,
     );
@@ -37,7 +39,7 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
       MaterialPageRoute(
         builder:
             (_) => DisplayInvoiceScreen(
-              client: _client,
+              pico: widget.pico,
               invoice: invoice,
               amount: amountSats,
               feeSats: feeSats,
@@ -52,8 +54,8 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
       appBar: AppBar(title: const Text('Receive Lightning')),
       body: SafeArea(
         child: AmountEntryWidget(
-          key: ValueKey(_client.federationId()),
-          client: _client,
+          key: ValueKey(widget.account.federationId),
+          pico: widget.pico,
           onConfirm: _handleConfirm,
         ),
       ),

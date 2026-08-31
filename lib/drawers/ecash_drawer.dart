@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
@@ -10,37 +10,33 @@ import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/widgets/payment_summary_row_widget.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 
-/// Confirms receiving an out-of-band ecash bundle, into the account named by
-/// [destination].
+/// Confirms receiving an out-of-band ecash bundle, into the account resolved
+/// by [_resolveDestination].
 class EcashDrawer extends StatefulWidget {
   /// The account in view when the bundle arrived. Used when it belongs to the
   /// bundle's federation — the balance the user is looking at is the one they
   /// mean — and ignored otherwise, since notes can only be received by the
   /// federation that issued them.
-  final PicoClient selected;
-  final PicoClientFactory clientFactory;
+  final PicoAccount selected;
+  final Pico pico;
   final ECashWrapper ecash;
 
   const EcashDrawer({
     super.key,
     required this.selected,
-    required this.clientFactory,
+    required this.pico,
     required this.ecash,
   });
 
   static Future<bool?> show(
     BuildContext context, {
-    required PicoClient selected,
-    required PicoClientFactory clientFactory,
+    required PicoAccount selected,
+    required Pico pico,
     required ECashWrapper ecash,
   }) {
     return DrawerUtils.show<bool>(
       context: context,
-      child: EcashDrawer(
-        selected: selected,
-        clientFactory: clientFactory,
-        ecash: ecash,
-      ),
+      child: EcashDrawer(selected: selected, pico: pico, ecash: ecash),
     );
   }
 
@@ -50,28 +46,30 @@ class EcashDrawer extends StatefulWidget {
 
 class _EcashDrawerState extends State<EcashDrawer> {
   // Cached so the lookup doesn't re-fire on every rebuild.
-  late final Future<PicoClient?> _destination = _resolveDestination();
+  late final Future<PicoAccount?> _destination = _resolveDestination();
 
   /// Which account the bundle lands in. The selected one when it belongs to
   /// the issuing federation, so scanning while parked on a page pays into the
   /// balance shown on it. Otherwise the bundle names a federation and nothing
-  /// more, and the factory answers with its first account — or `null` if the
-  /// user isn't joined to it at all.
-  Future<PicoClient?> _resolveDestination() async {
-    if (widget.selected.federationId() == widget.ecash.federationId()) {
+  /// more, and [Pico.account] answers with its primary account — or `null` if
+  /// the user isn't joined to it at all.
+  Future<PicoAccount?> _resolveDestination() async {
+    if (widget.selected.federationId == widget.ecash.federationId()) {
       return widget.selected;
     }
 
-    return widget.clientFactory.client(
-      federationId: widget.ecash.federationId(),
-    );
+    return widget.pico.account(federationId: widget.ecash.federationId());
   }
 
   Future<void> _handleReceive() async {
     final destination = await _destination;
     if (destination == null) throw Exception('Mint is unknown');
 
-    await destination.ecashReceive(ecash: widget.ecash);
+    await widget.pico.mintReceive(
+      federationId: destination.federationId,
+      account: destination.account,
+      ecash: widget.ecash,
+    );
 
     if (!mounted) return;
 
@@ -82,8 +80,6 @@ class _EcashDrawerState extends State<EcashDrawer> {
   Widget build(BuildContext context) {
     return DrawerShell(
       children: [
-        // The list stays the shell's direct child so it bleeds to the sheet
-        // edges; the async part sits inside it as one more row.
         BorderedList.column(
           children: [
             const PaymentSummaryRow(
@@ -91,21 +87,11 @@ class _EcashDrawerState extends State<EcashDrawer> {
               incoming: true,
               status: 'Receive',
             ),
-            // The fiat row needs a client for the cached rate, resolved
-            // async — until it lands (or if the federation is unknown) only
-            // the Bitcoin amount shows.
-            FutureBuilder<PicoClient?>(
-              future: _destination,
-              builder: (context, snapshot) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: amountRows(
-                    client: snapshot.data,
-                    amountSats: widget.ecash.amountSats(),
-                  ),
-                );
-              },
+            // The exchange-rate cache is app-wide, so the fiat row renders
+            // without waiting on the destination lookup.
+            ...amountRows(
+              pico: widget.pico,
+              amountSats: widget.ecash.amountSats(),
             ),
           ],
         ),

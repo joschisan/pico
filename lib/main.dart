@@ -7,7 +7,7 @@ import 'package:overlay_support/overlay_support.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:pico/bridge_generated.dart/frb_generated.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/screens/home_screen.dart';
 import 'package:pico/screens/landing_screen.dart';
 import 'package:pico/screens/onboarding_screen.dart';
@@ -28,9 +28,9 @@ void main() async {
 
   final db = await openDatabase(dbPath: dir.path);
 
-  final clientFactory = await PicoClientFactory.tryLoad(db: db);
+  final pico = await Pico.tryLoad(db: db);
 
-  if (clientFactory == null) {
+  if (pico == null) {
     runApp(PicoApp(home: LandingScreen(db: db)));
     return;
   }
@@ -39,17 +39,14 @@ void main() async {
   // can't transact, so it starts on onboarding. The home screen is only ever
   // mounted with a federation in hand, which is what lets it assume it has
   // one.
-  final clients = await clientFactory.clients();
+  final accounts = await pico.accounts();
 
   runApp(
     PicoApp(
       home:
-          clients.isEmpty
-              ? OnboardingScreen(clientFactory: clientFactory)
-              : HomeScreen(
-                clientFactory: clientFactory,
-                initialClients: clients,
-              ),
+          accounts.isEmpty
+              ? OnboardingScreen(pico: pico)
+              : HomeScreen(pico: pico, initialAccounts: accounts),
     ),
   );
 }

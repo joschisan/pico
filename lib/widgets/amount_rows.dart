@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/utils/currency_utils.dart';
 import 'package:pico/widgets/detail_row_widget.dart';
 
@@ -11,12 +11,8 @@ import 'package:pico/widgets/detail_row_widget.dart';
 ///
 /// The fiat row is converted from the cached rate without triggering a network
 /// fetch, and is omitted entirely (rather than left as an empty cell) when no
-/// rate has been cached yet — or when [client] is null (e.g. the issuing
-/// federation is unknown), in which case only the Bitcoin row is shown.
-List<Widget> amountRows({
-  required PicoClient? client,
-  required int amountSats,
-}) {
+/// rate has been cached yet.
+List<Widget> amountRows({required Pico pico, required int amountSats}) {
   final rows = <Widget>[
     DetailRow(
       icon: PhosphorIconsRegular.currencyBtc,
@@ -25,7 +21,7 @@ List<Widget> amountRows({
     ),
   ];
 
-  final fiat = client == null ? null : cachedFiat(client, amountSats);
+  final fiat = cachedFiat(pico, amountSats);
   if (fiat != null) {
     rows.add(
       DetailRow(

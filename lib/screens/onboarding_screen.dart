@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/drawers/scanner_drawer.dart';
 import 'package:pico/screens/home_screen.dart';
 import 'package:pico/utils/styles.dart';
@@ -17,32 +17,29 @@ import 'package:pico/widgets/circular_action_button_widget.dart';
 /// good — leaving the last federation is blocked, so nothing comes back here
 /// short of a restart with an empty wallet.
 class OnboardingScreen extends StatefulWidget {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
 
-  const OnboardingScreen({super.key, required this.clientFactory});
+  const OnboardingScreen({super.key, required this.pico});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  StreamSubscription<List<PicoClient>>? _subscription;
+  StreamSubscription<List<PicoAccount>>? _subscription;
 
   @override
   void initState() {
     super.initState();
-    _subscription = widget.clientFactory.subscribeClients().listen((clients) {
-      if (!mounted || clients.isEmpty) return;
+    _subscription = widget.pico.subscribeAccounts().listen((accounts) {
+      if (!mounted || accounts.isEmpty) return;
       // Clears the scanner and invite drawers along with this screen, so the
       // wallet lands on the home screen with nothing stacked behind it. The
       // invite drawer's own pop is a no-op once its route is gone.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder:
-              (_) => HomeScreen(
-                clientFactory: widget.clientFactory,
-                initialClients: clients,
-              ),
+              (_) => HomeScreen(pico: widget.pico, initialAccounts: accounts),
         ),
         (_) => false,
       );
@@ -76,14 +73,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             CircularActionButton(
               icon: PhosphorIconsRegular.qrCode,
               label: 'Scan',
-              // No client to hand the scanner — with none joined it accepts
+              // No account to hand the scanner — with none joined it accepts
               // invite codes only, which is exactly the one input this screen
               // is here to take.
               onTap:
                   () => ScannerDrawer.show(
                     context,
-                    client: null,
-                    clientFactory: widget.clientFactory,
+                    account: null,
+                    pico: widget.pico,
                   ),
             ),
           ],

@@ -1,7 +1,7 @@
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/utils/async_button_mixin.dart';
 import 'package:pico/screens/lnurl_amount_screen.dart';
@@ -76,13 +76,13 @@ class _ContactTileState extends State<_ContactTile> with AsyncButtonMixin {
 }
 
 class DisplayContactsScreen extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
 
   const DisplayContactsScreen({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
   });
 
   @override
@@ -107,7 +107,7 @@ class _DisplayContactsScreenState extends State<DisplayContactsScreen> {
   }
 
   Future<void> _loadContacts() async {
-    final contacts = await widget.clientFactory.listContacts();
+    final contacts = await widget.pico.listContacts();
     if (!mounted) return;
     setState(() {
       _contacts = contacts;
@@ -127,8 +127,8 @@ class _DisplayContactsScreenState extends State<DisplayContactsScreen> {
       MaterialPageRoute(
         builder:
             (_) => LnurlAmountScreen(
-              client: widget.client,
-              clientFactory: widget.clientFactory,
+              account: widget.account,
+              pico: widget.pico,
               lnurl: contact.lnurl,
               payResponse: payResponse,
               contactName: contact.name,
@@ -142,11 +142,11 @@ class _DisplayContactsScreenState extends State<DisplayContactsScreen> {
       MaterialPageRoute(
         builder:
             (_) => ContactNameEntryScreen(
-              clientFactory: widget.clientFactory,
+              pico: widget.pico,
               lnurl: contact.lnurl,
               initialName: contact.name,
               onDelete: () async {
-                await widget.clientFactory.deleteContact(lnurl: contact.lnurl);
+                await widget.pico.deleteContact(lnurl: contact.lnurl);
               },
             ),
       ),

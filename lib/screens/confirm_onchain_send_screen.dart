@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
@@ -14,7 +15,8 @@ import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
 
 class ConfirmOnchainSendScreen extends StatefulWidget {
-  final PicoClient client;
+  final PicoAccount account;
+  final Pico pico;
   final BitcoinAddressWrapper address;
   final int amountSats;
   final int feeSats;
@@ -25,7 +27,8 @@ class ConfirmOnchainSendScreen extends StatefulWidget {
 
   const ConfirmOnchainSendScreen({
     super.key,
-    required this.client,
+    required this.account,
+    required this.pico,
     required this.address,
     required this.amountSats,
     required this.feeSats,
@@ -42,9 +45,15 @@ class _ConfirmOnchainSendScreenState extends State<ConfirmOnchainSendScreen> {
     await requireBiometricAuth(context);
 
     if (widget.isMax) {
-      await widget.client.onchainSendMax(address: widget.address);
+      await widget.pico.walletSendMax(
+        federationId: widget.account.federationId,
+        account: widget.account.account,
+        address: widget.address,
+      );
     } else {
-      await widget.client.onchainSend(
+      await widget.pico.walletSend(
+        federationId: widget.account.federationId,
+        account: widget.account.account,
         address: widget.address,
         amountSats: widget.amountSats,
       );
@@ -67,7 +76,7 @@ class _ConfirmOnchainSendScreenState extends State<ConfirmOnchainSendScreen> {
               BorderedList.column(
                 children: [
                   ...amountRows(
-                    client: widget.client,
+                    pico: widget.pico,
                     amountSats: widget.amountSats,
                   ),
                   DetailRow(

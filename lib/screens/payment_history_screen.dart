@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/amount_visibility.dart';
 import 'package:pico/widgets/grouped_list_widget.dart';
@@ -12,12 +12,12 @@ import 'package:pico/drawers/payment_details_drawer.dart';
 import 'package:pico/utils/payment_utils.dart';
 
 class PaymentHistoryScreen extends StatefulWidget {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
   final List<OperationSummary> operations;
 
   const PaymentHistoryScreen({
     super.key,
-    required this.clientFactory,
+    required this.pico,
     required this.operations,
   });
 
@@ -142,12 +142,12 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
           itemBuilder:
               (context, payment) => PaymentCard(
                 key: ValueKey(payment.operationId),
-                clientFactory: widget.clientFactory,
+                pico: widget.pico,
                 event: payment,
                 onTap:
                     () => PaymentDetailsDrawer.show(
                       context,
-                      clientFactory: widget.clientFactory,
+                      pico: widget.pico,
                       event: payment,
                       display:
                           _showFiat ? BalanceDisplay.fiat : BalanceDisplay.sats,

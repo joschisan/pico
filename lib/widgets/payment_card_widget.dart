@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/utils/currency_utils.dart';
 import 'package:pico/utils/payment_utils.dart';
 import 'package:pico/widgets/amount_visibility.dart';
@@ -23,13 +23,13 @@ _Status? _classify(PaymentEvent event) => switch (event) {
 };
 
 class PaymentCard extends StatefulWidget {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
   final OperationSummary event;
   final VoidCallback onTap;
 
   const PaymentCard({
     super.key,
-    required this.clientFactory,
+    required this.pico,
     required this.event,
     required this.onTap,
   });
@@ -51,7 +51,7 @@ class _PaymentCardState extends State<PaymentCard> {
   @override
   void initState() {
     super.initState();
-    _subscription = widget.clientFactory
+    _subscription = widget.pico
         .subscribePaymentEvents(operationId: widget.event.operationId)
         .listen((e) {
           if (!mounted) return;

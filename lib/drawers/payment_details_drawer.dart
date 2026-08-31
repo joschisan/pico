@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/utils/currency_utils.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/styles.dart';
@@ -13,7 +13,7 @@ import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:share_plus/share_plus.dart';
 
 class PaymentDetailsDrawer extends StatefulWidget {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
   final OperationSummary event;
   // How the opening screen was rendering amounts. Passed in (rather than read
   // from an ancestor `AmountDisplay`) because the drawer is a modal route and
@@ -22,24 +22,20 @@ class PaymentDetailsDrawer extends StatefulWidget {
 
   const PaymentDetailsDrawer({
     super.key,
-    required this.clientFactory,
+    required this.pico,
     required this.event,
     required this.display,
   });
 
   static Future<void> show(
     BuildContext context, {
-    required PicoClientFactory clientFactory,
+    required Pico pico,
     required OperationSummary event,
     required BalanceDisplay display,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: PaymentDetailsDrawer(
-        clientFactory: clientFactory,
-        event: event,
-        display: display,
-      ),
+      child: PaymentDetailsDrawer(pico: pico, event: event, display: display),
     );
   }
 
@@ -54,7 +50,7 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
   @override
   void initState() {
     super.initState();
-    _subscription = widget.clientFactory
+    _subscription = widget.pico
         .subscribePaymentEvents(operationId: widget.event.operationId)
         .listen((e) {
           if (!mounted) return;
@@ -89,7 +85,7 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
                       _TimelineRow(
                         event: _events[i],
                         summary: widget.event,
-                        clientFactory: widget.clientFactory,
+                        pico: widget.pico,
                         isLast: i == _events.length - 1,
                         // Milliseconds since the previous event; null for the
                         // first event, which has nothing to measure against.
@@ -115,21 +111,21 @@ class _TimelineRow extends StatelessWidget {
   // The owning operation — carries the frozen fiat snapshot used to convert
   // this row's amounts when the fiat toggle is active.
   final OperationSummary summary;
-  final PicoClientFactory clientFactory;
+  final Pico pico;
   final bool isLast;
   final int? deltaMs;
 
   const _TimelineRow({
     required this.event,
     required this.summary,
-    required this.clientFactory,
+    required this.pico,
     required this.isLast,
     required this.deltaMs,
   });
 
   @override
   Widget build(BuildContext context) {
-    final desc = _describe(event, summary, clientFactory, context);
+    final desc = _describe(event, summary, pico, context);
     final scheme = Theme.of(context).colorScheme;
 
     return IntrinsicHeight(
@@ -265,7 +261,7 @@ void _share(String text) {
 _Description _describe(
   PaymentEvent event,
   OperationSummary summary,
-  PicoClientFactory clientFactory,
+  Pico pico,
   BuildContext context,
 ) {
   final scheme = Theme.of(context).colorScheme;

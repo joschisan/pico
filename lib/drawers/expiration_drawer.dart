@@ -2,37 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/widgets/balanced_text_widget.dart';
 
 class ExpirationDrawer extends StatelessWidget {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
   final int date;
   final InviteCodeWrapper? successor;
 
   const ExpirationDrawer({
     super.key,
-    required this.clientFactory,
+    required this.pico,
     required this.date,
     this.successor,
   });
 
   static Future<void> show(
     BuildContext context, {
-    required PicoClientFactory clientFactory,
+    required Pico pico,
     required int date,
     InviteCodeWrapper? successor,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: ExpirationDrawer(
-        clientFactory: clientFactory,
-        date: date,
-        successor: successor,
-      ),
+      child: ExpirationDrawer(pico: pico, date: date, successor: successor),
     );
   }
 
@@ -43,7 +39,7 @@ class ExpirationDrawer extends StatelessWidget {
   }
 
   Future<void> _joinSuccessor(BuildContext context) async {
-    await clientFactory.join(invite: successor!);
+    await pico.add(invite: successor!);
 
     if (!context.mounted) return;
 

@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/screens/confirm_onchain_send_screen.dart';
 import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/widgets/max_action_widget.dart';
 
 class OnchainAmountScreen extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
   final BitcoinAddressWrapper address;
 
   const OnchainAmountScreen({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
     required this.address,
   });
 
@@ -24,9 +24,8 @@ class OnchainAmountScreen extends StatefulWidget {
 
 class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
   Future<void> _handleConfirm(int amountSats) async {
-    final feeSats = await widget.client.onchainCalculateFees(
-      address: widget.address,
-      amountSats: amountSats,
+    final feeSats = await widget.pico.walletSendFee(
+      federationId: widget.account.federationId,
     );
 
     _confirm(amountSats: amountSats, feeSats: feeSats, isMax: false);
@@ -38,13 +37,15 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
   /// current when it is submitted, so a feerate that moves in between moves
   /// the amount with it.
   Future<void> _handleConfirmMax() async {
-    final amountSats = await widget.client.onchainMaxAmount();
+    final amountSats = await widget.pico.walletSendMaxAmount(
+      federationId: widget.account.federationId,
+      account: widget.account.account,
+    );
 
     if (amountSats <= 0) throw 'This account cannot cover the onchain fee';
 
-    final feeSats = await widget.client.onchainCalculateFees(
-      address: widget.address,
-      amountSats: amountSats,
+    final feeSats = await widget.pico.walletSendFee(
+      federationId: widget.account.federationId,
     );
 
     _confirm(amountSats: amountSats, feeSats: feeSats, isMax: true);
@@ -61,7 +62,8 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
       MaterialPageRoute(
         builder:
             (_) => ConfirmOnchainSendScreen(
-              client: widget.client,
+              account: widget.account,
+              pico: widget.pico,
               address: widget.address,
               amountSats: amountSats,
               feeSats: feeSats,
@@ -80,7 +82,7 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
       ),
       body: SafeArea(
         child: AmountEntryWidget(
-          client: widget.client,
+          pico: widget.pico,
           onConfirm: _handleConfirm,
           buttonText: 'Continue',
         ),

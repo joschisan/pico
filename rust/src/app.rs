@@ -15,28 +15,27 @@ use picomint_eventlog::EventLogId;
 use picomint_sqlite::{Database, DbRead};
 use tokio::sync::{Mutex, Notify};
 
-use crate::client::PicoClient;
+use crate::client::PicoAccount;
 use crate::db::{CONTACT, OperationFiat, RootEntropy, SelectedCurrency};
 use crate::events::{
     Notification, OperationSummary, PaymentEvent, is_summary_trigger, parse_notification,
     parse_payment_event, parse_summary,
 };
-use crate::exchange::{ExchangeRateCache, FRESHNESS, btc_price};
+use crate::exchange::{ExchangeRateCache, FRESHNESS, btc_price, fetch_exchange_rates};
 use crate::frb_generated::StreamSink;
 use crate::lnurl::LnurlWrapper;
 use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
 
 #[frb(opaque)]
-pub struct PicoClientFactory {
+pub struct Pico {
     db: Database,
     mnemonic: Mnemonic,
     /// The one picomint client, holding every joined federation as data.
     /// It owns the shared iroh endpoint, the federation configs and the
     /// daemon-wide event log; every operation names the federation it
-    /// acts on. There is no handle map to keep in sync — a [`PicoClient`]
-    /// is a pure derivation of `(federation, account)` plus the shared
-    /// handles, built on demand from the client's joined set.
-    client: Arc<Client>,
+    /// acts on. The money methods mirroring its `mint_` / `wallet_` / `ln_`
+    /// surface live in `crate::client`.
+    pub(crate) client: Arc<Client>,
     /// Wakes anyone iterating the client set when membership changes.
     /// `notify_waiters` is fire-and-forget; subscribers re-snapshot the
     /// joined set after waking.
@@ -74,7 +73,7 @@ impl PicoContact {
     }
 }
 
-impl PicoClientFactory {
+impl Pico {
     #[frb]
     pub async fn init(db: &DatabaseWrapper, mnemonic: &MnemonicWrapper) -> Result<Self, String> {
         let dbtx = db.0.begin_write();
@@ -128,32 +127,17 @@ impl PicoClientFactory {
         })
     }
 
-    /// The `(federation, account)` handle Dart holds: the shared client plus
-    /// the pair every money method passes back down, derived fresh — nothing
-    /// in it lives anywhere but here and the client's own tables.
-    fn handle(&self, federation_id: FederationId, account: Account, name: String) -> PicoClient {
-        PicoClient {
-            client: self.client.clone(),
-            federation_id,
-            account,
-            federation_name: name,
-            db: self.db.clone(),
-            exchange_rate_cache: self.exchange_rate_cache.clone(),
-        }
-    }
-
-    /// One handle per `(federation, account)` pair, federation-major and
-    /// account-minor — the order the home pager swipes in.
-    fn handles(&self) -> Vec<PicoClient> {
+    /// One row per joined `(federation, account)` pair, federation-major
+    /// and account-minor — the order the home pager swipes in.
+    fn rows(&self) -> Vec<PicoAccount> {
         self.client
             .federation_configs()
             .into_iter()
             .flat_map(|entry| {
                 Account::USER_ACCOUNTS
                     .into_iter()
-                    .map(move |account| (entry.0, account, entry.1.name.clone()))
+                    .map(move |account| PicoAccount::new(entry.0, account, entry.1.name.clone()))
             })
-            .map(|entry| self.handle(entry.0, entry.1, entry.2))
             .collect()
     }
 
@@ -162,14 +146,13 @@ impl PicoClientFactory {
         self.mnemonic.words().map(|s| s.to_string()).collect()
     }
 
-    /// A handle for every joined `(federation, account)` pair. All share the
-    /// one inner `Arc<Client>`, so callers all see the same connection state.
+    /// Every joined `(federation, account)` pair, as plain data.
     #[frb]
-    pub async fn clients(&self) -> Vec<PicoClient> {
-        self.handles()
+    pub async fn accounts(&self) -> Vec<PicoAccount> {
+        self.rows()
     }
 
-    /// Look up a federation's [`Account::PRIMARY`] client. `None` if the user
+    /// Look up a federation's [`Account::PRIMARY`] row. `None` if the user
     /// isn't joined to it, which is how the ecash drawer tells a bundle from
     /// a mint the wallet doesn't have.
     ///
@@ -179,17 +162,17 @@ impl PicoClientFactory {
     /// when the bundle belongs to its federation, and only asks here when it
     /// doesn't.
     #[frb]
-    pub async fn client(&self, federation_id: &str) -> Option<PicoClient> {
+    pub async fn account(&self, federation_id: &str) -> Option<PicoAccount> {
         let id = FederationId::from_str(federation_id).ok()?;
 
         let config = self.client.config(id)?;
 
-        Some(self.handle(id, Account::PRIMARY, config.name))
+        Some(PicoAccount::new(id, Account::PRIMARY, config.name))
     }
 
     /// Adds a federation, rebuilding whatever this seed already owns there.
     ///
-    /// One path, whether or not the seed has been here before: `join` scans
+    /// One path, whether or not the seed has been here before: `add` scans
     /// every account before anything is opened or written, and a seed that
     /// never held anything scans to nothing. There is no question to put to
     /// the user and so nothing for them to get wrong — answering "new mint"
@@ -200,7 +183,7 @@ impl PicoClientFactory {
     /// Returns only once the notes are back, so there is no progress to
     /// report and no half-joined federation to detect on the next launch.
     #[frb]
-    pub async fn join(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
+    pub async fn add(&self, invite: &InviteCodeWrapper) -> Result<PicoAccount, String> {
         // Rejected before the scan rather than after it. The invite code
         // commits to the federation id — `add` below refuses a config that
         // computes to any other — so a duplicate is knowable up front, and
@@ -235,9 +218,12 @@ impl PicoClientFactory {
         self.set_changed.notify_waiters();
 
         // Primary is what a caller that just joined gets handed: it is the
-        // account the pager lands on, and the only one a screen holding a
-        // single client can mean.
-        Ok(self.handle(federation_id, Account::PRIMARY, config.name))
+        // account the pager lands on.
+        Ok(PicoAccount::new(
+            federation_id,
+            Account::PRIMARY,
+            config.name,
+        ))
     }
 
     #[frb]
@@ -249,16 +235,55 @@ impl PicoClientFactory {
         dbtx.commit();
     }
 
-    #[frb]
-    pub async fn get_currency(&self) -> String {
-        self.currency().await
-    }
-
-    async fn currency(&self) -> String {
+    #[frb(sync)]
+    pub fn currency_code(&self) -> String {
         self.db
             .begin_read()
             .get(&SelectedCurrency, &())
             .unwrap_or_else(|| "USD".to_string())
+    }
+
+    /// Warm the exchange-rate cache, resolving only once a rate is actually
+    /// stored (or the fetch fails). Awaiting it lets callers repaint
+    /// fiat-dependent UI the moment a rate becomes available; a fresh cache
+    /// short-circuits without a network hit.
+    #[frb]
+    pub async fn prefetch_exchange_rates(&self) {
+        let _ = fetch_exchange_rates(self.exchange_rate_cache.clone()).await;
+    }
+
+    /// Converts a fiat amount in `currency_code` to sats. The caller supplies
+    /// the currency: the home screen reads it live via [`Self::currency_code`],
+    /// while the send/receive amount flow snapshots it once on entry (the user
+    /// can't change currency mid-flow), so this does no db read of its own.
+    #[frb]
+    pub async fn fiat_to_sats(
+        &self,
+        amount_fiat: f64,
+        currency_code: String,
+    ) -> Result<i64, String> {
+        fetch_exchange_rates(self.exchange_rate_cache.clone()).await?;
+
+        let guard = self.exchange_rate_cache.lock().await;
+        let (prices, _) = guard.as_ref().ok_or("No exchange rate cached")?;
+        let rate = btc_price(prices, &currency_code).ok_or("Currency not supported")?;
+
+        Ok(((amount_fiat / rate) * 100_000_000.0).round() as i64)
+    }
+
+    /// Converts `amount_sats` to `currency_code` using the cached exchange
+    /// rate, without triggering a network fetch. Returns `None` when no fresh
+    /// rate is cached, so callers can omit the fiat row rather than block on
+    /// the network. Currency is caller-supplied — see [`Self::fiat_to_sats`].
+    #[frb(sync)]
+    pub fn sats_to_fiat(&self, amount_sats: i64, currency_code: String) -> Option<f64> {
+        let guard = self.exchange_rate_cache.try_lock().ok()?;
+        let (prices, timestamp) = guard.as_ref()?;
+        if timestamp.elapsed() >= FRESHNESS {
+            return None;
+        }
+        let rate = btc_price(prices, &currency_code)?;
+        Some((amount_sats as f64 / 100_000_000.0) * rate)
     }
 
     /// Drop a federation: `Client::remove` shuts its runtime down, then
@@ -267,10 +292,10 @@ impl PicoClientFactory {
     /// config row. Re-joining the same federation later starts from a
     /// fresh ledger.
     #[frb]
-    pub async fn leave(&self, federation_id: &str) -> Result<(), String> {
+    pub async fn remove(&self, federation_id: &str) -> Result<(), String> {
         let fed_id = FederationId::from_str(federation_id).map_err(|e| e.to_string())?;
 
-        // A federation that is already gone is a leave that already
+        // A federation that is already gone is a removal that already
         // succeeded, not an error to surface — the drawer may fire twice.
         if self.client.config(fed_id).is_none() {
             return Ok(());
@@ -288,13 +313,13 @@ impl PicoClientFactory {
         Ok(())
     }
 
-    /// Live snapshot of every joined federation's handles; re-emits on every
-    /// set change (`join`/`leave`). Subscribers re-render passively
-    /// instead of re-fetching `clients()` after each navigation pop.
+    /// Live snapshot of every joined `(federation, account)` row; re-emits
+    /// on every set change (`add`/`remove`). Subscribers re-render passively
+    /// instead of re-fetching `accounts()` after each navigation pop.
     #[frb]
-    pub async fn subscribe_clients(&self, sink: StreamSink<Vec<PicoClient>>) {
+    pub async fn subscribe_accounts(&self, sink: StreamSink<Vec<PicoAccount>>) {
         loop {
-            let snapshot = self.handles();
+            let snapshot = self.rows();
             let set_changed = self.set_changed.notified();
             tokio::pin!(set_changed);
             if sink.add(snapshot).is_err() {
@@ -306,8 +331,8 @@ impl PicoClientFactory {
 
     /// Aggregated balance across every joined federation, in sats. Re-emits
     /// on any per-account balance change AND on set changes
-    /// (`join`/`leave`). The totals map survives rebuilds so a
-    /// join/leave doesn't reset the running sum to zero.
+    /// (`add`/`remove`). The totals map survives rebuilds so an
+    /// add/remove doesn't reset the running sum to zero.
     #[frb]
     pub async fn subscribe_global_balance(&self, sink: StreamSink<i64>) {
         let mut totals: HashMap<(FederationId, Account), i64> = HashMap::new();
@@ -342,7 +367,7 @@ impl PicoClientFactory {
             let mut merged = stream::select_all(tagged);
 
             // Re-arm the set-change notifier *before* emitting the
-            // initial sum, so a join/leave landing between the snapshot
+            // initial sum, so an add/remove landing between the snapshot
             // and the await still wakes us.
             let set_changed = self.set_changed.notified();
             tokio::pin!(set_changed);

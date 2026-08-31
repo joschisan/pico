@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
@@ -12,9 +13,14 @@ import 'package:pico/widgets/section_header_widget.dart';
 /// settings drawer alongside the row that opens this screen, so there is no
 /// destructive action up here.
 class ConnectionStatusScreen extends StatefulWidget {
-  final PicoClient client;
+  final PicoAccount account;
+  final Pico pico;
 
-  const ConnectionStatusScreen({super.key, required this.client});
+  const ConnectionStatusScreen({
+    super.key,
+    required this.account,
+    required this.pico,
+  });
 
   @override
   State<ConnectionStatusScreen> createState() => _ConnectionStatusScreenState();
@@ -25,12 +31,8 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
   // connections and emitting the current snapshot first, so dots don't
   // flicker in. Each entry is `(name, rttMs)`: a non-null RTT means that
   // guardian is connected, and carries its round-trip time in milliseconds.
-  late final Stream<List<(String, double?)>> _stream =
-      widget.client.subscribeConnectionStatus();
-
-  // Resolved once, above the status stream, so status updates don't re-trigger
-  // the lookup.
-  late final Future<String?> _name = widget.client.federationName();
+  late final Stream<List<(String, double?)>> _stream = widget.pico
+      .subscribeConnectionStatus(federationId: widget.account.federationId);
 
   // Round-trip time, sampled at connect. Sub-10ms links keep one decimal so
   // a fast guardian doesn't collapse to a misleading "0 ms".
@@ -43,77 +45,70 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Connectivity')),
-      body: FutureBuilder<String?>(
-        future: _name,
-        builder: (context, nameSnapshot) {
-          final name = nameSnapshot.data ?? 'Mint';
+      body: StreamBuilder<List<(String, double?)>>(
+        stream: _stream,
+        builder: (context, snapshot) {
+          final statuses = snapshot.data;
+          if (statuses == null) {
+            return const Center(child: smallSpinner);
+          }
 
-          return StreamBuilder<List<(String, double?)>>(
-            stream: _stream,
-            builder: (context, snapshot) {
-              final statuses = snapshot.data;
-              if (statuses == null) {
-                return const Center(child: smallSpinner);
-              }
+          final online = statuses.where((s) => s.$2 != null).length;
 
-              final online = statuses.where((s) => s.$2 != null).length;
-
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(0, 16, 0, 32),
-                child: BleedColumn(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(0, 16, 0, 32),
+            child: BleedColumn(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SectionHeader(title: 'Mint'),
+                BorderedList.column(
                   children: [
-                    const SectionHeader(title: 'Mint'),
-                    BorderedList.column(
-                      children: [
-                        ConnectionStatusHeader(
-                          name: name,
-                          online: online,
-                          total: statuses.length,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const SectionHeader(title: 'Guardians'),
-                    BorderedList.column(
-                      children: [
-                        for (final (name, rttMs) in statuses)
-                          ListTile(
-                            contentPadding: listTilePadding,
-                            leading: IconChip(
-                              icon: PhosphorIconsRegular.hardDrives,
-                              color: rttMs != null ? null : Colors.amber,
-                            ),
-                            // Stack name/status in the title (not subtitle) to
-                            // keep the single-line tile height.
-                            title: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(name, style: mediumStyle),
-                                Text(
-                                  rttMs != null ? 'Online' : 'Offline',
-                                  style: smallStyle.copyWith(
-                                    color: rttMs != null ? color : null,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            // Pico measures the link, so the round-trip time
-                            // rides along where conduit shows nothing.
-                            trailing:
-                                rttMs != null
-                                    ? Text(_formatRtt(rttMs), style: smallStyle)
-                                    : null,
-                          ),
-                      ],
+                    ConnectionStatusHeader(
+                      name: widget.account.federationName,
+                      online: online,
+                      total: statuses.length,
                     ),
                   ],
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                const SectionHeader(title: 'Guardians'),
+                BorderedList.column(
+                  children: [
+                    for (final (name, rttMs) in statuses)
+                      ListTile(
+                        contentPadding: listTilePadding,
+                        leading: IconChip(
+                          icon: PhosphorIconsRegular.hardDrives,
+                          color: rttMs != null ? null : Colors.amber,
+                        ),
+                        // Stack name/status in the title (not subtitle) to
+                        // keep the single-line tile height.
+                        title: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(name, style: mediumStyle),
+                            Text(
+                              rttMs != null ? 'Online' : 'Offline',
+                              style: smallStyle.copyWith(
+                                color: rttMs != null ? color : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Pico measures the link, so the round-trip time
+                        // rides along where conduit shows nothing.
+                        trailing:
+                            rttMs != null
+                                ? Text(_formatRtt(rttMs), style: smallStyle)
+                                : null,
+                      ),
+                  ],
+                ),
+              ],
+            ),
           );
         },
       ),

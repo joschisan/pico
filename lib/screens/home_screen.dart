@@ -5,9 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/drawers/ecash_drawer.dart';
@@ -52,11 +52,11 @@ import 'package:pico/screens/onchain_amount_screen.dart';
 const _pageSlideDuration = Duration(milliseconds: 500);
 const _pageSlideCurve = Curves.easeInOutSine;
 
-/// Identifies one entry in the factory's client map. A federation id alone
-/// no longer does: a federation contributes one client per account, and the
+/// Identifies one `(federation, account)` row. A federation id alone
+/// no longer does: a federation contributes one row per account, and the
 /// pager swipes through all of them.
-String _clientKey(PicoClient client) =>
-    '${client.federationId()}/${client.accountName()}';
+String _accountKey(PicoAccount account) =>
+    '${account.federationId}/${account.account}';
 
 /// Multimint home: the balance and the row naming its account form one
 /// swipeable page, so every balance is paged through rather than picked from
@@ -67,21 +67,21 @@ String _clientKey(PicoClient client) =>
 /// action spends from. The leading gear opens the settings drawer, which is
 /// where the account picker and leaving a mint live. The picomint
 /// eventlog is daemon-wide so recent ops and notifications come from a single
-/// factory-level stream — no per-client merging needed.
+/// app-level stream — no per-account merging needed.
 ///
 /// Always has a federation: it is only ever mounted with one — from startup
 /// or from [OnboardingScreen] — and the last one can't be left, so nothing
 /// here renders an empty state.
 class HomeScreen extends StatefulWidget {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
   // The federations already joined at mount, so the first frame has one to
   // render instead of waiting on this screen's own first emission.
-  final List<PicoClient> initialClients;
+  final List<PicoAccount> initialAccounts;
 
   const HomeScreen({
     super.key,
-    required this.clientFactory,
-    required this.initialClients,
+    required this.pico,
+    required this.initialAccounts,
   });
 
   @override
@@ -93,17 +93,17 @@ class _HomeScreenState extends State<HomeScreen> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
   StreamSubscription<Notification>? _notificationSubscription;
-  StreamSubscription<List<PicoClient>>? _clientsSubscription;
+  StreamSubscription<List<PicoAccount>>? _accountsSubscription;
 
   // Never empty: seeded from the mount-time list and only ever replaced by a
   // non-empty emission. Every account of every joined federation, shown or
   // not — [_visible] is the subset with pages.
-  late List<PicoClient> _clients = widget.initialClients;
-  // The accounts the pager carries, in [_clients] order. Derived state, kept
+  late List<PicoAccount> _accounts = widget.initialAccounts;
+  // The accounts the pager carries, in [_accounts] order. Derived state, kept
   // in a field rather than recomputed in `build` because the pager indexes
   // into it: the selection is a position in this list, so it has to hold
   // still between the frame that changes it and the jump that follows.
-  late List<PicoClient> _visible = _computeVisible();
+  late List<PicoAccount> _visible = _computeVisible();
   // Accounts opened from the picker this session. Deliberately not persisted:
   // an empty account you opened once would otherwise keep its page for good,
   // and anything you actually put money into keeps its page on its own.
@@ -111,28 +111,27 @@ class _HomeScreenState extends State<HomeScreen> {
   // Federations seen in the last emission, so the next one can tell an
   // arrival from a list that merely re-rendered.
   late Set<String> _knownFederationIds =
-      _clients.map((c) => c.federationId()).toSet();
+      _accounts.map((a) => a.federationId).toSet();
   // Holds the selection, not just the scroll: the account in view is the one
   // every action routes through, so this controller is the only place it is
   // recorded. Starts on the first federation's first account.
   final PageController _pageController = PageController();
-  // One session per account, mirroring the factory's
-  // `BTreeMap<(FederationId, Account), PicoClient>`: this is where a client's
+  // One session per account: this is where an account's
   // two streams are listened to, so everything below is a pure function of
-  // the values they carry. Keyed by [_clientKey] and kept in step with
-  // [_clients] by [_syncSessions], so a client in that list always has an
+  // the values they carry. Keyed by [_accountKey] and kept in step with
+  // [_accounts] by [_syncSessions], so an account in that list always has an
   // entry here.
   final Map<String, _FederationSession> _sessions = {};
   // Single cycling control over how balances read: sats → fiat → hidden.
   BalanceDisplay _balanceDisplay = BalanceDisplay.sats;
 
   // Whether a cached exchange rate exists, so the fiat step is reachable.
-  // The rate is global, so any client answers; `satsToFiat` is a cache-only
-  // sync read returning null when no fresh rate is stored.
+  // `satsToFiat` is a cache-only sync read returning null when no fresh rate
+  // is stored.
   bool get _fiatAvailable =>
-      _clients.first.satsToFiat(
+      widget.pico.satsToFiat(
         amountSats: 0,
-        currencyCode: _clients.first.currencyCode(),
+        currencyCode: widget.pico.currencyCode(),
       ) !=
       null;
 
@@ -151,51 +150,49 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _syncSessions(_clients);
-    _recentStream = widget.clientFactory.subscribeRecentOperations();
-    _notificationSubscription = widget.clientFactory
-        .subscribeNotifications()
-        .listen(_handleNotification);
-    _clientsSubscription = widget.clientFactory.subscribeClients().listen((
-      clients,
-    ) {
+    _syncSessions(_accounts);
+    _recentStream = widget.pico.subscribeRecentOperations();
+    _notificationSubscription = widget.pico.subscribeNotifications().listen(
+      _handleNotification,
+    );
+    _accountsSubscription = widget.pico.subscribeAccounts().listen((accounts) {
       if (!mounted) return;
       // Unreachable while the last federation can't be left, and kept so a
       // future path to an empty wallet degrades to a stale row rather than a
-      // crash on `_clients.first`.
-      if (clients.isEmpty) return;
+      // crash on `_accounts.first`.
+      if (accounts.isEmpty) return;
       setState(() {
-        _clients = clients;
-        final ids = clients.map((c) => c.federationId()).toSet();
+        _accounts = accounts;
+        final ids = accounts.map((a) => a.federationId).toSet();
         // A federation that wasn't in the previous list was just joined, so
         // page to it — the user acted on it, and a join that restored funds
         // arrives with them already on its balances. Its first page is its
-        // first account, since the factory orders by federation then account.
+        // first account, since the list orders by federation then account.
         // A federation that left needs no counterpart: the pager clamps onto
         // a page that still exists, and whatever it lands on is the
         // selection.
         final arrived = ids.difference(_knownFederationIds);
         _knownFederationIds = ids;
 
-        _syncSessions(clients);
+        _syncSessions(accounts);
         // A federation that left takes its accounts with it, so a re-join
         // later in the same session starts from a fresh primary.
-        final live = clients.map(_clientKey).toSet();
+        final live = accounts.map(_accountKey).toSet();
         _opened.removeWhere((key) => !live.contains(key));
         _visible = _computeVisible();
 
         if (arrived.isNotEmpty) {
           _pageTo(
-            _visible.indexWhere((c) => arrived.contains(c.federationId())),
+            _visible.indexWhere((a) => arrived.contains(a.federationId)),
             animate: true,
           );
         }
       });
-      // Warm each federation's exchange-rate cache so the fiat balance toggle
-      // and the send/receive fiat rows render from cache without blocking.
+      // Warm the exchange-rate cache so the fiat balance toggle and the
+      // send/receive fiat rows render from cache without blocking.
       // Repaint once the rates land so a balance shown in fiat updates from
       // its sats fallback without waiting for the next balance change.
-      Future.wait(clients.map((c) => c.prefetchExchangeRates())).then((_) {
+      widget.pico.prefetchExchangeRates().then((_) {
         if (mounted) setState(() {});
       });
     });
@@ -206,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _linkSubscription?.cancel();
     _notificationSubscription?.cancel();
-    _clientsSubscription?.cancel();
+    _accountsSubscription?.cancel();
     _pageController.dispose();
     for (final session in _sessions.values) {
       session.dispose();
@@ -246,30 +243,31 @@ class _HomeScreenState extends State<HomeScreen> {
   /// the scanner does for a camera frame. Returns whether anything recognised
   /// it, so the caller can say so when nothing did.
   bool _handleInput(String input) {
-    final client = _selectedClient();
+    final account = _selectedAccount();
 
     final parsers = [
       (
-        // Invite codes route to the join drawer, which owns the whole
+        // Invite codes route to the add drawer, which owns the whole
         // lifecycle — pasting an invite is a first-class way to join.
         parseInviteCode(invite: input),
-        (dynamic result) => InviteDrawer.show(
-          context,
-          invite: result,
-          clientFactory: widget.clientFactory,
-        ),
+        (dynamic result) =>
+            InviteDrawer.show(context, invite: result, pico: widget.pico),
       ),
       (
         parseBolt11Invoice(invoice: input),
-        (dynamic result) =>
-            LightningSendDrawer.show(context, client: client, invoice: result),
+        (dynamic result) => LightningSendDrawer.show(
+          context,
+          account: account,
+          pico: widget.pico,
+          invoice: result,
+        ),
       ),
       (
         parseEcash(ecash: input),
         (dynamic result) => EcashDrawer.show(
           context,
-          selected: client,
-          clientFactory: widget.clientFactory,
+          selected: account,
+          pico: widget.pico,
           ecash: result,
         ),
       ),
@@ -281,8 +279,8 @@ class _HomeScreenState extends State<HomeScreen> {
           MaterialPageRoute(
             builder:
                 (_) => OnchainAmountScreen(
-                  client: client,
-                  clientFactory: widget.clientFactory,
+                  account: account,
+                  pico: widget.pico,
                   address: result,
                 ),
           ),
@@ -292,8 +290,8 @@ class _HomeScreenState extends State<HomeScreen> {
         parseLnurl(request: input),
         (dynamic result) => LnurlDrawer.show(
           context,
-          client: client,
-          clientFactory: widget.clientFactory,
+          account: account,
+          pico: widget.pico,
           lnurl: result,
         ),
       ),
@@ -329,7 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// The account in view — a federation and one of its three balances — and
-  /// so the client every action routes through.
+  /// so the account every action routes through.
   ///
   /// Read from the pager rather than mirrored into state. A selection kept in
   /// both places has to be reconciled every time either moves — and the pager
@@ -343,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// read and the pager sits on its initial page; the clamp covers the frame
   /// between a federation leaving — taking three pages with it — and the
   /// pager laying out over the shorter list.
-  PicoClient _selectedClient() {
+  PicoAccount _selectedAccount() {
     final page = _pageController.hasClients ? _pageController.page : null;
     final index = (page ?? _pageController.initialPage.toDouble()).round();
 
@@ -378,24 +376,24 @@ class _HomeScreenState extends State<HomeScreen> {
   /// which account they mean and would otherwise each look its index up. The
   /// account may have no page — a balance can move in one the pager isn't
   /// carrying — in which case there is nowhere to slide to.
-  void _pageToClient(String key, {bool animate = false}) {
-    final index = _visible.indexWhere((c) => _clientKey(c) == key);
+  void _pageToAccount(String key, {bool animate = false}) {
+    final index = _visible.indexWhere((a) => _accountKey(a) == key);
 
     if (index >= 0) _pageTo(index, animate: animate);
   }
 
-  /// Brings [_sessions] into step with the client set: an account that
+  /// Brings [_sessions] into step with the account set: an account that
   /// arrived gets its streams opened, one that went gets them closed. A join
   /// brings three at once and a leave takes three, since a federation's
   /// accounts arrive and depart together. Called inside the same `setState`
-  /// that swaps [_clients], so the two never disagree by the time anything
+  /// that swaps [_accounts], so the two never disagree by the time anything
   /// builds.
-  void _syncSessions(List<PicoClient> clients) {
-    for (final client in clients) {
-      final key = _clientKey(client);
+  void _syncSessions(List<PicoAccount> accounts) {
+    for (final account in accounts) {
+      final key = _accountKey(account);
       if (_sessions.containsKey(key)) continue;
 
-      final session = _FederationSession(client);
+      final session = _FederationSession(widget.pico, account);
       // The balance as it stood the last time the listener below ran, so the
       // first value can be told from the ones after it: the first is the
       // account being read, and only a move past it is money arriving or
@@ -424,18 +422,18 @@ class _HomeScreenState extends State<HomeScreen> {
         // the jump [_refreshVisible] may have queued, so an account that just
         // earned its page slides over from where the user was rather than
         // being landed on.
-        if (moved) _pageToClient(key, animate: true);
+        if (moved) _pageToAccount(key, animate: true);
       });
       _sessions[key] = session;
     }
 
-    final keys = clients.map(_clientKey).toSet();
+    final keys = accounts.map(_accountKey).toSet();
     for (final key in _sessions.keys.toList()) {
       if (!keys.contains(key)) _sessions.remove(key)!.dispose();
     }
   }
 
-  /// Whether [client]'s account gets a page.
+  /// Whether [account] gets a page.
   ///
   /// Three accounts each is more pages than a wallet with two mints wants to
   /// swipe through when it is using one of them, so an account earns its page
@@ -445,22 +443,22 @@ class _HomeScreenState extends State<HomeScreen> {
   /// is what makes a restore that finds funds in an account nobody ever
   /// opened surface them instead of swallowing them. Either way the page is
   /// held for the session — spending the account empty doesn't take it.
-  bool _isVisible(PicoClient client) {
-    if (client.accountName() == primaryAccount) return true;
+  bool _isVisible(PicoAccount account) {
+    if (account.account == primaryAccount) return true;
 
-    return _opened.contains(_clientKey(client));
+    return _opened.contains(_accountKey(account));
   }
 
-  List<PicoClient> _computeVisible() {
-    final visible = _clients.where(_isVisible).toList();
+  List<PicoAccount> _computeVisible() {
+    final visible = _accounts.where(_isVisible).toList();
 
     // Unreachable — every federation contributes a primary — and kept so a
     // pager with no pages can never be built.
-    return visible.isEmpty ? _clients : visible;
+    return visible.isEmpty ? _accounts : visible;
   }
 
   /// Recomputes which accounts have pages, rebuilding only when the answer
-  /// changed. Called whenever one of its three inputs moves: the client set,
+  /// changed. Called whenever one of its three inputs moves: the account set,
   /// the stored set, and any account's balance.
   ///
   /// Holds the selection across the change. The pager indexes into
@@ -469,11 +467,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// selection is what every action spends from.
   void _refreshVisible() {
     final next = _computeVisible();
-    final keys = next.map(_clientKey).toList();
+    final keys = next.map(_accountKey).toList();
 
-    if (listEquals(keys, _visible.map(_clientKey).toList())) return;
+    if (listEquals(keys, _visible.map(_accountKey).toList())) return;
 
-    final selected = _clientKey(_selectedClient());
+    final selected = _accountKey(_selectedAccount());
 
     setState(() => _visible = next);
 
@@ -486,13 +484,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _pageTo(index >= 0 ? index : _primaryIndexOf(selected, next));
   }
 
-  /// Where [key]'s federation keeps its primary in [clients].
-  int _primaryIndexOf(String key, List<PicoClient> clients) {
+  /// Where [key]'s federation keeps its primary in [accounts].
+  int _primaryIndexOf(String key, List<PicoAccount> accounts) {
     final federationId = key.split('/').first;
 
-    final index = clients.indexWhere(
-      (c) =>
-          c.federationId() == federationId && c.accountName() == primaryAccount,
+    final index = accounts.indexWhere(
+      (a) => a.federationId == federationId && a.account == primaryAccount,
     );
 
     return index < 0 ? 0 : index;
@@ -501,86 +498,75 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Receive Lightning leads with the reusable code. The lnurl is read from
   /// the mint's locally mirrored gateway set, so this needs no round trip.
   void _onReceiveLightning() {
-    final client = _selectedClient();
+    final account = _selectedAccount();
 
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
             (_) => DisplayLnurlScreen(
-              client: client,
-              clientFactory: widget.clientFactory,
-              lnurl: client.lnurl(),
-              currencyCode: client.currencyCode(),
+              account: account,
+              pico: widget.pico,
+              lnurl: widget.pico.lnGenerateLnurl(
+                federationId: account.federationId,
+                account: account.account,
+              ),
+              currencyCode: widget.pico.currencyCode(),
             ),
       ),
     );
   }
 
   void _onSendEcash() {
-    final client = _selectedClient();
+    final account = _selectedAccount();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (_) => EcashAmountScreen(
-              client: client,
-              clientFactory: widget.clientFactory,
-            ),
+        builder: (_) => EcashAmountScreen(account: account, pico: widget.pico),
       ),
     );
   }
 
   void _onReceiveBitcoin() {
-    final client = _selectedClient();
+    final account = _selectedAccount();
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
-            (_) => WalletV2ReceiveScreen(
-              client: client,
-              clientFactory: widget.clientFactory,
-            ),
+            (_) => WalletV2ReceiveScreen(account: account, pico: widget.pico),
       ),
     );
   }
 
   void _onLightningAddress() {
-    final client = _selectedClient();
+    final account = _selectedAccount();
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
             (_) => LightningAddressEntryScreen(
-              client: client,
-              clientFactory: widget.clientFactory,
+              account: account,
+              pico: widget.pico,
             ),
       ),
     );
   }
 
   void _onContacts() {
-    final client = _selectedClient();
+    final account = _selectedAccount();
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
-            (_) => DisplayContactsScreen(
-              client: client,
-              clientFactory: widget.clientFactory,
-            ),
+            (_) => DisplayContactsScreen(account: account, pico: widget.pico),
       ),
     );
   }
 
   void _onScan() {
-    ScannerDrawer.show(
-      context,
-      client: _selectedClient(),
-      clientFactory: widget.clientFactory,
-    );
+    ScannerDrawer.show(context, account: _selectedAccount(), pico: widget.pico);
   }
 
   void _onSettings() {
     SettingsDrawer.show(
       context,
-      client: _selectedClient(),
-      clientFactory: widget.clientFactory,
+      account: _selectedAccount(),
+      pico: widget.pico,
       onSelectRecoveryPhrase: _openRecoveryPhrase,
       onSelectCurrency: _openCurrency,
       onSelectAccount: _openSelectAccount,
@@ -594,14 +580,17 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Lists the selected federation's accounts, including the ones without
   /// pages — this is the only place they can be reached from.
   void _openSelectAccount() {
-    final federationId = _selectedClient().federationId();
+    final federationId = _selectedAccount().federationId;
 
     SelectAccountDrawer.show(
       context,
       accounts: [
-        for (final client in _clients)
-          if (client.federationId() == federationId)
-            (client: client, balance: _sessions[_clientKey(client)]!.balance),
+        for (final account in _accounts)
+          if (account.federationId == federationId)
+            (
+              account: account,
+              balance: _sessions[_accountKey(account)]!.balance,
+            ),
       ],
       onSelect: _selectAccount,
     );
@@ -610,15 +599,15 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Gives [account] a page if it hasn't got one and swipes to it. Choosing
   /// an account is how an empty one is brought out — it holds its page for
   /// as long as the app is up, and past that only if it has a balance.
-  void _selectAccount(PicoClient account) {
-    _opened.add(_clientKey(account));
+  void _selectAccount(PicoAccount account) {
+    _opened.add(_accountKey(account));
 
     _refreshVisible();
 
     // Registered after the jump [_refreshVisible] may have queued, so the
     // slide starts from the page that was in view rather than from wherever
     // the new page pushed it.
-    _pageToClient(_clientKey(account), animate: true);
+    _pageToAccount(_accountKey(account), animate: true);
   }
 
   /// Lists every page the pager carries, across federations, and swipes to
@@ -629,23 +618,19 @@ class _HomeScreenState extends State<HomeScreen> {
     SelectPageDrawer.show(
       context,
       pages: [
-        for (final client in _visible)
-          (
-            client: client,
-            name: _sessions[_clientKey(client)]!.name,
-            balance: _sessions[_clientKey(client)]!.balance,
-          ),
+        for (final account in _visible)
+          (account: account, balance: _sessions[_accountKey(account)]!.balance),
       ],
-      selectedKey: _clientKey(_selectedClient()),
-      keyOf: _clientKey,
+      selectedKey: _accountKey(_selectedAccount()),
+      keyOf: _accountKey,
       onSelect: _selectPage,
     );
   }
 
-  /// Swipes to [client]'s page. It already has one — the picker only lists
+  /// Swipes to [account]'s page. It already has one — the picker only lists
   /// pages — so there is nothing to make visible first.
-  void _selectPage(PicoClient client) {
-    _pageToClient(_clientKey(client), animate: true);
+  void _selectPage(PicoAccount account) {
+    _pageToAccount(_accountKey(account), animate: true);
   }
 
   Future<void> _openRecoveryPhrase() async {
@@ -654,7 +639,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      final seedPhrase = await widget.clientFactory.seedPhrase();
+      final seedPhrase = await widget.pico.seedPhrase();
 
       if (!mounted) return;
 
@@ -671,8 +656,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openCurrency() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (_) => SelectCurrencyScreen(clientFactory: widget.clientFactory),
+        builder: (_) => SelectCurrencyScreen(pico: widget.pico),
       ),
     );
     // The currency may have changed; the rate map already covers every
@@ -684,7 +668,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openConnectivity() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ConnectionStatusScreen(client: _selectedClient()),
+        builder:
+            (_) => ConnectionStatusScreen(
+              account: _selectedAccount(),
+              pico: widget.pico,
+            ),
       ),
     );
   }
@@ -692,9 +680,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openLeave() {
     LeaveFederationDrawer.show(
       context,
-      client: _selectedClient(),
-      clientFactory: widget.clientFactory,
-      // Nothing to route: the factory's client stream drives the selection, so
+      account: _selectedAccount(),
+      pico: widget.pico,
+      // Nothing to route: the account stream drives the selection, so
       // the row and every action follow the remaining federations on their own.
       onSuccess: () {},
     );
@@ -703,7 +691,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showEventDetails(OperationSummary event) {
     PaymentDetailsDrawer.show(
       context,
-      clientFactory: widget.clientFactory,
+      pico: widget.pico,
       event: event,
       display: _balanceDisplay,
     );
@@ -753,7 +741,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 // height however many accounts there are.
                 _PageDots(count: _visible.length, controller: _pageController),
                 _FederationPager(
-                  clients: _visible,
+                  accounts: _visible,
+                  pico: widget.pico,
                   sessions: _sessions,
                   controller: _pageController,
                   display: _balanceDisplay,
@@ -806,7 +795,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 RecentPayments(
-                  clientFactory: widget.clientFactory,
+                  pico: widget.pico,
                   stream: _recentStream,
                   onTransactionTap: _showEventDetails,
                 ),
@@ -819,11 +808,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// The UI's half of one client: its two streams, listened to once and held
-/// open for as long as that account's federation is joined, plus the name
-/// they belong to. Held by [_HomeScreenState._sessions], one per entry in the
-/// factory's client map — so three per federation, each carrying its own
-/// account's balance and all three carrying the same connectivity.
+/// The UI's half of one account: its two streams, listened to once and held
+/// open for as long as that account's federation is joined. Held by
+/// [_HomeScreenState._sessions], one per joined `(federation, account)` row —
+/// so three per federation, each carrying its own account's balance and all
+/// three carrying the same connectivity.
 ///
 /// The bridge hands back a single-subscription stream per call, so a stream
 /// passed down the tree would throw the second time a widget listened to it.
@@ -840,34 +829,28 @@ class _FederationSession {
   final ValueNotifier<List<(String, double?)>?> connection = ValueNotifier(
     null,
   );
-  final ValueNotifier<String?> name = ValueNotifier(null);
 
   late final StreamSubscription<int> _balanceSubscription;
   late final StreamSubscription<List<(String, double?)>>
   _connectionSubscription;
-  bool _disposed = false;
 
-  _FederationSession(PicoClient client) {
-    _balanceSubscription = client.subscribeBalance().listen(
-      (sats) => balance.value = sats,
-    );
-    _connectionSubscription = client.subscribeConnectionStatus().listen(
-      (statuses) => connection.value = statuses,
-    );
-    // The one value that resolves rather than streaming. Guarded because a
-    // federation can be left before its name comes back.
-    client.federationName().then((value) {
-      if (!_disposed) name.value = value;
-    });
+  _FederationSession(Pico pico, PicoAccount account) {
+    _balanceSubscription = pico
+        .mintSubscribeBalance(
+          federationId: account.federationId,
+          account: account.account,
+        )
+        .listen((sats) => balance.value = sats);
+    _connectionSubscription = pico
+        .subscribeConnectionStatus(federationId: account.federationId)
+        .listen((statuses) => connection.value = statuses);
   }
 
   void dispose() {
-    _disposed = true;
     _balanceSubscription.cancel();
     _connectionSubscription.cancel();
     balance.dispose();
     connection.dispose();
-    name.dispose();
   }
 }
 
@@ -877,12 +860,12 @@ class _FederationSession {
 class _BalanceHero extends StatelessWidget {
   final ValueListenable<int?> balance;
   final BalanceDisplay display;
-  final PicoClient rateClient;
+  final Pico pico;
 
   const _BalanceHero({
     required this.balance,
     required this.display,
-    required this.rateClient,
+    required this.pico,
   });
 
   @override
@@ -897,7 +880,7 @@ class _BalanceHero extends StatelessWidget {
           // display (and a "Bitcoin" unit label to match).
           final fiat =
               (!hidden && display == BalanceDisplay.fiat)
-                  ? cachedFiat(rateClient, sats ?? 0)
+                  ? cachedFiat(pico, sats ?? 0)
                   : null;
 
           return AmountHeadline(
@@ -912,7 +895,7 @@ class _BalanceHero extends StatelessWidget {
                 // Convert each tweened sats value to fiat so it counts up on
                 // the same tween as the sats view.
                 formatter: (s) {
-                  final tweened = cachedFiat(rateClient, s);
+                  final tweened = cachedFiat(pico, s);
                   return tweened == null
                       ? ''
                       : formatFiat(fiat.currency, tweened.value);
@@ -949,7 +932,7 @@ class _BalanceHero extends StatelessWidget {
 /// view, so it is where you would look to go to another one, and a list beats
 /// a swipe once the balance you are after is several pages away.
 class _FederationRow extends StatelessWidget {
-  final ValueListenable<String?> name;
+  final String name;
   final String account;
   final ValueListenable<List<(String, double?)>?> connection;
   final VoidCallback onTap;
@@ -993,18 +976,8 @@ class _FederationRow extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ValueListenableBuilder<String?>(
-                valueListenable: name,
-                builder:
-                    (_, value, _) => Text(
-                      value ?? '\u2026',
-                      style: mediumStyle,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-              ),
+              Text(name, style: mediumStyle, overflow: TextOverflow.ellipsis),
               Text(
-                // Fixed at construction, so unlike the name and the chip
-                // above it there is nothing to wait for.
                 account,
                 style: smallStyle.copyWith(color: scheme.onSurfaceVariant),
               ),
@@ -1020,14 +993,16 @@ class _FederationRow extends StatelessWidget {
 /// that account's [_FederationSession]. Stateless, so the pager is free to
 /// build and drop pages as they scroll.
 class _FederationPage extends StatelessWidget {
-  final PicoClient client;
+  final PicoAccount account;
+  final Pico pico;
   final _FederationSession session;
   final BalanceDisplay display;
   final VoidCallback onBalanceTap;
   final VoidCallback onAccountTap;
 
   const _FederationPage({
-    required this.client,
+    required this.account,
+    required this.pico,
     required this.session,
     required this.display,
     required this.onBalanceTap,
@@ -1052,15 +1027,15 @@ class _FederationPage extends StatelessWidget {
             child: _BalanceHero(
               balance: session.balance,
               display: display,
-              rateClient: client,
+              pico: pico,
             ),
           ),
         ),
         BorderedList.column(
           children: [
             _FederationRow(
-              name: session.name,
-              account: client.accountName(),
+              name: account.federationName,
+              account: account.account,
               connection: session.connection,
               onTap: onAccountTap,
             ),
@@ -1082,8 +1057,9 @@ class _FederationPage extends StatelessWidget {
 /// same gesture rather than a second control, because choosing one is the
 /// same act as choosing a federation — it names the balance being spent.
 class _FederationPager extends StatelessWidget implements Bleeds {
-  final List<PicoClient> clients;
-  // Keyed by [_clientKey], one entry per client in [clients].
+  final List<PicoAccount> accounts;
+  final Pico pico;
+  // Keyed by [_accountKey], one entry per account in [accounts].
   final Map<String, _FederationSession> sessions;
   final PageController controller;
   final BalanceDisplay display;
@@ -1091,7 +1067,8 @@ class _FederationPager extends StatelessWidget implements Bleeds {
   final VoidCallback onAccountTap;
 
   const _FederationPager({
-    required this.clients,
+    required this.accounts,
+    required this.pico,
     required this.sessions,
     required this.controller,
     required this.display,
@@ -1099,9 +1076,10 @@ class _FederationPager extends StatelessWidget implements Bleeds {
     required this.onAccountTap,
   });
 
-  Widget _page(PicoClient client) => _FederationPage(
-    client: client,
-    session: sessions[_clientKey(client)]!,
+  Widget _page(PicoAccount account) => _FederationPage(
+    account: account,
+    pico: pico,
+    session: sessions[_accountKey(account)]!,
     display: display,
     onBalanceTap: onBalanceTap,
     onAccountTap: onAccountTap,
@@ -1121,19 +1099,19 @@ class _FederationPager extends StatelessWidget implements Bleeds {
         TickerMode(
           enabled: false,
           child: IgnorePointer(
-            child: Opacity(opacity: 0, child: _page(clients.first)),
+            child: Opacity(opacity: 0, child: _page(accounts.first)),
           ),
         ),
         Positioned.fill(
           child: PageView.builder(
             controller: controller,
-            itemCount: clients.length,
+            itemCount: accounts.length,
             // Settling on a page is the selection being made — the same
             // commitment a tap in a picker would have been, so it gets the
             // same haptic. Nothing to report upwards: the controller already
             // holds the selection.
             onPageChanged: (_) => HapticFeedback.selectionClick(),
-            itemBuilder: (context, index) => _page(clients[index]),
+            itemBuilder: (context, index) => _page(accounts[index]),
           ),
         ),
       ],

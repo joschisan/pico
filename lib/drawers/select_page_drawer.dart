@@ -8,15 +8,11 @@ import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
-/// One page of the pager as the list sees it: the client to page to when it
-/// is chosen, and the federation name and balance to show while choosing —
-/// both live, since the page they describe keeps updating behind the sheet.
-typedef PageOption =
-    ({
-      PicoClient client,
-      ValueListenable<String?> name,
-      ValueListenable<int?> balance,
-    });
+/// One page of the pager as the list sees it: the account to page to when it
+/// is chosen, and the balance to show while choosing — live, since the page
+/// it describes keeps updating behind the sheet. The federation name rides on
+/// the account itself.
+typedef PageOption = ({PicoAccount account, ValueListenable<int?> balance});
 
 /// Lists what the pager carries, so a balance can be jumped to instead of
 /// swiped to.
@@ -35,10 +31,10 @@ class SelectPageDrawer extends StatelessWidget {
   final String selectedKey;
 
   /// How a page is keyed, so [selectedKey] can be matched against a row
-  /// without this drawer knowing what identifies a client.
-  final String Function(PicoClient) keyOf;
+  /// without this drawer knowing what identifies an account.
+  final String Function(PicoAccount) keyOf;
 
-  final void Function(PicoClient) onSelect;
+  final void Function(PicoAccount) onSelect;
 
   const SelectPageDrawer({
     super.key,
@@ -52,8 +48,8 @@ class SelectPageDrawer extends StatelessWidget {
     BuildContext context, {
     required List<PageOption> pages,
     required String selectedKey,
-    required String Function(PicoClient) keyOf,
-    required void Function(PicoClient) onSelect,
+    required String Function(PicoAccount) keyOf,
+    required void Function(PicoAccount) onSelect,
   }) {
     return DrawerUtils.show(
       context: context,
@@ -84,30 +80,24 @@ class SelectPageDrawer extends StatelessWidget {
   }
 
   Widget _row(BuildContext context, PageOption page) {
-    final selected = keyOf(page.client) == selectedKey;
+    final selected = keyOf(page.account) == selectedKey;
 
-    return ValueListenableBuilder<String?>(
-      valueListenable: page.name,
-      builder: (context, name, _) {
-        return ValueListenableBuilder<int?>(
-          valueListenable: page.balance,
-          builder: (context, sats, _) {
-            return SettingsCard(
-              icon: PhosphorIconsRegular.stack,
-              iconColor:
-                  selected ? Theme.of(context).colorScheme.primary : null,
-              // The federation leads, as it does on the row this opens from:
-              // across mints it is what tells two pages apart, and the
-              // account is the qualifier under it.
-              title: name ?? '…',
-              subtitle: _subtitle(page.client.accountName(), sats),
-              // Every row picks, including the page already in view — landing
-              // back where you started is a fair answer to opening the list.
-              onTap: () {
-                Navigator.of(context).pop();
-                onSelect(page.client);
-              },
-            );
+    return ValueListenableBuilder<int?>(
+      valueListenable: page.balance,
+      builder: (context, sats, _) {
+        return SettingsCard(
+          icon: PhosphorIconsRegular.stack,
+          iconColor: selected ? Theme.of(context).colorScheme.primary : null,
+          // The federation leads, as it does on the row this opens from:
+          // across mints it is what tells two pages apart, and the
+          // account is the qualifier under it.
+          title: page.account.federationName,
+          subtitle: _subtitle(page.account.account, sats),
+          // Every row picks, including the page already in view — landing
+          // back where you started is a fair answer to opening the list.
+          onTap: () {
+            Navigator.of(context).pop();
+            onSelect(page.account);
           },
         );
       },
