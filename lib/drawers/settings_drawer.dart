@@ -68,7 +68,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
   // Cached so rebuilds don't re-subscribe. Each entry is `(name, rttMs)`: a
   // non-null RTT means that guardian is connected.
   late final Stream<List<(String, double?)>> _connectionStream = widget.pico
-      .subscribeConnectionStatus(federationId: widget.account.federationId);
+      .subscribeConnectionStatus(federation: widget.account.federation);
 
   late final String? _currencyName =
       findFiatCurrency(code: widget.pico.currencyCode())?.name;
@@ -102,7 +102,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             SettingsCard(
               icon: PhosphorIconsRegular.stack,
               title: 'Select Account',
-              subtitle: widget.account.account,
+              subtitle: widget.account.account.display(),
               onTap: () => _select(widget.onSelectAccount),
             ),
             _buildConnectivityCard(),

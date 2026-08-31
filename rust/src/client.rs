@@ -5,7 +5,6 @@
 //! [`PicoAccount`] is the plain data row the home pager renders.
 
 use std::collections::BTreeMap;
-use std::str::FromStr;
 
 use bitcoin::Amount as BtcAmount;
 use flutter_rust_bridge::frb;
@@ -18,7 +17,10 @@ use picomint_core::ln::gateway::{GatewayInfo, GatewayPk};
 
 use crate::app::Pico;
 use crate::frb_generated::StreamSink;
-use crate::{BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, InviteCodeWrapper};
+use crate::{
+    AccountWrapper, BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper,
+    FederationIdWrapper, InviteCodeWrapper,
+};
 
 /// Holds a caller-selected gateway plus its routing info, returned by
 /// [`Pico::ln_select_gateway`] and handed back to
@@ -60,52 +62,36 @@ impl GatewayInfoWrapper {
 }
 
 /// One `(federation, account)` row of the wallet, as plain data — every
-/// money method on [`Pico`] takes the two ids back. The name rides along so
-/// the pager renders without a config lookup per page.
+/// money method on [`Pico`] takes the typed pair back. The name rides along
+/// so the pager renders without a config lookup per page.
 #[frb]
 #[derive(Clone)]
 pub struct PicoAccount {
-    pub federation_id: String,
-    pub account: String,
+    pub federation: FederationIdWrapper,
+    pub account: AccountWrapper,
     pub federation_name: String,
 }
 
 impl PicoAccount {
     pub(crate) fn new(federation: FederationId, account: Account, name: String) -> PicoAccount {
         PicoAccount {
-            federation_id: federation.to_string(),
-            account: account.to_string(),
+            federation: FederationIdWrapper(federation),
+            account: AccountWrapper(account),
             federation_name: name,
         }
     }
-}
-
-/// The typed pair behind a [`PicoAccount`]'s two id strings. Errors are
-/// unreachable for ids that came out of [`Pico::accounts`] — they only fire
-/// on a corrupted caller.
-fn parse_pair(federation_id: &str, account: &str) -> Result<(FederationId, Account), String> {
-    let federation = FederationId::from_str(federation_id).map_err(|e| e.to_string())?;
-
-    let account = Account::USER_ACCOUNTS
-        .into_iter()
-        .find(|candidate| candidate.to_string() == account)
-        .ok_or_else(|| format!("Unknown account: {account}"))?;
-
-    Ok((federation, account))
 }
 
 impl Pico {
     #[frb]
     pub async fn mint_send(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         amount_sat: i64,
     ) -> Result<ECashWrapper, String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         self.client
-            .mint_send(federation, account, Amount::from_sat(amount_sat as u64))
+            .mint_send(federation.0, account.0, Amount::from_sat(amount_sat as u64))
             .await
             .map(ECashWrapper)
             .map_err(|e| e.to_string())
@@ -127,11 +113,13 @@ impl Pico {
     /// Infallible: `None` is an account holding no notes, which is the empty
     /// wallet the caller shouldn't have offered this on.
     #[frb]
-    pub async fn mint_send_max(&self, federation_id: &str, account: &str) -> Option<ECashWrapper> {
-        let (federation, account) = parse_pair(federation_id, account).ok()?;
-
+    pub async fn mint_send_max(
+        &self,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
+    ) -> Option<ECashWrapper> {
         self.client
-            .mint_send_max(federation, account)
+            .mint_send_max(federation.0, account.0)
             .ok()
             .flatten()
             .map(ECashWrapper)
@@ -140,14 +128,12 @@ impl Pico {
     #[frb]
     pub async fn mint_receive(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         ecash: &ECashWrapper,
     ) -> Result<(), String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         self.client
-            .mint_receive(federation, account, &ecash.0)
+            .mint_receive(federation.0, account.0, &ecash.0)
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
@@ -169,22 +155,20 @@ impl Pico {
     #[frb]
     pub async fn mint_transfer_to_primary(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
     ) -> Result<(), String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
-        let Ok(Some(ecash)) = self.client.mint_send_max(federation, account) else {
+        let Ok(Some(ecash)) = self.client.mint_send_max(federation.0, account.0) else {
             return Ok(());
         };
 
         if let Err(error) = self
             .client
-            .mint_receive(federation, Account::PRIMARY, &ecash)
+            .mint_receive(federation.0, Account::PRIMARY, &ecash)
         {
             // The guard row a receive takes is only committed on success, so
             // this second attempt isn't refused as a repeat of the first.
-            self.client.mint_receive(federation, account, &ecash).ok();
+            self.client.mint_receive(federation.0, account.0, &ecash).ok();
 
             return Err(error.to_string());
         }
@@ -195,15 +179,11 @@ impl Pico {
     #[frb]
     pub async fn mint_subscribe_balance(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         sink: StreamSink<i64>,
     ) {
-        let Ok(pair) = parse_pair(federation_id, account) else {
-            return;
-        };
-
-        let mut stream = self.client.mint_subscribe_balance(pair.0, pair.1);
+        let mut stream = self.client.mint_subscribe_balance(federation.0, account.0);
 
         while let Some(amount) = stream.next().await {
             if sink.add((amount.msat / 1000) as i64).is_err() {
@@ -218,13 +198,11 @@ impl Pico {
     #[frb]
     pub async fn ln_select_gateway(
         &self,
-        federation_id: &str,
+        federation: &FederationIdWrapper,
     ) -> Result<GatewayInfoWrapper, String> {
-        let federation = FederationId::from_str(federation_id).map_err(|e| e.to_string())?;
-
         let (gateway_pk, gateway_info) = self
             .client
-            .ln_select_gateway(federation)
+            .ln_select_gateway(federation.0)
             .map_err(|e| e.to_string())?;
 
         Ok(GatewayInfoWrapper {
@@ -236,17 +214,15 @@ impl Pico {
     #[frb]
     pub async fn ln_send(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
         invoice: &Bolt11InvoiceWrapper,
     ) -> Result<String, String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         self.client
             .ln_send(
-                federation,
-                account,
+                federation.0,
+                account.0,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
                 invoice.0.clone(),
@@ -259,18 +235,16 @@ impl Pico {
     #[frb]
     pub async fn ln_receive(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
         amount_sat: i64,
     ) -> Result<String, String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         let invoice = self
             .client
             .ln_receive(
-                federation,
-                account,
+                federation.0,
+                account.0,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
                 Amount::from_sat(amount_sat as u64),
@@ -293,16 +267,12 @@ impl Pico {
     #[frb]
     pub async fn ln_send_max_amount(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
     ) -> i64 {
-        let Ok(pair) = parse_pair(federation_id, account) else {
-            return 0;
-        };
-
         self.client
-            .ln_send_max_amount(pair.0, pair.1, &gateway.gateway_info)
+            .ln_send_max_amount(federation.0, account.0, &gateway.gateway_info)
             .map(|amount| (amount.msat / 1000) as i64)
             .unwrap_or(0)
     }
@@ -316,17 +286,15 @@ impl Pico {
     #[frb]
     pub async fn ln_send_max(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
         lnurl: String,
     ) -> Result<String, String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         self.client
             .ln_send_max(
-                federation,
-                account,
+                federation.0,
+                account.0,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
                 &lnurl,
@@ -338,24 +306,26 @@ impl Pico {
 
     /// Reads the locally mirrored gateway set, so it never touches the network.
     #[frb(sync)]
-    pub fn ln_generate_lnurl(&self, federation_id: &str, account: &str) -> String {
-        let Ok(pair) = parse_pair(federation_id, account) else {
-            return String::new();
-        };
-
+    pub fn ln_generate_lnurl(
+        &self,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
+    ) -> String {
         self.client
-            .ln_generate_lnurl(pair.0, pair.1, "http://159.223.25.182:8082/".to_string())
+            .ln_generate_lnurl(
+                federation.0,
+                account.0,
+                "http://159.223.25.182:8082/".to_string(),
+            )
             .unwrap_or_default()
     }
 
     /// The current flat per-tx fee for sending onchain, independent of
     /// address and amount.
     #[frb]
-    pub async fn wallet_send_fee(&self, federation_id: &str) -> Result<i64, String> {
-        let federation = FederationId::from_str(federation_id).map_err(|e| e.to_string())?;
-
+    pub async fn wallet_send_fee(&self, federation: &FederationIdWrapper) -> Result<i64, String> {
         self.client
-            .wallet_send_fee(federation)
+            .wallet_send_fee(federation.0)
             .await
             .map(|fee| fee.to_sat() as i64)
             .map_err(|e| e.to_string())
@@ -364,17 +334,15 @@ impl Pico {
     #[frb]
     pub async fn wallet_send(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         address: &BitcoinAddressWrapper,
         amount_sats: i64,
     ) -> Result<(), String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         self.client
             .wallet_send(
-                federation,
-                account,
+                federation.0,
+                account.0,
                 address.0.clone(),
                 BtcAmount::from_sat(amount_sats as u64),
                 None,
@@ -395,13 +363,11 @@ impl Pico {
     #[frb]
     pub async fn wallet_send_max_amount(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
     ) -> Result<i64, String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         self.client
-            .wallet_send_max_amount(federation, account)
+            .wallet_send_max_amount(federation.0, account.0)
             .await
             .map(|amount| amount.to_sat() as i64)
             .map_err(|e| e.to_string())
@@ -413,14 +379,12 @@ impl Pico {
     #[frb]
     pub async fn wallet_send_max(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
         address: &BitcoinAddressWrapper,
     ) -> Result<(), String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         self.client
-            .wallet_send_max(federation, account, address.0.clone())
+            .wallet_send_max(federation.0, account.0, address.0.clone())
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())
@@ -429,13 +393,11 @@ impl Pico {
     #[frb]
     pub async fn wallet_deposit_address(
         &self,
-        federation_id: &str,
-        account: &str,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
     ) -> Result<String, String> {
-        let (federation, account) = parse_pair(federation_id, account)?;
-
         self.client
-            .wallet_deposit_address(federation, account)
+            .wallet_deposit_address(federation.0, account.0)
             .await
             .map(|address| address.to_string())
             .map_err(|e| e.to_string())
@@ -453,14 +415,10 @@ impl Pico {
     #[frb]
     pub async fn subscribe_connection_status(
         &self,
-        federation_id: &str,
+        federation: &FederationIdWrapper,
         sink: StreamSink<Vec<(String, Option<f64>)>>,
     ) {
-        let Ok(federation) = FederationId::from_str(federation_id) else {
-            return;
-        };
-
-        let Some(config) = self.client.config(federation) else {
+        let Some(config) = self.client.config(federation.0) else {
             return;
         };
 
@@ -472,7 +430,7 @@ impl Pico {
             .map(|entry| (*entry.0, entry.1.name.clone()))
             .collect();
 
-        let Ok(mut stream) = self.client.connection_status_stream(federation) else {
+        let Ok(mut stream) = self.client.connection_status_stream(federation.0) else {
             return;
         };
 
@@ -499,22 +457,21 @@ impl Pico {
     /// completes or for a federation that has not announced an expiry —
     /// either way the UI screens that key off this stay dormant.
     #[frb]
-    pub async fn expiration_date(&self, federation_id: &str) -> Option<i64> {
-        let federation = FederationId::from_str(federation_id).ok()?;
-
+    pub async fn expiration_date(&self, federation: &FederationIdWrapper) -> Option<i64> {
         self.client
-            .expiry_status(federation)
+            .expiry_status(federation.0)
             .map(|status| status.timestamp as i64)
     }
 
     /// Invite for the announced successor federation, if the expiring
     /// federation named one. Same cache as [`Self::expiration_date`].
     #[frb]
-    pub async fn expiration_successor(&self, federation_id: &str) -> Option<InviteCodeWrapper> {
-        let federation = FederationId::from_str(federation_id).ok()?;
-
+    pub async fn expiration_successor(
+        &self,
+        federation: &FederationIdWrapper,
+    ) -> Option<InviteCodeWrapper> {
         self.client
-            .expiry_status(federation)?
+            .expiry_status(federation.0)?
             .successor
             .map(InviteCodeWrapper)
     }

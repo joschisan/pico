@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
+import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/animated_entry_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
@@ -16,11 +17,16 @@ class RecentPayments extends StatefulWidget implements Bleeds {
   final Stream<List<OperationSummary>> stream;
   final void Function(OperationSummary) onTransactionTap;
 
+  /// Read at tap time rather than taken as a value — the pager can swipe
+  /// to another account without this widget rebuilding.
+  final PicoAccount Function() selectedAccount;
+
   const RecentPayments({
     super.key,
     required this.pico,
     required this.stream,
     required this.onTransactionTap,
+    required this.selectedAccount,
   });
 
   @override
@@ -59,12 +65,21 @@ class _RecentPaymentsState extends State<RecentPayments> {
   }
 
   void _openHistory() {
+    final account = widget.selectedAccount();
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
             (_) => PaymentHistoryScreen(
               pico: widget.pico,
-              operations: widget.pico.listOperations().reversed.toList(),
+              operations:
+                  widget.pico
+                      .listOperations(
+                        federation: account.federation,
+                        account: account.account,
+                      )
+                      .reversed
+                      .toList(),
             ),
       ),
     );

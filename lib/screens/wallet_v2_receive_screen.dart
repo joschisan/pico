@@ -36,7 +36,7 @@ class _WalletV2ReceiveScreenState extends State<WalletV2ReceiveScreen> {
     setState(() => _address = null);
     try {
       final addr = await widget.pico.walletDepositAddress(
-        federationId: widget.account.federationId,
+        federation: widget.account.federation,
         account: widget.account.account,
       );
       if (!mounted) return;

@@ -54,11 +54,12 @@ class _EcashDrawerState extends State<EcashDrawer> {
   /// more, and [Pico.account] answers with its primary account — or `null` if
   /// the user isn't joined to it at all.
   Future<PicoAccount?> _resolveDestination() async {
-    if (widget.selected.federationId == widget.ecash.federationId()) {
+    if (widget.selected.federation.display() ==
+        widget.ecash.federation().display()) {
       return widget.selected;
     }
 
-    return widget.pico.account(federationId: widget.ecash.federationId());
+    return widget.pico.account(federation: widget.ecash.federation());
   }
 
   Future<void> _handleReceive() async {
@@ -66,7 +67,7 @@ class _EcashDrawerState extends State<EcashDrawer> {
     if (destination == null) throw Exception('Mint is unknown');
 
     await widget.pico.mintReceive(
-      federationId: destination.federationId,
+      federation: destination.federation,
       account: destination.account,
       ecash: widget.ecash,
     );

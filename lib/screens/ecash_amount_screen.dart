@@ -28,7 +28,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
 
     _display(
       await widget.pico.mintSend(
-        federationId: widget.account.federationId,
+        federation: widget.account.federation,
         account: widget.account.account,
         amountSat: amountSats,
       ),
@@ -43,7 +43,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
     await requireBiometricAuth(context);
 
     final ecash = await widget.pico.mintSendMax(
-      federationId: widget.account.federationId,
+      federation: widget.account.federation,
       account: widget.account.account,
     );
 

@@ -92,7 +92,7 @@ class SelectPageDrawer extends StatelessWidget {
           // across mints it is what tells two pages apart, and the
           // account is the qualifier under it.
           title: page.account.federationName,
-          subtitle: _subtitle(page.account.account, sats),
+          subtitle: _subtitle(page.account.account.display(), sats),
           // Every row picks, including the page already in view — landing
           // back where you started is a fair answer to opening the list.
           onTap: () {

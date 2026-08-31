@@ -72,14 +72,14 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
 
     if (widget.isMax) {
       await widget.pico.lnSendMax(
-        federationId: widget.account.federationId,
+        federation: widget.account.federation,
         account: widget.account.account,
         gateway: widget.gateway,
         lnurl: widget.lnurl.encode(),
       );
     } else {
       await widget.pico.lnSend(
-        federationId: widget.account.federationId,
+        federation: widget.account.federation,
         account: widget.account.account,
         gateway: widget.gateway,
         invoice: widget.invoice!,

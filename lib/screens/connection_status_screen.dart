@@ -32,7 +32,7 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
   // flicker in. Each entry is `(name, rttMs)`: a non-null RTT means that
   // guardian is connected, and carries its round-trip time in milliseconds.
   late final Stream<List<(String, double?)>> _stream = widget.pico
-      .subscribeConnectionStatus(federationId: widget.account.federationId);
+      .subscribeConnectionStatus(federation: widget.account.federation);
 
   // Round-trip time, sampled at connect. Sub-10ms links keep one decimal so
   // a fast guardian doesn't collapse to a misleading "0 ms".
