@@ -132,14 +132,12 @@ pub enum PaymentEvent {
     },
     MintSendSuccess {
         timestamp: i64,
-        /// Base32-encoded ecash; the Dart side parses it back into an
-        /// `ECashWrapper` on demand for the display screen. Deliberately a
-        /// `String` while the ids went typed: frb can't put opaque types
-        /// inside a value-typed enum without flipping the whole enum
-        /// opaque, and a timeline replay would otherwise decode every
-        /// historical bundle just to show a list. `ECash`'s `Display` is
-        /// `picomint_base32::encode`, the exact encoding `parse_ecash`
-        /// reverses.
+        /// Base32-encoded ecash, passed through verbatim from the picomint
+        /// event — which carries the string for the same reasons this
+        /// stays one while the ids went typed: replaying history shouldn't
+        /// decode every bundle, and frb can't put opaque types inside a
+        /// value-typed enum anyway. `parse_ecash` reverses it on demand
+        /// for the display screen.
         ecash: String,
     },
     MintSendFailure {
@@ -385,7 +383,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     if let Some(e) = entry.to_event::<MintSendSuccessEvent>() {
         return Some(PaymentEvent::MintSendSuccess {
             timestamp,
-            ecash: e.ecash.to_string(),
+            ecash: e.ecash.clone(),
         });
     }
     if entry.to_event::<MintSendFailureEvent>().is_some() {
