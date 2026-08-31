@@ -45,6 +45,7 @@ pub enum PaymentType {
 #[derive(Clone)]
 pub struct OperationSummary {
     pub operation_id: String,
+    pub federation_id: String,
     pub incoming: bool,
     pub payment_type: PaymentType,
     pub amount_sats: i64,
@@ -274,6 +275,7 @@ pub(crate) fn parse_summary(
 
     Some(OperationSummary {
         operation_id: entry.operation.to_string(),
+        federation_id: entry.federation.to_string(),
         incoming,
         payment_type,
         amount_sats,

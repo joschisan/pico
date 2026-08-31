@@ -540,6 +540,26 @@ impl Pico {
         }
     }
 
+    /// Resolves once no picomint state machine is still driving the
+    /// operation — immediately for settled or unknown ones. Backs the
+    /// in-progress spinner on payment cards; the outcome itself arrives
+    /// through `subscribe_payment_events`. Resolves immediately if either
+    /// id fails to parse.
+    #[frb]
+    pub async fn subscribe_completion(&self, federation_id: String, operation_id: String) {
+        let Ok(federation) = FederationId::from_str(&federation_id) else {
+            return;
+        };
+
+        let Ok(hash) = sha256::Hash::from_str(&operation_id) else {
+            return;
+        };
+
+        self.client
+            .subscribe_completion(federation, OperationId(hash))
+            .await;
+    }
+
     /// Toast/haptic stream — fires per matching event committed after
     /// the historical replay. Spans every federation, since the picomint
     /// eventlog is daemon-wide.

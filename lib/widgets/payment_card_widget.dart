@@ -41,6 +41,7 @@ class PaymentCard extends StatefulWidget {
 class _PaymentCardState extends State<PaymentCard> {
   _Status _status = _Status.ok;
   StreamSubscription<PaymentEvent>? _subscription;
+  bool _inProgress = true;
 
   DateTime get _time =>
       DateTime.fromMillisecondsSinceEpoch(widget.event.timestamp);
@@ -57,6 +58,14 @@ class _PaymentCardState extends State<PaymentCard> {
           if (!mounted) return;
           final next = _classify(e);
           if (next != null) setState(() => _status = next);
+        });
+    widget.pico
+        .subscribeCompletion(
+          federationId: widget.event.federationId,
+          operationId: widget.event.operationId,
+        )
+        .then((_) {
+          if (mounted) setState(() => _inProgress = false);
         });
     // A relative label goes stale where the federation name it replaced never
     // could: a settled payment emits no further events, so a row built as
@@ -128,9 +137,25 @@ class _PaymentCardState extends State<PaymentCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            PaymentTypeUtils.getLabel(widget.event.paymentType),
-            style: mediumStyle,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                PaymentTypeUtils.getLabel(widget.event.paymentType),
+                style: mediumStyle,
+              ),
+              if (_inProgress) ...[
+                const SizedBox(width: 6),
+                SizedBox(
+                  width: 10,
+                  height: 10,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: subColor,
+                  ),
+                ),
+              ],
+            ],
           ),
           Text(
             _age,
