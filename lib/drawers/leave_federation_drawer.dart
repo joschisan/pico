@@ -45,7 +45,7 @@ class LeaveFederationDrawer extends StatefulWidget {
 
 class _LeaveFederationDrawerState extends State<LeaveFederationDrawer> {
   Future<void> _handleLeaveFederation() async {
-    await widget.pico.remove(federationId: widget.account.federationId);
+    await widget.pico.remove(federation: widget.account.federation);
 
     if (!mounted) return;
 

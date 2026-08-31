@@ -40,7 +40,7 @@ class DisplayEcashScreen extends StatelessWidget {
   /// Reclaim the unsent eCash back into the balance, then return home.
   Future<void> _handleCancel(BuildContext context, PicoAccount account) async {
     await pico.mintReceive(
-      federationId: account.federationId,
+      federation: account.federation,
       account: account.account,
       ecash: ecash,
     );

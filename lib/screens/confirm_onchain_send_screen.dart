@@ -46,13 +46,13 @@ class _ConfirmOnchainSendScreenState extends State<ConfirmOnchainSendScreen> {
 
     if (widget.isMax) {
       await widget.pico.walletSendMax(
-        federationId: widget.account.federationId,
+        federation: widget.account.federation,
         account: widget.account.account,
         address: widget.address,
       );
     } else {
       await widget.pico.walletSend(
-        federationId: widget.account.federationId,
+        federation: widget.account.federation,
         account: widget.account.account,
         address: widget.address,
         amountSats: widget.amountSats,

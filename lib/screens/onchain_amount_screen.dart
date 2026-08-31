@@ -25,7 +25,7 @@ class OnchainAmountScreen extends StatefulWidget {
 class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
   Future<void> _handleConfirm(int amountSats) async {
     final feeSats = await widget.pico.walletSendFee(
-      federationId: widget.account.federationId,
+      federation: widget.account.federation,
     );
 
     _confirm(amountSats: amountSats, feeSats: feeSats, isMax: false);
@@ -38,14 +38,14 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
   /// the amount with it.
   Future<void> _handleConfirmMax() async {
     final amountSats = await widget.pico.walletSendMaxAmount(
-      federationId: widget.account.federationId,
+      federation: widget.account.federation,
       account: widget.account.account,
     );
 
     if (amountSats <= 0) throw 'This account cannot cover the onchain fee';
 
     final feeSats = await widget.pico.walletSendFee(
-      federationId: widget.account.federationId,
+      federation: widget.account.federation,
     );
 
     _confirm(amountSats: amountSats, feeSats: feeSats, isMax: true);

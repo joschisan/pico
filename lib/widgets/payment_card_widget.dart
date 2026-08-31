@@ -41,6 +41,13 @@ class PaymentCard extends StatefulWidget {
 class _PaymentCardState extends State<PaymentCard> {
   _Status _status = _Status.ok;
   StreamSubscription<PaymentEvent>? _subscription;
+  // Read synchronously so the first frame renders the truth — a default
+  // in either direction flickers for the other case while the answer
+  // round-trips the bridge.
+  late bool _inProgress = widget.pico.operationIsActive(
+    federation: widget.event.federation,
+    operation: widget.event.operation,
+  );
 
   DateTime get _time =>
       DateTime.fromMillisecondsSinceEpoch(widget.event.timestamp);
@@ -52,12 +59,22 @@ class _PaymentCardState extends State<PaymentCard> {
   void initState() {
     super.initState();
     _subscription = widget.pico
-        .subscribePaymentEvents(operationId: widget.event.operationId)
+        .subscribePaymentEvents(operation: widget.event.operation)
         .listen((e) {
           if (!mounted) return;
           final next = _classify(e);
           if (next != null) setState(() => _status = next);
         });
+    if (_inProgress) {
+      widget.pico
+          .subscribeCompletion(
+            federation: widget.event.federation,
+            operation: widget.event.operation,
+          )
+          .then((_) {
+            if (mounted) setState(() => _inProgress = false);
+          });
+    }
     // A relative label goes stale where the federation name it replaced never
     // could: a settled payment emits no further events, so a row built as
     // "Just now" would still read that an hour on. Half a minute keeps it
@@ -128,9 +145,25 @@ class _PaymentCardState extends State<PaymentCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            PaymentTypeUtils.getLabel(widget.event.paymentType),
-            style: mediumStyle,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                PaymentTypeUtils.getLabel(widget.event.paymentType),
+                style: mediumStyle,
+              ),
+              if (_inProgress) ...[
+                const SizedBox(width: 6),
+                SizedBox(
+                  width: 10,
+                  height: 10,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: subColor,
+                  ),
+                ),
+              ],
+            ],
           ),
           Text(
             _age,

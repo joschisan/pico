@@ -65,10 +65,10 @@ class _SelectCurrencyScreenState extends State<SelectCurrencyScreen> {
               ),
               // Picking is the confirmation — set the currency and return to
               // settings, which re-reads the name on the way back.
-              onTap: () async {
-                await widget.pico.setCurrency(currencyCode: currency.code);
+              onTap: () {
+                widget.pico.setCurrency(currencyCode: currency.code);
 
-                if (context.mounted) Navigator.of(context).pop();
+                Navigator.of(context).pop();
               },
             ),
       ),

@@ -37,7 +37,7 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
     );
 
     final gateway = await widget.pico.lnSelectGateway(
-      federationId: widget.account.federationId,
+      federation: widget.account.federation,
     );
 
     final feeSats = gateway.gatewayFeeForInvoice(invoice: invoice);
@@ -63,11 +63,11 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   /// max path exists precisely to leave none.
   Future<void> _handleConfirmMax() async {
     final gateway = await widget.pico.lnSelectGateway(
-      federationId: widget.account.federationId,
+      federation: widget.account.federation,
     );
 
     final amountSats = await widget.pico.lnSendMaxAmount(
-      federationId: widget.account.federationId,
+      federation: widget.account.federation,
       account: widget.account.account,
       gateway: gateway,
     );

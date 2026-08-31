@@ -1,5 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::str::FromStr;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use flutter_rust_bridge::frb;
@@ -9,7 +8,6 @@ use iroh::Endpoint;
 use iroh::endpoint::presets::N0;
 use iroh_mdns_address_lookup::MdnsAddressLookup;
 use picomint_client::{Account, Client, Mnemonic, OperationId};
-use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
 use picomint_eventlog::EventLogId;
 use picomint_sqlite::{Database, DbRead};
@@ -24,7 +22,10 @@ use crate::events::{
 use crate::exchange::{ExchangeRateCache, FRESHNESS, btc_price, fetch_exchange_rates};
 use crate::frb_generated::StreamSink;
 use crate::lnurl::LnurlWrapper;
-use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
+use crate::{
+    AccountWrapper, DatabaseWrapper, FederationIdWrapper, InviteCodeWrapper, MnemonicWrapper,
+    OperationIdWrapper,
+};
 
 #[frb(opaque)]
 pub struct Pico {
@@ -141,14 +142,14 @@ impl Pico {
             .collect()
     }
 
-    #[frb]
-    pub async fn seed_phrase(&self) -> Vec<String> {
+    #[frb(sync)]
+    pub fn seed_phrase(&self) -> Vec<String> {
         self.mnemonic.words().map(|s| s.to_string()).collect()
     }
 
     /// Every joined `(federation, account)` pair, as plain data.
-    #[frb]
-    pub async fn accounts(&self) -> Vec<PicoAccount> {
+    #[frb(sync)]
+    pub fn accounts(&self) -> Vec<PicoAccount> {
         self.rows()
     }
 
@@ -161,13 +162,11 @@ impl Pico {
     /// not the usual path: the drawer receives into the account on screen
     /// when the bundle belongs to its federation, and only asks here when it
     /// doesn't.
-    #[frb]
-    pub async fn account(&self, federation_id: &str) -> Option<PicoAccount> {
-        let id = FederationId::from_str(federation_id).ok()?;
+    #[frb(sync)]
+    pub fn account(&self, federation: &FederationIdWrapper) -> Option<PicoAccount> {
+        let config = self.client.config(federation.0)?;
 
-        let config = self.client.config(id)?;
-
-        Some(PicoAccount::new(id, Account::PRIMARY, config.name))
+        Some(PicoAccount::new(federation.0, Account::PRIMARY, config.name))
     }
 
     /// Adds a federation, rebuilding whatever this seed already owns there.
@@ -226,8 +225,8 @@ impl Pico {
         ))
     }
 
-    #[frb]
-    pub async fn set_currency(&self, currency_code: &str) {
+    #[frb(sync)]
+    pub fn set_currency(&self, currency_code: &str) {
         let dbtx = self.db.begin_write();
 
         dbtx.insert(&SelectedCurrency, &(), &currency_code.to_string());
@@ -292,12 +291,10 @@ impl Pico {
     /// config row. Re-joining the same federation later starts from a
     /// fresh ledger.
     #[frb]
-    pub async fn remove(&self, federation_id: &str) -> Result<(), String> {
-        let fed_id = FederationId::from_str(federation_id).map_err(|e| e.to_string())?;
-
+    pub async fn remove(&self, federation: &FederationIdWrapper) -> Result<(), String> {
         // A federation that is already gone is a removal that already
         // succeeded, not an error to surface — the drawer may fire twice.
-        if self.client.config(fed_id).is_none() {
+        if self.client.config(federation.0).is_none() {
             return Ok(());
         }
 
@@ -305,7 +302,7 @@ impl Pico {
         // federation's client state, not something a user joins or leaves
         // individually.
         self.client
-            .remove(fed_id)
+            .remove(federation.0)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -390,13 +387,43 @@ impl Pico {
         }
     }
 
-    /// One-shot list of every operation across every federation in
+    /// One-shot history of the operations `(federation, account)` ran, in
     /// chronological order (oldest first — Dart reverses for display).
-    /// Cards rendered from this snapshot stay static; live status is
-    /// reachable only by opening the per-op drawer.
-    #[frb]
-    pub async fn list_operations(&self) -> Vec<OperationSummary> {
-        let names = self.federation_names_snapshot();
+    /// Filtered here rather than in Dart so only the account's rows cross
+    /// the bridge. Cards rendered from this snapshot stay static; live
+    /// status is reachable only by opening the per-op drawer.
+    #[frb(sync)]
+    pub fn list_operations(
+        &self,
+        federation: &FederationIdWrapper,
+        account: &AccountWrapper,
+    ) -> Vec<OperationSummary> {
+        self.drain_summaries(Some((federation.0, account.0))).0
+    }
+
+    /// The last three operations across every federation, oldest first —
+    /// the synchronous initial value for the recent-payments list, so its
+    /// first frame renders the truth; `subscribe_recent_operations` then
+    /// carries every change.
+    #[frb(sync)]
+    pub fn recent_operations(&self) -> Vec<OperationSummary> {
+        self.drain_summaries(None)
+            .0
+            .into_iter()
+            .rev()
+            .take(3)
+            .rev()
+            .collect()
+    }
+
+    /// Drain the full event log into summaries, returning them with the
+    /// log position the drain reached — the tail point a live subscription
+    /// continues from. `scope` narrows to one `(federation, account)`;
+    /// `None` spans everything.
+    fn drain_summaries(
+        &self,
+        scope: Option<(FederationId, Account)>,
+    ) -> (Vec<OperationSummary>, EventLogId) {
         let mut position = EventLogId::LOG_START;
         let mut summaries: Vec<OperationSummary> = Vec::new();
 
@@ -404,12 +431,17 @@ impl Pico {
             let batch = self.client.get_event_log(position, 1000);
 
             for entry in &batch {
+                if let Some(scope) = scope
+                    && (entry.1.federation, entry.1.account) != scope
+                {
+                    continue;
+                }
                 let fiat = self
                     .db
                     .begin_read()
                     .get(&OperationFiat, &entry.1.operation)
                     .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
-                if let Some(summary) = parse_summary(&entry.1, &names, fiat) {
+                if let Some(summary) = parse_summary(&entry.1, fiat) {
                     summaries.push(summary);
                 }
             }
@@ -421,7 +453,7 @@ impl Pico {
             }
         }
 
-        summaries
+        (summaries, position)
     }
 
     /// Live ordered list of operation summaries (newest first) across
@@ -432,47 +464,26 @@ impl Pico {
     /// user opens the drawer.
     #[frb]
     pub async fn subscribe_recent_operations(&self, sink: StreamSink<Vec<OperationSummary>>) {
-        // Phase 1: drain history into the full summaries vector. No emits.
-        let mut summaries: Vec<OperationSummary> = Vec::new();
-        let mut position = EventLogId::LOG_START;
-        let names = self.federation_names_snapshot();
+        // Phase 1: drain history. Still emitted despite the widget seeding
+        // itself synchronously via `recent_operations` — an event landing
+        // between that seed and this drain would otherwise sit unemitted
+        // until the next one after it.
+        let (drained, mut position) = self.drain_summaries(None);
 
-        loop {
-            let batch = self.client.get_event_log(position, 1000);
-
-            for entry in &batch {
-                let fiat = self
-                    .db
-                    .begin_read()
-                    .get(&OperationFiat, &entry.1.operation)
-                    .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
-                if let Some(summary) = parse_summary(&entry.1, &names, fiat) {
-                    summaries.push(summary);
-                }
-            }
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                break;
-            }
-        }
-
-        summaries = summaries.into_iter().rev().take(3).rev().collect();
+        let mut summaries: Vec<OperationSummary> =
+            drained.into_iter().rev().take(3).rev().collect();
 
         if sink.add(summaries.clone()).is_err() {
             return;
         }
 
-        // Phase 2: tail live events. Re-snapshot names per batch so a
-        // newly-joined federation's name lands on its own first event.
+        // Phase 2: tail live events.
         let notify: Arc<Notify> = self.client.event_notify();
 
         loop {
             let notified = notify.notified();
 
             let batch = self.client.get_event_log(position, 1000);
-            let names = self.federation_names_snapshot();
 
             for entry in &batch {
                 // Price each new payment as we observe it, so the summary we
@@ -483,7 +494,7 @@ impl Pico {
                 } else {
                     None
                 };
-                if let Some(summary) = parse_summary(&entry.1, &names, fiat) {
+                if let Some(summary) = parse_summary(&entry.1, fiat) {
                     summaries.push(summary);
                 }
             }
@@ -500,35 +511,19 @@ impl Pico {
         }
     }
 
-    /// Snapshot of joined federation ids → names. Used to resolve
-    /// `OperationSummary.federation_name` at parse time.
-    fn federation_names_snapshot(&self) -> BTreeMap<FederationId, String> {
-        self.client
-            .federation_configs()
-            .into_iter()
-            .map(|entry| (entry.0, entry.1.name))
-            .collect()
-    }
-
     /// Live tail of every picomint event for a single operation, parsed
     /// into the rich [`PaymentEvent`] enum for the details drawer timeline.
     /// Replays existing events first (oldest → newest) then yields new
-    /// ones as they're committed. Silently exits if `operation_id` doesn't
-    /// parse as a valid sha256 hash. Operation ids are globally unique so
+    /// ones as they're committed. Operation ids are globally unique so
     /// no federation context is required — reads the daemon-wide eventlog
     /// directly.
     #[frb]
     pub async fn subscribe_payment_events(
         &self,
-        operation_id: String,
+        operation: &OperationIdWrapper,
         sink: StreamSink<PaymentEvent>,
     ) {
-        let Ok(hash) = sha256::Hash::from_str(&operation_id) else {
-            return;
-        };
-        let op = OperationId(hash);
-
-        let mut stream = self.client.subscribe_operation_events(op);
+        let mut stream = self.client.subscribe_operation_events(operation.0);
 
         while let Some(entry) = stream.next().await {
             let Some(event) = parse_payment_event(&entry) else {
@@ -538,6 +533,33 @@ impl Pico {
                 break;
             }
         }
+    }
+
+    /// Whether any picomint state machine is still driving the operation —
+    /// the synchronous initial value for the payment-card spinner, so the
+    /// first frame renders the truth instead of a guess.
+    #[frb(sync)]
+    pub fn operation_is_active(
+        &self,
+        federation: &FederationIdWrapper,
+        operation: &OperationIdWrapper,
+    ) -> bool {
+        self.client.operation_is_active(federation.0, operation.0)
+    }
+
+    /// Resolves once no picomint state machine is still driving the
+    /// operation — immediately for settled or unknown ones. Backs the
+    /// in-progress spinner on payment cards; the outcome itself arrives
+    /// through `subscribe_payment_events`.
+    #[frb]
+    pub async fn subscribe_completion(
+        &self,
+        federation: &FederationIdWrapper,
+        operation: &OperationIdWrapper,
+    ) {
+        self.client
+            .subscribe_completion(federation.0, operation.0)
+            .await;
     }
 
     /// Toast/haptic stream — fires per matching event committed after
@@ -583,8 +605,8 @@ impl Pico {
         }
     }
 
-    #[frb]
-    pub async fn save_contact(&self, lnurl: &LnurlWrapper, name: &str) {
+    #[frb(sync)]
+    pub fn save_contact(&self, lnurl: &LnurlWrapper, name: &str) {
         let dbtx = self.db.begin_write();
 
         dbtx.insert(&CONTACT, &lnurl.0, &name.to_string());
@@ -592,13 +614,13 @@ impl Pico {
         dbtx.commit();
     }
 
-    #[frb]
-    pub async fn get_contact_name(&self, lnurl: &LnurlWrapper) -> Option<String> {
+    #[frb(sync)]
+    pub fn get_contact_name(&self, lnurl: &LnurlWrapper) -> Option<String> {
         self.db.begin_read().get(&CONTACT, &lnurl.0)
     }
 
-    #[frb]
-    pub async fn list_contacts(&self) -> Vec<PicoContact> {
+    #[frb(sync)]
+    pub fn list_contacts(&self) -> Vec<PicoContact> {
         let mut contacts: Vec<_> = self.db.begin_read().iter(&CONTACT, |it| {
             it.map(|(lnurl, name)| PicoContact {
                 lnurl: LnurlWrapper(lnurl),
@@ -612,8 +634,8 @@ impl Pico {
         contacts
     }
 
-    #[frb]
-    pub async fn delete_contact(&self, lnurl: &LnurlWrapper) {
+    #[frb(sync)]
+    pub fn delete_contact(&self, lnurl: &LnurlWrapper) {
         let dbtx = self.db.begin_write();
 
         dbtx.remove(&CONTACT, &lnurl.0);

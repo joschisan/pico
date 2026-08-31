@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
+import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/animated_entry_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
@@ -16,11 +17,16 @@ class RecentPayments extends StatefulWidget implements Bleeds {
   final Stream<List<OperationSummary>> stream;
   final void Function(OperationSummary) onTransactionTap;
 
+  /// Read at tap time rather than taken as a value — the pager can swipe
+  /// to another account without this widget rebuilding.
+  final PicoAccount Function() selectedAccount;
+
   const RecentPayments({
     super.key,
     required this.pico,
     required this.stream,
     required this.onTransactionTap,
+    required this.selectedAccount,
   });
 
   @override
@@ -28,26 +34,28 @@ class RecentPayments extends StatefulWidget implements Bleeds {
 }
 
 class _RecentPaymentsState extends State<RecentPayments> {
-  List<OperationSummary> _payments = [];
+  late List<OperationSummary> _payments;
   StreamSubscription<List<OperationSummary>>? _subscription;
 
-  /// Payments in the first snapshot render without the entry animation; only
+  /// Payments present at seed time render without the entry animation; only
   /// payments appearing after the screen opened grow in.
-  Set<String>? _initialIds;
+  late final Set<String> _initialIds;
 
   @override
   void initState() {
     super.initState();
+    // Seeded synchronously so the first frame renders the truth — list and
+    // empty state alike are facts, not defaults rendered while the
+    // stream's first snapshot is in flight.
+    _payments = widget.pico.recentOperations().reversed.toList();
+    _initialIds = _payments.map((p) => p.operation.display()).toSet();
     _subscription = widget.stream.listen(_onSnapshot);
   }
 
   void _onSnapshot(List<OperationSummary> snapshot) {
     if (!mounted) return;
 
-    setState(() {
-      _payments = snapshot.reversed.toList();
-      _initialIds ??= _payments.map((p) => p.operationId).toSet();
-    });
+    setState(() => _payments = snapshot.reversed.toList());
   }
 
   @override
@@ -56,17 +64,22 @@ class _RecentPaymentsState extends State<RecentPayments> {
     super.dispose();
   }
 
-  Future<void> _openHistory() async {
-    final operations = await widget.pico.listOperations();
-
-    if (!mounted) return;
+  void _openHistory() {
+    final account = widget.selectedAccount();
 
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
             (_) => PaymentHistoryScreen(
               pico: widget.pico,
-              operations: operations.reversed.toList(),
+              operations:
+                  widget.pico
+                      .listOperations(
+                        federation: account.federation,
+                        account: account.account,
+                      )
+                      .reversed
+                      .toList(),
             ),
       ),
     );
@@ -74,10 +87,12 @@ class _RecentPaymentsState extends State<RecentPayments> {
 
   @override
   Widget build(BuildContext context) {
+    final payments = _payments;
+
     // A BleedColumn so a hosting BleedColumn passes this through uninset:
     // the rows carry their own content padding and must reach the screen
     // edges, while the header and empty-state text take the standard inset.
-    if (_payments.isEmpty) {
+    if (payments.isEmpty) {
       return BleedColumn(
         children: [
           const SizedBox(height: 64),
@@ -103,15 +118,15 @@ class _RecentPaymentsState extends State<RecentPayments> {
         ),
         BorderedList.column(
           children: [
-            for (var i = 0; i < _payments.length; i++)
+            for (final payment in payments)
               KeyedSubtree(
-                key: ValueKey(_payments[i].operationId),
+                key: ValueKey(payment.operation.display()),
                 child: AnimatedEntry(
-                  animate: !_initialIds!.contains(_payments[i].operationId),
+                  animate: !_initialIds.contains(payment.operation.display()),
                   child: PaymentCard(
                     pico: widget.pico,
-                    event: _payments[i],
-                    onTap: () => widget.onTransactionTap(_payments[i]),
+                    event: payment,
+                    onTap: () => widget.onTransactionTap(payment),
                   ),
                 ),
               ),

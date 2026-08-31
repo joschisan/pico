@@ -9,7 +9,6 @@
 //! - [`parse_payment_event`] — every public picomint event → rich
 //!   [`PaymentEvent`] for the per-op timeline drawer.
 
-use std::collections::BTreeMap;
 
 use flutter_rust_bridge::frb;
 use picomint_client::ln::events::{
@@ -27,8 +26,9 @@ use picomint_client::wallet::events::{
 };
 use picomint_client::{Account, TxAcceptEvent, TxCreateEvent, TxRejectEvent};
 use picomint_core::bitcoin::hex::DisplayHex;
-use picomint_core::config::FederationId;
 use picomint_eventlog::EventLogEntry;
+
+use crate::{FederationIdWrapper, OperationIdWrapper};
 
 #[frb]
 #[derive(Clone)]
@@ -44,16 +44,12 @@ pub enum PaymentType {
 #[frb]
 #[derive(Clone)]
 pub struct OperationSummary {
-    pub operation_id: String,
+    pub operation: OperationIdWrapper,
+    pub federation: FederationIdWrapper,
     pub incoming: bool,
     pub payment_type: PaymentType,
     pub amount_sats: i64,
     pub timestamp: i64,
-    /// `Some(name)` if the federation is still warm at parse time;
-    /// `None` if the user has since left, in which case the Dart side
-    /// renders "Unknown Federation". Resolved against a snapshot of
-    /// the client set — past summaries don't get re-resolved on leave.
-    pub federation_name: Option<String>,
     /// Fiat value of `amount_sats` at the rate snapshotted when the payment
     /// was first observed live. `None` for operations with no stored
     /// snapshot (predating the feature, or no rate cached at the time) — the
@@ -136,11 +132,12 @@ pub enum PaymentEvent {
     },
     MintSendSuccess {
         timestamp: i64,
-        /// Base32-encoded ecash; the Dart side parses it back into an
-        /// `ECashWrapper` on demand for the display screen. Stored as a
-        /// `String` (not `ECashWrapper`) because frb can't put opaque
-        /// types inside a value-typed enum without flipping the whole
-        /// enum opaque.
+        /// Base32-encoded ecash, passed through verbatim from the picomint
+        /// event — which carries the string for the same reasons this
+        /// stays one while the ids went typed: replaying history shouldn't
+        /// decode every bundle, and frb can't put opaque types inside a
+        /// value-typed enum anyway. `parse_ecash` reverses it on demand
+        /// for the display screen.
         ecash: String,
     },
     MintSendFailure {
@@ -252,14 +249,11 @@ pub(crate) fn is_summary_trigger(entry: &EventLogEntry) -> bool {
 }
 
 /// Parse the trigger events that materialize a new operation in the list.
-/// Every other event type returns `None`. `names` is a snapshot of
-/// currently-warm federation ids → names; entries from federations the user
-/// has since left resolve to `federation_name: None`. `fiat` is the
+/// Every other event type returns `None`. `fiat` is the
 /// `(currency_code, btc_price)` snapshotted for this operation, if any —
 /// converted to the displayed `fiat_amount`.
 pub(crate) fn parse_summary(
     entry: &EventLogEntry,
-    names: &BTreeMap<FederationId, String>,
     fiat: Option<(String, f64)>,
 ) -> Option<OperationSummary> {
     let (incoming, payment_type, amount_sats) = trigger_fields(entry)?;
@@ -273,12 +267,12 @@ pub(crate) fn parse_summary(
     };
 
     Some(OperationSummary {
-        operation_id: entry.operation.to_string(),
+        operation: OperationIdWrapper(entry.operation),
+        federation: FederationIdWrapper(entry.federation),
         incoming,
         payment_type,
         amount_sats,
         timestamp: entry.timestamp as i64,
-        federation_name: names.get(&entry.federation).cloned(),
         fiat_amount,
         fiat_currency_code,
     })
@@ -389,7 +383,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     if let Some(e) = entry.to_event::<MintSendSuccessEvent>() {
         return Some(PaymentEvent::MintSendSuccess {
             timestamp,
-            ecash: e.ecash.to_string(),
+            ecash: e.ecash.clone(),
         });
     }
     if entry.to_event::<MintSendFailureEvent>().is_some() {

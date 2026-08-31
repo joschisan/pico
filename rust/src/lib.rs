@@ -15,8 +15,9 @@ use std::str::FromStr;
 use bitcoin::address::NetworkUnchecked;
 use flutter_rust_bridge::frb;
 use lightning_invoice::Bolt11Invoice;
-use picomint_client::Mnemonic;
 use picomint_client::mint::ECash;
+use picomint_client::{Account, Mnemonic, OperationId};
+use picomint_core::config::FederationId;
 use picomint_core::invite::InviteCode;
 use picomint_sqlite::Database;
 
@@ -87,6 +88,43 @@ pub fn parse_invite_code(invite: &str) -> Option<InviteCodeWrapper> {
         .map(InviteCodeWrapper)
 }
 
+// Typed ids, so an id handed out by a summary is passed back into calls
+// without a parse anywhere. Opaque handles have no value semantics in
+// Dart — where the UI needs identity (`ValueKey`s, set membership) it
+// derives the string form via `display()` instead.
+#[frb(opaque)]
+#[derive(Clone)]
+pub struct FederationIdWrapper(pub(crate) FederationId);
+
+impl FederationIdWrapper {
+    #[frb(sync)]
+    pub fn display(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+#[frb(opaque)]
+#[derive(Clone)]
+pub struct AccountWrapper(pub(crate) Account);
+
+impl AccountWrapper {
+    #[frb(sync)]
+    pub fn display(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+#[frb(opaque)]
+#[derive(Clone)]
+pub struct OperationIdWrapper(pub(crate) OperationId);
+
+impl OperationIdWrapper {
+    #[frb(sync)]
+    pub fn display(&self) -> String {
+        self.0.to_string()
+    }
+}
+
 #[frb(opaque)]
 #[derive(Clone)]
 pub struct ECashWrapper(pub(crate) ECash);
@@ -98,10 +136,10 @@ impl ECashWrapper {
     }
 
     /// Federation that minted these notes — needed to look up the
-    /// reissuing client when displaying ecash from history.
+    /// reissuing account when displaying ecash from history.
     #[frb(sync)]
-    pub fn federation_id(&self) -> String {
-        self.0.mint.to_string()
+    pub fn federation(&self) -> FederationIdWrapper {
+        FederationIdWrapper(self.0.mint)
     }
 
     #[frb(sync)]

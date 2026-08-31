@@ -106,12 +106,8 @@ class _DisplayContactsScreenState extends State<DisplayContactsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadContacts() async {
-    final contacts = await widget.pico.listContacts();
-    if (!mounted) return;
-    setState(() {
-      _contacts = contacts;
-    });
+  void _loadContacts() {
+    setState(() => _contacts = widget.pico.listContacts());
   }
 
   List<PicoContact> get _filteredContacts {
@@ -145,9 +141,7 @@ class _DisplayContactsScreenState extends State<DisplayContactsScreen> {
               pico: widget.pico,
               lnurl: contact.lnurl,
               initialName: contact.name,
-              onDelete: () async {
-                await widget.pico.deleteContact(lnurl: contact.lnurl);
-              },
+              onDelete: () => widget.pico.deleteContact(lnurl: contact.lnurl),
             ),
       ),
     );

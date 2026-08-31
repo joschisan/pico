@@ -56,7 +56,7 @@ const _pageSlideCurve = Curves.easeInOutSine;
 /// no longer does: a federation contributes one row per account, and the
 /// pager swipes through all of them.
 String _accountKey(PicoAccount account) =>
-    '${account.federationId}/${account.account}';
+    '${account.federation.display()}/${account.account.display()}';
 
 /// Multimint home: the balance and the row naming its account form one
 /// swipeable page, so every balance is paged through rather than picked from
@@ -111,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Federations seen in the last emission, so the next one can tell an
   // arrival from a list that merely re-rendered.
   late Set<String> _knownFederationIds =
-      _accounts.map((a) => a.federationId).toSet();
+      _accounts.map((a) => a.federation.display()).toSet();
   // Holds the selection, not just the scroll: the account in view is the one
   // every action routes through, so this controller is the only place it is
   // recorded. Starts on the first federation's first account.
@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (accounts.isEmpty) return;
       setState(() {
         _accounts = accounts;
-        final ids = accounts.map((a) => a.federationId).toSet();
+        final ids = accounts.map((a) => a.federation.display()).toSet();
         // A federation that wasn't in the previous list was just joined, so
         // page to it — the user acted on it, and a join that restored funds
         // arrives with them already on its balances. Its first page is its
@@ -183,7 +183,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
         if (arrived.isNotEmpty) {
           _pageTo(
-            _visible.indexWhere((a) => arrived.contains(a.federationId)),
+            _visible.indexWhere(
+              (a) => arrived.contains(a.federation.display()),
+            ),
             animate: true,
           );
         }
@@ -444,7 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// opened surface them instead of swallowing them. Either way the page is
   /// held for the session — spending the account empty doesn't take it.
   bool _isVisible(PicoAccount account) {
-    if (account.account == primaryAccount) return true;
+    if (account.account.display() == primaryAccount) return true;
 
     return _opened.contains(_accountKey(account));
   }
@@ -489,7 +491,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final federationId = key.split('/').first;
 
     final index = accounts.indexWhere(
-      (a) => a.federationId == federationId && a.account == primaryAccount,
+      (a) =>
+          a.federation.display() == federationId &&
+          a.account.display() == primaryAccount,
     );
 
     return index < 0 ? 0 : index;
@@ -507,7 +511,7 @@ class _HomeScreenState extends State<HomeScreen> {
               account: account,
               pico: widget.pico,
               lnurl: widget.pico.lnGenerateLnurl(
-                federationId: account.federationId,
+                federation: account.federation,
                 account: account.account,
               ),
               currencyCode: widget.pico.currencyCode(),
@@ -580,13 +584,13 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Lists the selected federation's accounts, including the ones without
   /// pages — this is the only place they can be reached from.
   void _openSelectAccount() {
-    final federationId = _selectedAccount().federationId;
+    final federationId = _selectedAccount().federation.display();
 
     SelectAccountDrawer.show(
       context,
       accounts: [
         for (final account in _accounts)
-          if (account.federationId == federationId)
+          if (account.federation.display() == federationId)
             (
               account: account,
               balance: _sessions[_accountKey(account)]!.balance,
@@ -639,9 +643,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      final seedPhrase = await widget.pico.seedPhrase();
-
-      if (!mounted) return;
+      final seedPhrase = widget.pico.seedPhrase();
 
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -798,6 +800,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   pico: widget.pico,
                   stream: _recentStream,
                   onTransactionTap: _showEventDetails,
+                  selectedAccount: _selectedAccount,
                 ),
               ],
             ),
@@ -837,12 +840,12 @@ class _FederationSession {
   _FederationSession(Pico pico, PicoAccount account) {
     _balanceSubscription = pico
         .mintSubscribeBalance(
-          federationId: account.federationId,
+          federation: account.federation,
           account: account.account,
         )
         .listen((sats) => balance.value = sats);
     _connectionSubscription = pico
-        .subscribeConnectionStatus(federationId: account.federationId)
+        .subscribeConnectionStatus(federation: account.federation)
         .listen((statuses) => connection.value = statuses);
   }
 
@@ -1035,7 +1038,7 @@ class _FederationPage extends StatelessWidget {
           children: [
             _FederationRow(
               name: account.federationName,
-              account: account.account,
+              account: account.account.display(),
               connection: session.connection,
               onTap: onAccountTap,
             ),

@@ -70,7 +70,7 @@ class _LightningSendDrawerState extends State<LightningSendDrawer> {
   Future<void> _loadQuote() async {
     try {
       final gateway = await widget.pico.lnSelectGateway(
-        federationId: widget.account.federationId,
+        federation: widget.account.federation,
       );
 
       final feeSats = gateway.gatewayFeeForInvoice(invoice: widget.invoice);
@@ -90,7 +90,7 @@ class _LightningSendDrawerState extends State<LightningSendDrawer> {
     await requireBiometricAuth(context);
 
     await widget.pico.lnSend(
-      federationId: widget.account.federationId,
+      federation: widget.account.federation,
       account: widget.account.account,
       gateway: quote.gateway,
       invoice: widget.invoice,
