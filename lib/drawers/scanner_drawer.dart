@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/fountain.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
@@ -21,25 +21,20 @@ import 'package:pico/screens/onchain_amount_screen.dart';
 /// Presented full-screen rather than in a sheet, so the camera gets the whole
 /// viewport and a QR only has to fill the viewfinder to read.
 class ScannerDrawer extends StatefulWidget {
-  final PicoClient? client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount? account;
+  final Pico pico;
 
-  const ScannerDrawer({
-    super.key,
-    required this.client,
-    required this.clientFactory,
-  });
+  const ScannerDrawer({super.key, required this.account, required this.pico});
 
   static Future<void> show(
     BuildContext context, {
-    required PicoClient? client,
-    required PicoClientFactory clientFactory,
+    required PicoAccount? account,
+    required Pico pico,
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder:
-            (_) => ScannerDrawer(client: client, clientFactory: clientFactory),
+        builder: (_) => ScannerDrawer(account: account, pico: pico),
       ),
     );
   }
@@ -55,25 +50,21 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
   void _processInput(String input) {
     if (!_isScanning) return;
 
-    // Invite codes always win and don't need a warm client — that's
-    // how the user joins their first federation. InviteDrawer owns the
-    // join lifecycle so its own (still-mounted) context drives the pop
+    // Invite codes always win and don't need a joined federation — that's
+    // how the user joins their first one. InviteDrawer owns the add
+    // lifecycle so its own (still-mounted) context drives the pop
     // and toast.
     final invite = parseInviteCode(invite: input);
     if (invite != null) {
       _isScanning = false;
       HapticFeedback.mediumImpact();
       Navigator.of(context).pop();
-      InviteDrawer.show(
-        context,
-        invite: invite,
-        clientFactory: widget.clientFactory,
-      );
+      InviteDrawer.show(context, invite: invite, pico: widget.pico);
       return;
     }
 
-    final client = widget.client;
-    if (client == null) {
+    final account = widget.account;
+    if (account == null) {
       _isScanning = false;
       HapticFeedback.mediumImpact();
       Navigator.of(context).pop();
@@ -84,15 +75,19 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
     final parsers = [
       (
         parseBolt11Invoice(invoice: input),
-        (dynamic result) =>
-            LightningSendDrawer.show(context, client: client, invoice: result),
+        (dynamic result) => LightningSendDrawer.show(
+          context,
+          account: account,
+          pico: widget.pico,
+          invoice: result,
+        ),
       ),
       (
         parseEcash(ecash: input),
         (dynamic result) => EcashDrawer.show(
           context,
-          selected: client,
-          clientFactory: widget.clientFactory,
+          selected: account,
+          pico: widget.pico,
           ecash: result,
         ),
       ),
@@ -105,8 +100,8 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
           MaterialPageRoute(
             builder:
                 (_) => OnchainAmountScreen(
-                  client: client,
-                  clientFactory: widget.clientFactory,
+                  account: account,
+                  pico: widget.pico,
                   address: result,
                 ),
           ),
@@ -116,8 +111,8 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
         parseLnurl(request: input),
         (dynamic result) => LnurlDrawer.show(
           context,
-          client: client,
-          clientFactory: widget.clientFactory,
+          account: account,
+          pico: widget.pico,
           lnurl: result,
         ),
       ),
@@ -125,8 +120,8 @@ class _ScannerDrawerState extends State<ScannerDrawer> {
         _decoder.addFragment(fragment: input),
         (dynamic result) => EcashDrawer.show(
           context,
-          selected: client,
-          clientFactory: widget.clientFactory,
+          selected: account,
+          pico: widget.pico,
           ecash: result,
         ),
       ),

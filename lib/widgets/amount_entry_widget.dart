@@ -3,21 +3,21 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:pico/utils/styles.dart';
-import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
 import 'package:pico/utils/currency_utils.dart';
 import 'package:pico/widgets/amount_headline_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 
 class AmountEntryWidget extends StatefulWidget {
-  final PicoClient client;
+  final Pico pico;
   final Future<void> Function(int amountSats) onConfirm;
   final void Function(int currentAmount)? onAmountChanged;
   final String buttonText;
 
   const AmountEntryWidget({
     super.key,
-    required this.client,
+    required this.pico,
     required this.onConfirm,
     this.onAmountChanged,
     this.buttonText = 'Confirm',
@@ -34,7 +34,7 @@ class _AmountEntryWidgetState extends State<AmountEntryWidget> {
   // currency from this flow, so a fixed string is correct and spares a db read
   // per keystroke — the home screen, which must track live switches, reads it
   // fresh instead (see `cachedFiatAmount`).
-  late final String _currencyCode = widget.client.currencyCode();
+  late final String _currencyCode = widget.pico.currencyCode();
 
   @override
   void initState() {
@@ -42,7 +42,7 @@ class _AmountEntryWidgetState extends State<AmountEntryWidget> {
     // Refresh the exchange-rate cache on entry so the fiat amount rows on the
     // following confirm/display screen stay populated even if the rate cached
     // at home start has since expired.
-    widget.client.prefetchExchangeRates();
+    widget.pico.prefetchExchangeRates();
   }
 
   FiatCurrency get _currency {
@@ -86,7 +86,7 @@ class _AmountEntryWidgetState extends State<AmountEntryWidget> {
     if (widget.onAmountChanged == null) return;
 
     if (_enterFiat) {
-      final amountSats = await widget.client.fiatToSats(
+      final amountSats = await widget.pico.fiatToSats(
         amountFiat: _fiatAmount,
         currencyCode: _currencyCode,
       );
@@ -110,7 +110,7 @@ class _AmountEntryWidgetState extends State<AmountEntryWidget> {
 
     // Prefetch exchange rates when switching to fiat mode
     if (_enterFiat) {
-      widget.client.prefetchExchangeRates();
+      widget.pico.prefetchExchangeRates();
     }
 
     // Same digits, different sat value — parent's fee preview would
@@ -125,7 +125,7 @@ class _AmountEntryWidgetState extends State<AmountEntryWidget> {
 
     final amountSats =
         _enterFiat
-            ? await widget.client.fiatToSats(
+            ? await widget.pico.fiatToSats(
               amountFiat: _fiatAmount,
               currencyCode: _currencyCode,
             )

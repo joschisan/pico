@@ -8,9 +8,9 @@ import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
-/// One of a federation's accounts as the picker sees it: the client to hand
+/// One of a federation's accounts as the picker sees it: the account to hand
 /// back when it is chosen, and the live balance to show while choosing.
-typedef AccountOption = ({PicoClient client, ValueListenable<int?> balance});
+typedef AccountOption = ({PicoAccount account, ValueListenable<int?> balance});
 
 /// Picks which of a federation's three accounts the pager sits on.
 ///
@@ -23,7 +23,7 @@ class SelectAccountDrawer extends StatelessWidget {
   /// swipe them.
   final List<AccountOption> accounts;
 
-  final void Function(PicoClient) onSelect;
+  final void Function(PicoAccount) onSelect;
 
   const SelectAccountDrawer({
     super.key,
@@ -34,7 +34,7 @@ class SelectAccountDrawer extends StatelessWidget {
   static Future<void> show(
     BuildContext context, {
     required List<AccountOption> accounts,
-    required void Function(PicoClient) onSelect,
+    required void Function(PicoAccount) onSelect,
   }) {
     return DrawerUtils.show(
       context: context,
@@ -47,21 +47,21 @@ class SelectAccountDrawer extends StatelessWidget {
     return DrawerShell(
       children: [
         BorderedList.column(
-          children: [for (final account in accounts) _row(account)],
+          children: [for (final option in accounts) _row(option)],
         ),
       ],
     );
   }
 
-  Widget _row(AccountOption account) {
+  Widget _row(AccountOption option) {
     return ValueListenableBuilder<int?>(
-      valueListenable: account.balance,
+      valueListenable: option.balance,
       builder: (context, sats, _) {
         return SettingsCard(
           // The same chip the home row and the page list carry, so an account
           // reads as an account wherever it is listed.
           icon: PhosphorIconsRegular.stack,
-          title: account.client.accountName(),
+          title: option.account.account,
           // Null until the first value lands, which leaves the row single-line
           // rather than claiming a balance of zero it hasn't read yet.
           subtitle:
@@ -70,7 +70,7 @@ class SelectAccountDrawer extends StatelessWidget {
           // back where you started is a fair answer to opening the list.
           onTap: () {
             Navigator.of(context).pop();
-            onSelect(account.client);
+            onSelect(option.account);
           },
         );
       },

@@ -139,12 +139,11 @@ jobs:
 
     - run: flutter pub get
 
+    # All picomint crates resolve from one git source sharing one locked
+    # rev, so bumping any one of them moves them all — naming the full
+    # crate list here would just rot as crates come and go.
     - name: Move the pin to picomint main
-      run: |
-        cargo update \
-          -p picomint-base32 -p picomint-client -p picomint-core \
-          -p picomint-eventlog -p picomint-fountain -p picomint-lnurl \
-          -p picomint-redb
+      run: cargo update -p picomint-client
       working-directory: rust
 
     - name: Generate bridge bindings

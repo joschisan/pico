@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
@@ -10,13 +10,13 @@ import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
 
 class WalletV2ReceiveScreen extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
 
   const WalletV2ReceiveScreen({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
   });
 
   @override
@@ -24,7 +24,6 @@ class WalletV2ReceiveScreen extends StatefulWidget {
 }
 
 class _WalletV2ReceiveScreenState extends State<WalletV2ReceiveScreen> {
-  late final PicoClient _client = widget.client;
   String? _address;
 
   @override
@@ -36,7 +35,10 @@ class _WalletV2ReceiveScreenState extends State<WalletV2ReceiveScreen> {
   Future<void> _fetchAddress() async {
     setState(() => _address = null);
     try {
-      final addr = await _client.onchainReceiveAddress();
+      final addr = await widget.pico.walletDepositAddress(
+        federationId: widget.account.federationId,
+        account: widget.account.account,
+      );
       if (!mounted) return;
       setState(() => _address = addr);
     } catch (_) {

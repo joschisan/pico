@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/widgets/animated_entry_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
@@ -12,13 +12,13 @@ import 'package:pico/utils/styles.dart';
 import 'package:pico/screens/payment_history_screen.dart';
 
 class RecentPayments extends StatefulWidget implements Bleeds {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
   final Stream<List<OperationSummary>> stream;
   final void Function(OperationSummary) onTransactionTap;
 
   const RecentPayments({
     super.key,
-    required this.clientFactory,
+    required this.pico,
     required this.stream,
     required this.onTransactionTap,
   });
@@ -57,7 +57,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
   }
 
   Future<void> _openHistory() async {
-    final operations = await widget.clientFactory.listOperations();
+    final operations = await widget.pico.listOperations();
 
     if (!mounted) return;
 
@@ -65,7 +65,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
       MaterialPageRoute(
         builder:
             (_) => PaymentHistoryScreen(
-              clientFactory: widget.clientFactory,
+              pico: widget.pico,
               operations: operations.reversed.toList(),
             ),
       ),
@@ -109,7 +109,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
                 child: AnimatedEntry(
                   animate: !_initialIds!.contains(_payments[i].operationId),
                   child: PaymentCard(
-                    clientFactory: widget.clientFactory,
+                    pico: widget.pico,
                     event: _payments[i],
                     onTap: () => widget.onTransactionTap(_payments[i]),
                   ),

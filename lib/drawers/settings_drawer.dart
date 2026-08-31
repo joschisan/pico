@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/federation_utils.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
@@ -15,8 +15,8 @@ import 'package:pico/widgets/settings_card_widget.dart';
 /// and hands off to a caller callback, whose stable context owns the
 /// navigation — this drawer's own context dies with the pop.
 class SettingsDrawer extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
   final VoidCallback onSelectRecoveryPhrase;
   final VoidCallback onSelectCurrency;
   final VoidCallback onSelectAccount;
@@ -27,8 +27,8 @@ class SettingsDrawer extends StatefulWidget {
 
   const SettingsDrawer({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
     required this.onSelectRecoveryPhrase,
     required this.onSelectCurrency,
     required this.onSelectAccount,
@@ -38,8 +38,8 @@ class SettingsDrawer extends StatefulWidget {
 
   static Future<void> show(
     BuildContext context, {
-    required PicoClient client,
-    required PicoClientFactory clientFactory,
+    required PicoAccount account,
+    required Pico pico,
     required VoidCallback onSelectRecoveryPhrase,
     required VoidCallback onSelectCurrency,
     required VoidCallback onSelectAccount,
@@ -49,8 +49,8 @@ class SettingsDrawer extends StatefulWidget {
     return DrawerUtils.show(
       context: context,
       child: SettingsDrawer(
-        client: client,
-        clientFactory: clientFactory,
+        account: account,
+        pico: pico,
         onSelectRecoveryPhrase: onSelectRecoveryPhrase,
         onSelectCurrency: onSelectCurrency,
         onSelectAccount: onSelectAccount,
@@ -67,30 +67,11 @@ class SettingsDrawer extends StatefulWidget {
 class _SettingsDrawerState extends State<SettingsDrawer> {
   // Cached so rebuilds don't re-subscribe. Each entry is `(name, rttMs)`: a
   // non-null RTT means that guardian is connected.
-  late final Stream<List<(String, double?)>> _connectionStream =
-      widget.client.subscribeConnectionStatus();
+  late final Stream<List<(String, double?)>> _connectionStream = widget.pico
+      .subscribeConnectionStatus(federationId: widget.account.federationId);
 
-  /// Both null until their first read lands, which leaves the row single-line
-  /// rather than flashing a placeholder.
-  String? _currencyName;
-  String? _federationName;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCurrencyName();
-    widget.client.federationName().then((name) {
-      if (mounted && name != null) setState(() => _federationName = name);
-    });
-  }
-
-  Future<void> _loadCurrencyName() async {
-    final code = await widget.clientFactory.getCurrency();
-
-    if (!mounted) return;
-
-    setState(() => _currencyName = findFiatCurrency(code: code)?.name);
-  }
+  late final String? _currencyName =
+      findFiatCurrency(code: widget.pico.currencyCode())?.name;
 
   /// Pops the drawer, then runs the caller's action against its own context.
   void _select(VoidCallback action) {
@@ -121,9 +102,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             SettingsCard(
               icon: PhosphorIconsRegular.stack,
               title: 'Select Account',
-              // Sync, unlike the two rows above: which account is in view is
-              // decided by the page the drawer opened over.
-              subtitle: widget.client.accountName(),
+              subtitle: widget.account.account,
               onTap: () => _select(widget.onSelectAccount),
             ),
             _buildConnectivityCard(),
@@ -133,7 +112,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
               SettingsCard(
                 icon: PhosphorIconsRegular.trash,
                 title: 'Remove Mint',
-                subtitle: _federationName,
+                subtitle: widget.account.federationName,
                 onTap: () => _select(onSelectLeave),
               ),
           ],

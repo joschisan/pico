@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/screens/contact_name_entry_screen.dart';
 import 'package:pico/utils/styles.dart';
@@ -17,8 +17,8 @@ import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
 
 class ConfirmLnurlSendScreen extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
   // Resolved ahead for an ordinary send, so the number reviewed is pinned
   // into the invoice paid. Null on a max send, which resolves its own: the
   // amount is picomint's to size fresh at pay time, and pinning a figure
@@ -35,8 +35,8 @@ class ConfirmLnurlSendScreen extends StatefulWidget {
 
   const ConfirmLnurlSendScreen({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
     required this.invoice,
     required this.lnurl,
     required this.amountSats,
@@ -57,10 +57,8 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
     final name = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder:
-            (_) => ContactNameEntryScreen(
-              clientFactory: widget.clientFactory,
-              lnurl: widget.lnurl,
-            ),
+            (_) =>
+                ContactNameEntryScreen(pico: widget.pico, lnurl: widget.lnurl),
       ),
     );
 
@@ -73,12 +71,16 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
     await requireBiometricAuth(context);
 
     if (widget.isMax) {
-      await widget.client.lnSendMax(
+      await widget.pico.lnSendMax(
+        federationId: widget.account.federationId,
+        account: widget.account.account,
         gateway: widget.gateway,
         lnurl: widget.lnurl.encode(),
       );
     } else {
-      await widget.client.lnSend(
+      await widget.pico.lnSend(
+        federationId: widget.account.federationId,
+        account: widget.account.account,
         gateway: widget.gateway,
         invoice: widget.invoice!,
       );
@@ -113,7 +115,7 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
               BorderedList.column(
                 children: [
                   ...amountRows(
-                    client: widget.client,
+                    pico: widget.pico,
                     amountSats: widget.amountSats,
                   ),
                   DetailRow(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/screens/onboarding_screen.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/notification_utils.dart';
@@ -28,16 +28,11 @@ class ConfirmRecoveryPhraseScreen extends StatelessWidget {
       return;
     }
 
-    final clientFactory = await PicoClientFactory.init(
-      db: db,
-      mnemonic: mnemonic,
-    );
+    final pico = await Pico.init(db: db, mnemonic: mnemonic);
 
     if (context.mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => OnboardingScreen(clientFactory: clientFactory),
-        ),
+        MaterialPageRoute(builder: (context) => OnboardingScreen(pico: pico)),
         (route) => false,
       );
     }

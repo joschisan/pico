@@ -1,6 +1,6 @@
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/grouped_list_widget.dart';
@@ -8,9 +8,9 @@ import 'package:pico/widgets/search_field_widget.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
 
 class SelectCurrencyScreen extends StatefulWidget {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
 
-  const SelectCurrencyScreen({super.key, required this.clientFactory});
+  const SelectCurrencyScreen({super.key, required this.pico});
 
   @override
   State<SelectCurrencyScreen> createState() => _SelectCurrencyScreenState();
@@ -66,9 +66,7 @@ class _SelectCurrencyScreenState extends State<SelectCurrencyScreen> {
               // Picking is the confirmation — set the currency and return to
               // settings, which re-reads the name on the way back.
               onTap: () async {
-                await widget.clientFactory.setCurrency(
-                  currencyCode: currency.code,
-                );
+                await widget.pico.setCurrency(currencyCode: currency.code);
 
                 if (context.mounted) Navigator.of(context).pop();
               },

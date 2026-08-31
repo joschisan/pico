@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/fountain.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
@@ -11,7 +10,6 @@ import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/widgets/shareable_row_widget.dart';
-import 'package:pico/widgets/detail_row_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
 
 Stream<String> _createFrameStream(ECashEncoder encoder) async* {
@@ -24,22 +22,28 @@ Stream<String> _createFrameStream(ECashEncoder encoder) async* {
 class DisplayEcashScreen extends StatelessWidget {
   // Optional so the payment-details drawer can replay an old ecash
   // bundle even after the user has left the issuing federation — in
-  // that case we drop the cancel action since reissuing requires a
-  // warm client for the same federation.
-  final PicoClient? client;
+  // that case we drop the cancel action since reissuing requires an
+  // account at the same federation.
+  final PicoAccount? account;
+  final Pico pico;
   final ECashWrapper ecash;
   final ECashEncoder encoder;
 
   const DisplayEcashScreen({
     super.key,
-    this.client,
+    this.account,
+    required this.pico,
     required this.ecash,
     required this.encoder,
   });
 
   /// Reclaim the unsent eCash back into the balance, then return home.
-  Future<void> _handleCancel(BuildContext context, PicoClient client) async {
-    await client.ecashReceive(ecash: ecash);
+  Future<void> _handleCancel(BuildContext context, PicoAccount account) async {
+    await pico.mintReceive(
+      federationId: account.federationId,
+      account: account.account,
+      ecash: ecash,
+    );
 
     if (!context.mounted) return;
 
@@ -48,7 +52,7 @@ class DisplayEcashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final client = this.client;
+    final account = this.account;
     return Scaffold(
       appBar: AppBar(title: const Text('Send eCash')),
       body: ScrollableBody(
@@ -66,30 +70,19 @@ class DisplayEcashScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 16),
-              // Cancelling needs a warm client for the issuing federation, so
+              // Cancelling needs an account at the issuing federation, so
               // it is dropped when replaying an old bundle after leaving.
-              if (client != null) ...[
+              if (account != null) ...[
                 AsyncButton(
                   text: 'Cancel',
-                  onPressed: () => _handleCancel(context, client),
+                  onPressed: () => _handleCancel(context, account),
                 ),
                 const SizedBox(height: 16),
               ],
               BorderedList.column(
                 children: [
                   ShareableRow(data: ecash.toString(), label: 'eCash'),
-                  if (client != null)
-                    ...amountRows(
-                      client: client,
-                      amountSats: ecash.amountSats(),
-                    )
-                  else
-                    DetailRow(
-                      icon: PhosphorIconsRegular.currencyBtc,
-                      label: 'Bitcoin',
-                      value:
-                          '${NumberFormat('#,###').format(ecash.amountSats())} sat',
-                    ),
+                  ...amountRows(pico: pico, amountSats: ecash.amountSats()),
                 ],
               ),
             ],

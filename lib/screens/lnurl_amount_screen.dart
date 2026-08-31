@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/screens/confirm_lnurl_send_screen.dart';
@@ -8,16 +8,16 @@ import 'package:pico/widgets/amount_entry_widget.dart';
 import 'package:pico/widgets/max_action_widget.dart';
 
 class LnurlAmountScreen extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
   final LnurlWrapper lnurl;
   final PayResponseWrapper payResponse;
   final String? contactName;
 
   const LnurlAmountScreen({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
     required this.lnurl,
     required this.payResponse,
     this.contactName,
@@ -36,7 +36,9 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
       amountSats: amountSats,
     );
 
-    final gateway = await widget.client.lnSelectGateway();
+    final gateway = await widget.pico.lnSelectGateway(
+      federationId: widget.account.federationId,
+    );
 
     final feeSats = gateway.gatewayFeeForInvoice(invoice: invoice);
 
@@ -60,9 +62,15 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   /// payment capped to the payee's limit would leave notes behind, and the
   /// max path exists precisely to leave none.
   Future<void> _handleConfirmMax() async {
-    final gateway = await widget.client.lnSelectGateway();
+    final gateway = await widget.pico.lnSelectGateway(
+      federationId: widget.account.federationId,
+    );
 
-    final amountSats = await widget.client.lnMaxAmount(gateway: gateway);
+    final amountSats = await widget.pico.lnSendMaxAmount(
+      federationId: widget.account.federationId,
+      account: widget.account.account,
+      gateway: gateway,
+    );
 
     if (amountSats <= 0) throw 'This account is empty';
 
@@ -96,8 +104,8 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
       MaterialPageRoute(
         builder:
             (_) => ConfirmLnurlSendScreen(
-              client: widget.client,
-              clientFactory: widget.clientFactory,
+              account: widget.account,
+              pico: widget.pico,
               invoice: invoice,
               lnurl: widget.lnurl,
               amountSats: amountSats,
@@ -121,7 +129,7 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
       body: SafeArea(
         maintainBottomViewPadding: true,
         child: AmountEntryWidget(
-          client: widget.client,
+          pico: widget.pico,
           onConfirm: _handleConfirm,
           buttonText: 'Continue',
         ),

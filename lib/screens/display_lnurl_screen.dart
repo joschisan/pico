@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/balanced_text_widget.dart';
@@ -17,15 +17,15 @@ import 'package:url_launcher/url_launcher.dart';
 /// amount any number of times. A fixed-amount Bolt11 invoice is the app-bar
 /// action, and the point-of-sale terminal a row beneath the code it runs on.
 class DisplayLnurlScreen extends StatelessWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
   final String lnurl;
   final String currencyCode;
 
   const DisplayLnurlScreen({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
     required this.lnurl,
     required this.currencyCode,
   });
@@ -45,11 +45,7 @@ class DisplayLnurlScreen extends StatelessWidget {
     // on top, so the amount screen reads as an alternative to this view.
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder:
-            (_) => InvoiceAmountScreen(
-              client: client,
-              clientFactory: clientFactory,
-            ),
+        builder: (_) => InvoiceAmountScreen(account: account, pico: pico),
       ),
     );
   }

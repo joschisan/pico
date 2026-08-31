@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
@@ -12,30 +12,26 @@ import 'package:pico/drawers/lightning_send_drawer.dart';
 import 'package:pico/utils/drawer_utils.dart';
 
 class LnurlDrawer extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
   final LnurlWrapper lnurl;
 
   const LnurlDrawer({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
     required this.lnurl,
   });
 
   static Future<void> show(
     BuildContext context, {
-    required PicoClient client,
-    required PicoClientFactory clientFactory,
+    required PicoAccount account,
+    required Pico pico,
     required LnurlWrapper lnurl,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: LnurlDrawer(
-        client: client,
-        clientFactory: clientFactory,
-        lnurl: lnurl,
-      ),
+      child: LnurlDrawer(account: account, pico: pico, lnurl: lnurl),
     );
   }
 
@@ -60,21 +56,20 @@ class _LnurlDrawerState extends State<LnurlDrawer> {
       Navigator.of(context).pop();
       LightningSendDrawer.show(
         context,
-        client: widget.client,
+        account: widget.account,
+        pico: widget.pico,
         invoice: invoice,
       );
     } else {
-      final contactName = await widget.clientFactory.getContactName(
-        lnurl: widget.lnurl,
-      );
+      final contactName = await widget.pico.getContactName(lnurl: widget.lnurl);
 
       if (!mounted) return;
 
       DrawerUtils.popAndPush(
         context,
         LnurlAmountScreen(
-          client: widget.client,
-          clientFactory: widget.clientFactory,
+          account: widget.account,
+          pico: widget.pico,
           lnurl: widget.lnurl,
           payResponse: payResponse,
           contactName: contactName,

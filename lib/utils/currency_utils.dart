@@ -1,5 +1,5 @@
 import 'package:intl/intl.dart';
-import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 
@@ -32,14 +32,11 @@ String formatFiat(FiatCurrency currency, double amount) =>
 /// rate, without triggering a network fetch. Returns the currency and the
 /// converted value, or `null` when no rate has been cached yet. Formatting is
 /// the caller's — see [formatFiat].
-({FiatCurrency currency, double value})? cachedFiat(
-  PicoClient client,
-  int amountSats,
-) {
+({FiatCurrency currency, double value})? cachedFiat(Pico pico, int amountSats) {
   // Read the selected currency live — this path feeds the home screen, which
-  // must reflect a currency switched in settings without rebuilding clients.
-  final code = client.currencyCode();
-  final fiat = client.satsToFiat(amountSats: amountSats, currencyCode: code);
+  // must reflect a currency switched in settings without rebuilding accounts.
+  final code = pico.currencyCode();
+  final fiat = pico.satsToFiat(amountSats: amountSats, currencyCode: code);
   if (fiat == null) return null;
 
   return (currency: findFiatCurrency(code: code)!, value: fiat);
@@ -50,7 +47,7 @@ String formatFiat(FiatCurrency currency, double amount) =>
 /// code (e.g. `usd`), for the two-line trailing of the payment cards — keeping
 /// the unit consistent with `sat`. Returns `null` when no rate was stored for
 /// this operation (payments predating the feature, or none cached when they
-/// landed). Unlike [cachedFiat] this needs no client — it reads the
+/// landed). Unlike [cachedFiat] this needs no [Pico] — it reads the
 /// frozen rate, so history shows each payment's value as of when it happened.
 ({String number, String unit})? historicalFiatParts(
   OperationSummary event, {

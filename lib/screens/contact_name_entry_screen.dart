@@ -1,6 +1,6 @@
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/drawers/delete_contact_drawer.dart';
 import 'package:pico/utils/styles.dart';
@@ -8,14 +8,14 @@ import 'package:pico/widgets/text_entry_body_widget.dart';
 import 'package:share_plus/share_plus.dart';
 
 class ContactNameEntryScreen extends StatefulWidget {
-  final PicoClientFactory clientFactory;
+  final Pico pico;
   final LnurlWrapper lnurl;
   final String? initialName;
   final Future<void> Function()? onDelete;
 
   const ContactNameEntryScreen({
     super.key,
-    required this.clientFactory,
+    required this.pico,
     required this.lnurl,
     this.initialName,
     this.onDelete,
@@ -49,7 +49,7 @@ class _ContactNameEntryScreenState extends State<ContactNameEntryScreen> {
       throw 'Please enter a name';
     }
 
-    await widget.clientFactory.saveContact(lnurl: widget.lnurl, name: name);
+    await widget.pico.saveContact(lnurl: widget.lnurl, name: name);
 
     if (!mounted) return;
 

@@ -5,7 +5,7 @@ import 'package:pico/utils/styles.dart';
 import 'package:pico/screens/input_recovery_phrase_screen.dart';
 import 'package:pico/screens/onboarding_screen.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
@@ -96,7 +96,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 onPressed: () async {
                   final mnemonic = await generateMnemonic();
 
-                  final clientFactory = await PicoClientFactory.init(
+                  final pico = await Pico.init(
                     db: widget.db,
                     mnemonic: mnemonic,
                   );
@@ -105,9 +105,7 @@ class _LandingScreenState extends State<LandingScreen> {
 
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                      builder:
-                          (context) =>
-                              OnboardingScreen(clientFactory: clientFactory),
+                      builder: (context) => OnboardingScreen(pico: pico),
                     ),
                   );
                 },

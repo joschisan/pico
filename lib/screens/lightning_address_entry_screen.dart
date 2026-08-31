@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/factory.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/screens/lnurl_amount_screen.dart';
 import 'package:pico/widgets/text_entry_body_widget.dart';
@@ -32,13 +32,13 @@ class _AddressTextController extends TextEditingController {
 }
 
 class LightningAddressEntryScreen extends StatefulWidget {
-  final PicoClient client;
-  final PicoClientFactory clientFactory;
+  final PicoAccount account;
+  final Pico pico;
 
   const LightningAddressEntryScreen({
     super.key,
-    required this.client,
-    required this.clientFactory,
+    required this.account,
+    required this.pico,
   });
 
   @override
@@ -75,7 +75,7 @@ class _LightningAddressEntryScreenState
 
     final payResponse = await lnurlFetchLimits(lnurl: lnurl);
 
-    final contactName = await widget.clientFactory.getContactName(lnurl: lnurl);
+    final contactName = await widget.pico.getContactName(lnurl: lnurl);
 
     if (!mounted) return;
 
@@ -83,8 +83,8 @@ class _LightningAddressEntryScreenState
       MaterialPageRoute(
         builder:
             (_) => LnurlAmountScreen(
-              client: widget.client,
-              clientFactory: widget.clientFactory,
+              account: widget.account,
+              pico: widget.pico,
               lnurl: lnurl,
               payResponse: payResponse,
               contactName: contactName,
