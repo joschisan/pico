@@ -11,15 +11,12 @@ use iroh_mdns_address_lookup::MdnsAddressLookup;
 use picomint_client::{Account, Client, Mnemonic, OperationId};
 use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
-use picomint_eventlog::{EventLogId, EventLogger};
-use picomint_redb::Database;
-use tokio::sync::{Mutex, Notify, RwLock};
+use picomint_eventlog::EventLogId;
+use picomint_sqlite::{Database, DbRead};
+use tokio::sync::{Mutex, Notify};
 
 use crate::client::PicoClient;
-use crate::db::{
-    CONTACT, ClientConfig, EventLog, EventLogByOperation, OperationFiat, RootEntropy,
-    SelectedCurrency,
-};
+use crate::db::{CONTACT, OperationFiat, RootEntropy, SelectedCurrency};
 use crate::events::{
     Notification, OperationSummary, PaymentEvent, is_summary_trigger, parse_notification,
     parse_payment_event, parse_summary,
@@ -32,28 +29,17 @@ use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
 #[frb(opaque)]
 pub struct PicoClientFactory {
     db: Database,
-    /// Daemon-wide event log over the app's `EVENT_LOG` tables. Cloned into
-    /// every `Client::new` so all federations append to one ordered log.
-    logger: EventLogger,
     mnemonic: Mnemonic,
-    /// Single iroh endpoint shared across all per-federation clients.
-    /// Address grinding is the slowest part of bringup so we bind once
-    /// at factory construction and reuse for every `Client::new`.
-    endpoint: Endpoint,
-    /// All warm clients, keyed by `(FederationId, Account)` — one entry per
-    /// account, three per joined federation, all three sharing that
-    /// federation's single `Arc<Client>`. Constructed at startup from
-    /// `ClientConfig`; `join` inserts a federation's whole row of
-    /// accounts, `leave` removes it. The key order is federation-major and
-    /// account-minor, which is the order the home pager swipes in.
-    ///
-    /// Re-joining a previously-left federation reuses the same keys —
-    /// `Client::wipe` clears the federation's prefixed tables on leave, so
-    /// the second join sees a clean state.
-    clients: Arc<RwLock<BTreeMap<(FederationId, Account), PicoClient>>>,
+    /// The one picomint client, holding every joined federation as data.
+    /// It owns the shared iroh endpoint, the federation configs and the
+    /// daemon-wide event log; every operation names the federation it
+    /// acts on. There is no handle map to keep in sync — a [`PicoClient`]
+    /// is a pure derivation of `(federation, account)` plus the shared
+    /// handles, built on demand from the client's joined set.
+    client: Arc<Client>,
     /// Wakes anyone iterating the client set when membership changes.
     /// `notify_waiters` is fire-and-forget; subscribers re-snapshot the
-    /// map after waking.
+    /// joined set after waking.
     set_changed: Arc<Notify>,
     /// Single exchange-rate cache shared by every client (the BTC price is
     /// global, not per-federation) and by the fiat-snapshot recorder. One
@@ -113,52 +99,62 @@ impl PicoClientFactory {
         Self::assemble(db.0.clone(), mnemonic, endpoint).await.ok()
     }
 
-    /// Build the factory and warm every persisted federation into a
-    /// ready-to-use `PicoClient`. Each `Client::new` here re-runs the
-    /// per-federation handshake; doing them in parallel keeps cold
-    /// startup time bounded by the slowest peer rather than their sum.
+    /// Build the factory and bring every joined federation up. `connect` is
+    /// pico's eager path — the gateway leaves federations dormant, but every
+    /// federation in this wallet has a balance on screen, so all of them
+    /// come up at startup.
     async fn assemble(
         db: Database,
         mnemonic: Mnemonic,
         endpoint: Endpoint,
     ) -> Result<Self, String> {
-        let entries: Vec<(FederationId, picomint_core::config::ConsensusConfig)> =
-            db.begin_read().iter(&ClientConfig, |it| it.collect());
+        let client = Arc::new(Client::new(
+            endpoint,
+            db.clone(),
+            mnemonic.clone(),
+            Some(crate::payout::fee_config()),
+        ));
 
-        let logger = EventLogger::new(EventLog, EventLogByOperation);
-
-        let exchange_rate_cache: ExchangeRateCache = Arc::new(Mutex::new(None));
-
-        let mut warmed: BTreeMap<(FederationId, Account), PicoClient> = BTreeMap::new();
-        for (fed_id, config) in entries {
-            let client = Client::new(
-                endpoint.clone(),
-                db.clone(),
-                logger.clone(),
-                &mnemonic,
-                config,
-                Some(crate::payout::fee_config()),
-            );
-
-            warmed.extend(build_accounts(
-                client,
-                fed_id,
-                db.clone(),
-                exchange_rate_cache.clone(),
-            ));
+        for fed_id in client.federations() {
+            client.connect(fed_id).map_err(|e| e.to_string())?;
         }
-
-        let clients = Arc::new(RwLock::new(warmed));
 
         Ok(Self {
             db,
-            logger,
             mnemonic,
-            endpoint,
-            clients,
+            client,
             set_changed: Arc::new(Notify::new()),
-            exchange_rate_cache,
+            exchange_rate_cache: Arc::new(Mutex::new(None)),
         })
+    }
+
+    /// The `(federation, account)` handle Dart holds: the shared client plus
+    /// the pair every money method passes back down, derived fresh — nothing
+    /// in it lives anywhere but here and the client's own tables.
+    fn handle(&self, federation_id: FederationId, account: Account, name: String) -> PicoClient {
+        PicoClient {
+            client: self.client.clone(),
+            federation_id,
+            account,
+            federation_name: name,
+            db: self.db.clone(),
+            exchange_rate_cache: self.exchange_rate_cache.clone(),
+        }
+    }
+
+    /// One handle per `(federation, account)` pair, federation-major and
+    /// account-minor — the order the home pager swipes in.
+    fn handles(&self) -> Vec<PicoClient> {
+        self.client
+            .federation_configs()
+            .into_iter()
+            .flat_map(|entry| {
+                Account::USER_ACCOUNTS
+                    .into_iter()
+                    .map(move |account| (entry.0, account, entry.1.name.clone()))
+            })
+            .map(|entry| self.handle(entry.0, entry.1, entry.2))
+            .collect()
     }
 
     #[frb]
@@ -166,12 +162,11 @@ impl PicoClientFactory {
         self.mnemonic.words().map(|s| s.to_string()).collect()
     }
 
-    /// Snapshot of every warm client. Cheap (`PicoClient: Clone`) — the
-    /// inner `Arc<Client>` is shared, so callers all see the same
-    /// connection state.
+    /// A handle for every joined `(federation, account)` pair. All share the
+    /// one inner `Arc<Client>`, so callers all see the same connection state.
     #[frb]
     pub async fn clients(&self) -> Vec<PicoClient> {
-        self.clients.read().await.values().cloned().collect()
+        self.handles()
     }
 
     /// Look up a federation's [`Account::PRIMARY`] client. `None` if the user
@@ -186,11 +181,10 @@ impl PicoClientFactory {
     #[frb]
     pub async fn client(&self, federation_id: &str) -> Option<PicoClient> {
         let id = FederationId::from_str(federation_id).ok()?;
-        self.clients
-            .read()
-            .await
-            .get(&(id, Account::PRIMARY))
-            .cloned()
+
+        let config = self.client.config(id)?;
+
+        Some(self.handle(id, Account::PRIMARY, config.name))
     }
 
     /// Adds a federation, rebuilding whatever this seed already owns there.
@@ -208,79 +202,42 @@ impl PicoClientFactory {
     #[frb]
     pub async fn join(&self, invite: &InviteCodeWrapper) -> Result<PicoClient, String> {
         // Rejected before the scan rather than after it. The invite code
-        // commits to the federation id — `join` below refuses a config that
+        // commits to the federation id — `add` below refuses a config that
         // computes to any other — so a duplicate is knowable up front, and
         // there is no reason to make the user wait out four account scans to
-        // be told what the code alone already said.
-        if self
-            .clients
-            .read()
-            .await
-            .contains_key(&(invite.0.federation, Account::PRIMARY))
-        {
+        // be told what the code alone already said. The check inside `add`
+        // is atomic with the write, so it is the authority; this one only
+        // spares the wait.
+        if self.client.config(invite.0.federation).is_some() {
             return Err("This mint is already added".to_string());
         }
 
-        // Reads nothing and writes nothing locally, so a failure here leaves
-        // the wallet exactly as it was — the federation stays unjoined.
-        let join = picomint_client::join(&self.endpoint, &self.mnemonic, &invite.0)
+        // Downloads the config, scans every account, and lands config,
+        // counter marks and restored notes in one dbtx: either the
+        // federation is joined with every counter in place and its balance
+        // already there, or it isn't joined at all. A failure leaves the
+        // wallet exactly as it was.
+        let federation_id = self
+            .client
+            .add(&invite.0, None)
             .await
             .map_err(|e| e.to_string())?;
 
-        let config = join.config().clone();
+        self.client
+            .connect(federation_id)
+            .map_err(|e| e.to_string())?;
 
-        let federation_id = config.calculate_federation_id();
+        let config = self
+            .client
+            .config(federation_id)
+            .expect("the federation was just added");
 
-        let dbtx = self.db.begin_write();
-
-        // The check above is only as fresh as the read that took it, and the
-        // scan is a long await for a second join of the same invite to land
-        // in; this one is atomic with the write, so it is the authority.
-        // Rejecting rather than handing back what is already there matters
-        // most here: the counter marks below describe how far this seed's
-        // counter space was walked, and writing them over a live federation
-        // would rewind it. Insert reports whatever it displaced, and
-        // returning drops the dbtx uncommitted — which aborts it, so the row
-        // we overwrote is left exactly as it was.
-        if dbtx
-            .insert(&ClientConfig, &federation_id, &config)
-            .is_some()
-        {
-            return Err("This mint is already added".to_string());
-        }
-
-        // Counter marks and restored notes, riding the same commit as the
-        // join itself: either the federation is joined with every counter in
-        // place and its balance already there, or it isn't joined at all.
-        join.commit(&dbtx);
-
-        dbtx.commit();
-
-        let client = Client::new(
-            self.endpoint.clone(),
-            self.db.clone(),
-            self.logger.clone(),
-            &self.mnemonic,
-            config,
-            Some(crate::payout::fee_config()),
-        );
-
-        let accounts = build_accounts(
-            client,
-            federation_id,
-            self.db.clone(),
-            self.exchange_rate_cache.clone(),
-        );
+        self.set_changed.notify_waiters();
 
         // Primary is what a caller that just joined gets handed: it is the
         // account the pager lands on, and the only one a screen holding a
         // single client can mean.
-        let pico = accounts[&(federation_id, Account::PRIMARY)].clone();
-
-        self.clients.write().await.extend(accounts);
-        self.set_changed.notify_waiters();
-
-        Ok(pico)
+        Ok(self.handle(federation_id, Account::PRIMARY, config.name))
     }
 
     #[frb]
@@ -304,47 +261,40 @@ impl PicoClientFactory {
             .unwrap_or_else(|| "USD".to_string())
     }
 
-    /// Drop a federation: shut down the client, wipe its per-federation
-    /// prefixed tables, then drop the config row. Wipe + remove
-    /// share a single write tx so a crash mid-leave can never leave
-    /// orphan client state behind a missing config row. Re-joining the
-    /// same federation later starts from a fresh ledger.
+    /// Drop a federation: `Client::remove` shuts its runtime down, then
+    /// wipes its rows and drops its config in one dbtx, so a crash
+    /// mid-leave can never leave orphan client state behind a missing
+    /// config row. Re-joining the same federation later starts from a
+    /// fresh ledger.
     #[frb]
     pub async fn leave(&self, federation_id: &str) -> Result<(), String> {
         let fed_id = FederationId::from_str(federation_id).map_err(|e| e.to_string())?;
 
-        // Every account goes at once — accounts are a split of one federation
-        // client, not something a user joins or leaves individually. The
-        // shutdown and wipe below run once for the client all three shared.
-        let mut guard = self.clients.write().await;
-        let removed: Vec<PicoClient> = Account::USER_ACCOUNTS
-            .into_iter()
-            .filter_map(|account| guard.remove(&(fed_id, account)))
-            .collect();
-        drop(guard);
-
-        let Some(client) = removed.into_iter().next() else {
+        // A federation that is already gone is a leave that already
+        // succeeded, not an error to surface — the drawer may fire twice.
+        if self.client.config(fed_id).is_none() {
             return Ok(());
-        };
+        }
 
-        client.client.shutdown().await;
-
-        let dbtx = self.db.begin_write();
-        client.client.wipe(&dbtx);
-        dbtx.remove(&ClientConfig, &fed_id);
-        dbtx.commit();
+        // Every account goes at once — accounts are a split of one
+        // federation's client state, not something a user joins or leaves
+        // individually.
+        self.client
+            .remove(fed_id)
+            .await
+            .map_err(|e| e.to_string())?;
 
         self.set_changed.notify_waiters();
         Ok(())
     }
 
-    /// Live snapshot of every warm client; re-emits on every set change
-    /// (`join`/`leave`). Subscribers re-render passively
+    /// Live snapshot of every joined federation's handles; re-emits on every
+    /// set change (`join`/`leave`). Subscribers re-render passively
     /// instead of re-fetching `clients()` after each navigation pop.
     #[frb]
     pub async fn subscribe_clients(&self, sink: StreamSink<Vec<PicoClient>>) {
         loop {
-            let snapshot: Vec<PicoClient> = self.clients.read().await.values().cloned().collect();
+            let snapshot = self.handles();
             let set_changed = self.set_changed.notified();
             tokio::pin!(set_changed);
             if sink.add(snapshot).is_err() {
@@ -354,8 +304,8 @@ impl PicoClientFactory {
         }
     }
 
-    /// Aggregated balance across every warm client, in sats. Re-emits on
-    /// any per-client balance change AND on client-set changes
+    /// Aggregated balance across every joined federation, in sats. Re-emits
+    /// on any per-account balance change AND on set changes
     /// (`join`/`leave`). The totals map survives rebuilds so a
     /// join/leave doesn't reset the running sum to zero.
     #[frb]
@@ -363,27 +313,29 @@ impl PicoClientFactory {
         let mut totals: HashMap<(FederationId, Account), i64> = HashMap::new();
 
         loop {
-            // Snapshot the live client set; build a tagged stream per
-            // client so we can attribute incoming balances back to an
-            // account and discard departed clients on the next rebuild.
-            let snapshot: Vec<((FederationId, Account), PicoClient)> = self
-                .clients
-                .read()
-                .await
-                .iter()
-                .map(|(k, v)| (*k, v.clone()))
+            // Snapshot the joined set; build a tagged stream per account so
+            // we can attribute incoming balances back to an account and
+            // discard departed federations on the next rebuild.
+            let snapshot: Vec<(FederationId, Account)> = self
+                .client
+                .federations()
+                .into_iter()
+                .flat_map(|fed_id| {
+                    Account::USER_ACCOUNTS
+                        .into_iter()
+                        .map(move |account| (fed_id, account))
+                })
                 .collect();
 
-            let alive: HashSet<(FederationId, Account)> =
-                snapshot.iter().map(|(k, _)| *k).collect();
+            let alive: HashSet<(FederationId, Account)> = snapshot.iter().copied().collect();
             totals.retain(|key, _| alive.contains(key));
 
             let mut tagged: Vec<BoxStream<'static, ((FederationId, Account), i64)>> =
                 Vec::with_capacity(snapshot.len());
-            for (key, client) in snapshot {
-                let stream = client
+            for key in snapshot {
+                let stream = self
                     .client
-                    .subscribe_balance_changes(client.account)
+                    .mint_subscribe_balance(key.0, key.1)
                     .map(move |amt| (key, (amt.msat / 1000) as i64));
                 tagged.push(stream.boxed());
             }
@@ -419,15 +371,19 @@ impl PicoClientFactory {
     /// reachable only by opening the per-op drawer.
     #[frb]
     pub async fn list_operations(&self) -> Vec<OperationSummary> {
-        let names = self.federation_names_snapshot().await;
+        let names = self.federation_names_snapshot();
         let mut position = EventLogId::LOG_START;
         let mut summaries: Vec<OperationSummary> = Vec::new();
 
         loop {
-            let batch = self.logger.get_event_log(&self.db, position, 1000);
+            let batch = self.client.get_event_log(position, 1000);
 
             for entry in &batch {
-                let fiat = self.db.begin_read().get(&OperationFiat, &entry.1.operation);
+                let fiat = self
+                    .db
+                    .begin_read()
+                    .get(&OperationFiat, &entry.1.operation)
+                    .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
                 if let Some(summary) = parse_summary(&entry.1, &names, fiat) {
                     summaries.push(summary);
                 }
@@ -454,13 +410,17 @@ impl PicoClientFactory {
         // Phase 1: drain history into the full summaries vector. No emits.
         let mut summaries: Vec<OperationSummary> = Vec::new();
         let mut position = EventLogId::LOG_START;
-        let names = self.federation_names_snapshot().await;
+        let names = self.federation_names_snapshot();
 
         loop {
-            let batch = self.logger.get_event_log(&self.db, position, 1000);
+            let batch = self.client.get_event_log(position, 1000);
 
             for entry in &batch {
-                let fiat = self.db.begin_read().get(&OperationFiat, &entry.1.operation);
+                let fiat = self
+                    .db
+                    .begin_read()
+                    .get(&OperationFiat, &entry.1.operation)
+                    .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
                 if let Some(summary) = parse_summary(&entry.1, &names, fiat) {
                     summaries.push(summary);
                 }
@@ -481,13 +441,13 @@ impl PicoClientFactory {
 
         // Phase 2: tail live events. Re-snapshot names per batch so a
         // newly-joined federation's name lands on its own first event.
-        let notify: Arc<Notify> = self.logger.event_notify(&self.db);
+        let notify: Arc<Notify> = self.client.event_notify();
 
         loop {
             let notified = notify.notified();
 
-            let batch = self.logger.get_event_log(&self.db, position, 1000);
-            let names = self.federation_names_snapshot().await;
+            let batch = self.client.get_event_log(position, 1000);
+            let names = self.federation_names_snapshot();
 
             for entry in &batch {
                 // Price each new payment as we observe it, so the summary we
@@ -515,16 +475,13 @@ impl PicoClientFactory {
         }
     }
 
-    /// Snapshot of currently-warm federation ids → names. Used to
-    /// resolve `OperationSummary.federation_name` at parse time. The three
-    /// accounts of a federation all carry its name, so they collapse onto one
-    /// entry here.
-    async fn federation_names_snapshot(&self) -> BTreeMap<FederationId, String> {
-        self.clients
-            .read()
-            .await
-            .iter()
-            .map(|((id, _), c)| (*id, c.federation_name.clone()))
+    /// Snapshot of joined federation ids → names. Used to resolve
+    /// `OperationSummary.federation_name` at parse time.
+    fn federation_names_snapshot(&self) -> BTreeMap<FederationId, String> {
+        self.client
+            .federation_configs()
+            .into_iter()
+            .map(|entry| (entry.0, entry.1.name))
             .collect()
     }
 
@@ -546,11 +503,7 @@ impl PicoClientFactory {
         };
         let op = OperationId(hash);
 
-        let notify = self.logger.event_notify(&self.db);
-        let mut stream = self
-            .logger
-            .subscribe_operation_events(self.db.clone(), notify, op)
-            .boxed();
+        let mut stream = self.client.subscribe_operation_events(op);
 
         while let Some(entry) = stream.next().await {
             let Some(event) = parse_payment_event(&entry) else {
@@ -572,7 +525,7 @@ impl PicoClientFactory {
         let mut position = EventLogId::LOG_START;
 
         loop {
-            let batch = self.logger.get_event_log(&self.db, position, 1000);
+            let batch = self.client.get_event_log(position, 1000);
 
             position = position.saturating_add(batch.len() as u64);
 
@@ -582,12 +535,12 @@ impl PicoClientFactory {
         }
 
         // Phase 2: tail live events; every match fires a notification.
-        let notify: Arc<Notify> = self.logger.event_notify(&self.db);
+        let notify: Arc<Notify> = self.client.event_notify();
 
         loop {
             let notified = notify.notified();
 
-            let batch = self.logger.get_event_log(&self.db, position, 1000);
+            let batch = self.client.get_event_log(position, 1000);
 
             for entry in &batch {
                 if let Some(notification) = parse_notification(&entry.1) {
@@ -644,35 +597,6 @@ impl PicoClientFactory {
     }
 }
 
-/// One `PicoClient` per account, all sharing `client` — the federation's
-/// whole row of the map, ready to be `extend`ed into it. Keyed the way the map
-/// is, so a caller never has to pair a client back up with its key.
-fn build_accounts(
-    client: Arc<Client>,
-    federation_id: FederationId,
-    db: Database,
-    exchange_rate_cache: ExchangeRateCache,
-) -> BTreeMap<(FederationId, Account), PicoClient> {
-    let federation_name = client.config().name.clone();
-
-    Account::USER_ACCOUNTS
-        .into_iter()
-        .map(|account| {
-            (
-                (federation_id, account),
-                PicoClient {
-                    client: client.clone(),
-                    federation_id,
-                    account,
-                    federation_name: federation_name.clone(),
-                    db: db.clone(),
-                    exchange_rate_cache: exchange_rate_cache.clone(),
-                },
-            )
-        })
-        .collect()
-}
-
 /// Snapshot the live exchange rate against a freshly-observed trigger event,
 /// returning the stored `(currency, rate)`. Idempotent write-if-absent: returns
 /// an existing snapshot untouched, otherwise reads the selected currency and
@@ -686,7 +610,7 @@ fn snapshot_fiat(
     op: &OperationId,
 ) -> Option<(String, f64)> {
     if let Some(existing) = db.begin_read().get(&OperationFiat, op) {
-        return Some(existing);
+        return Some((existing.0, f64::from_bits(existing.1)));
     }
 
     let currency = db
@@ -707,7 +631,7 @@ fn snapshot_fiat(
     };
 
     let dbtx = db.begin_write();
-    dbtx.insert(&OperationFiat, op, &(currency.clone(), rate));
+    dbtx.insert(&OperationFiat, op, &(currency.clone(), rate.to_bits()));
     dbtx.commit();
 
     Some((currency, rate))

@@ -19,7 +19,7 @@ picomint-core = { git = "https://github.com/joschisan/picomint", branch = "main"
 picomint-eventlog = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-fountain = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-lnurl = { git = "https://github.com/joschisan/picomint", branch = "main" }
-picomint-redb = { git = "https://github.com/joschisan/picomint", branch = "main" }
+picomint-sqlite = { git = "https://github.com/joschisan/picomint", branch = "main" }
 regex = "1"
 reqwest = { version = "=0.12.22", features = ["rustls-tls", "json"], default-features = false }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }

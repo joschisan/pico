@@ -9,7 +9,7 @@ use picomint_core::Amount;
 use picomint_core::PeerId;
 use picomint_core::config::FederationId;
 use picomint_core::ln::gateway::{GatewayInfo, GatewayPk};
-use picomint_redb::Database;
+use picomint_sqlite::{Database, DbRead};
 
 use crate::db::SelectedCurrency;
 use crate::exchange::{ExchangeRateCache, FRESHNESS, btc_price, fetch_exchange_rates};
@@ -154,7 +154,9 @@ impl PicoClient {
 
     #[frb]
     pub async fn subscribe_balance(&self, sink: StreamSink<i64>) {
-        let mut stream = self.client.subscribe_balance_changes(self.account);
+        let mut stream = self
+            .client
+            .mint_subscribe_balance(self.federation_id, self.account);
 
         while let Some(amount) = stream.next().await {
             if sink.add((amount.msat / 1000) as i64).is_err() {
@@ -176,15 +178,19 @@ impl PicoClient {
     pub async fn subscribe_connection_status(&self, sink: StreamSink<Vec<(String, Option<f64>)>>) {
         // Guardian names keyed by PeerId so every emission renders all
         // guardians (even before their first status lands) in a stable order.
-        let names: BTreeMap<PeerId, String> = self
-            .client
-            .config()
+        let Some(config) = self.client.config(self.federation_id) else {
+            return;
+        };
+
+        let names: BTreeMap<PeerId, String> = config
             .peers
             .iter()
-            .map(|(id, peer)| (*id, peer.name.clone()))
+            .map(|entry| (*entry.0, entry.1.name.clone()))
             .collect();
 
-        let mut stream = self.client.connection_status_stream();
+        let Ok(mut stream) = self.client.connection_status_stream(self.federation_id) else {
+            return;
+        };
 
         while let Some(status_map) = stream.next().await {
             let statuses: Vec<(String, Option<f64>)> = names
@@ -221,8 +227,11 @@ impl PicoClient {
     #[frb]
     pub async fn ecash_send(&self, amount_sat: i64) -> Result<ECashWrapper, String> {
         self.client
-            .mint()
-            .send(self.account, Amount::from_sat(amount_sat as u64))
+            .mint_send(
+                self.federation_id,
+                self.account,
+                Amount::from_sat(amount_sat as u64),
+            )
             .await
             .map(ECashWrapper)
             .map_err(|e| e.to_string())
@@ -245,14 +254,17 @@ impl PicoClient {
     /// wallet the caller shouldn't have offered this on.
     #[frb]
     pub async fn ecash_send_max(&self) -> Option<ECashWrapper> {
-        self.client.mint().send_max(self.account).map(ECashWrapper)
+        self.client
+            .mint_send_max(self.federation_id, self.account)
+            .ok()
+            .flatten()
+            .map(ECashWrapper)
     }
 
     #[frb]
     pub async fn ecash_receive(&self, ecash: &ECashWrapper) -> Result<(), String> {
         self.client
-            .mint()
-            .receive(self.account, &ecash.0)
+            .mint_receive(self.federation_id, self.account, &ecash.0)
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
@@ -278,14 +290,19 @@ impl PicoClient {
     /// account they came from.
     #[frb]
     pub async fn transfer_to_primary(&self) -> Result<(), String> {
-        let Some(ecash) = self.client.mint().send_max(self.account) else {
+        let Ok(Some(ecash)) = self.client.mint_send_max(self.federation_id, self.account) else {
             return Ok(());
         };
 
-        if let Err(error) = self.client.mint().receive(Account::PRIMARY, &ecash) {
+        if let Err(error) = self
+            .client
+            .mint_receive(self.federation_id, Account::PRIMARY, &ecash)
+        {
             // The guard row a receive takes is only committed on success, so
             // this second attempt isn't refused as a repeat of the first.
-            self.client.mint().receive(self.account, &ecash).ok();
+            self.client
+                .mint_receive(self.federation_id, self.account, &ecash)
+                .ok();
 
             return Err(error.to_string());
         }
@@ -301,8 +318,8 @@ impl PicoClient {
     ) -> Result<String, String> {
         let invoice = self
             .client
-            .ln()
-            .receive(
+            .ln_receive(
+                self.federation_id,
                 self.account,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
@@ -321,8 +338,7 @@ impl PicoClient {
     pub async fn ln_select_gateway(&self) -> Result<GatewayInfoWrapper, String> {
         let (gateway_pk, gateway_info) = self
             .client
-            .ln()
-            .select_gateway()
+            .ln_select_gateway(self.federation_id)
             .map_err(|e| e.to_string())?;
 
         Ok(GatewayInfoWrapper {
@@ -338,8 +354,8 @@ impl PicoClient {
         invoice: &Bolt11InvoiceWrapper,
     ) -> Result<String, String> {
         self.client
-            .ln()
-            .send(
+            .ln_send(
+                self.federation_id,
                 self.account,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
@@ -361,12 +377,10 @@ impl PicoClient {
     /// where the spending does.
     #[frb]
     pub async fn ln_max_amount(&self, gateway: &GatewayInfoWrapper) -> i64 {
-        let amount = self
-            .client
-            .ln()
-            .send_max_amount(self.account, &gateway.gateway_info);
-
-        (amount.msat / 1000) as i64
+        self.client
+            .ln_send_max_amount(self.federation_id, self.account, &gateway.gateway_info)
+            .map(|amount| (amount.msat / 1000) as i64)
+            .unwrap_or(0)
     }
 
     /// Empties the account to `lnurl` through `gateway`: picomint resolves
@@ -382,8 +396,8 @@ impl PicoClient {
         lnurl: String,
     ) -> Result<String, String> {
         self.client
-            .ln()
-            .send_max(
+            .ln_send_max(
+                self.federation_id,
                 self.account,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
@@ -398,8 +412,12 @@ impl PicoClient {
     #[frb(sync)]
     pub fn lnurl(&self) -> String {
         self.client
-            .ln()
-            .generate_lnurl(self.account, "http://159.223.25.182:8082/".to_string())
+            .ln_generate_lnurl(
+                self.federation_id,
+                self.account,
+                "http://159.223.25.182:8082/".to_string(),
+            )
+            .unwrap_or_default()
     }
 
     #[frb]
@@ -412,8 +430,7 @@ impl PicoClient {
         // address/amount. Match the existing UI signature; ignore the
         // extra inputs.
         self.client
-            .wallet()
-            .send_fee()
+            .wallet_send_fee(self.federation_id)
             .await
             .map(|fee| fee.to_sat() as i64)
             .map_err(|e| e.to_string())
@@ -426,8 +443,8 @@ impl PicoClient {
         amount_sats: i64,
     ) -> Result<(), String> {
         self.client
-            .wallet()
-            .send(
+            .wallet_send(
+                self.federation_id,
                 self.account,
                 address.0.clone(),
                 BtcAmount::from_sat(amount_sats as u64),
@@ -449,8 +466,7 @@ impl PicoClient {
     #[frb]
     pub async fn onchain_max_amount(&self) -> Result<i64, String> {
         self.client
-            .wallet()
-            .send_max_amount(self.account)
+            .wallet_send_max_amount(self.federation_id, self.account)
             .await
             .map(|amount| amount.to_sat() as i64)
             .map_err(|e| e.to_string())
@@ -462,8 +478,7 @@ impl PicoClient {
     #[frb]
     pub async fn onchain_send_max(&self, address: &BitcoinAddressWrapper) -> Result<(), String> {
         self.client
-            .wallet()
-            .send_max(self.account, address.0.clone())
+            .wallet_send_max(self.federation_id, self.account, address.0.clone())
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())
@@ -471,6 +486,10 @@ impl PicoClient {
 
     #[frb]
     pub async fn onchain_receive_address(&self) -> Result<String, String> {
-        Ok(self.client.wallet().receive(self.account).await.to_string())
+        self.client
+            .wallet_deposit_address(self.federation_id, self.account)
+            .await
+            .map(|address| address.to_string())
+            .map_err(|e| e.to_string())
     }
 }

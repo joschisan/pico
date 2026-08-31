@@ -18,7 +18,7 @@ use lightning_invoice::Bolt11Invoice;
 use picomint_client::Mnemonic;
 use picomint_client::mint::ECash;
 use picomint_core::invite::InviteCode;
-use picomint_redb::Database;
+use picomint_sqlite::Database;
 
 pub use client::{GatewayInfoWrapper, PicoClient};
 pub use currency::{FiatCurrency, find_fiat_currency, list_fiat_currencies};
@@ -69,7 +69,7 @@ pub struct DatabaseWrapper(pub(crate) Database);
 pub async fn open_database(db_path: &str) -> DatabaseWrapper {
     let db_path = PathBuf::from_str(db_path)
         .expect("db_path is a valid path")
-        .join("pico.redb");
+        .join("pico.sqlite");
 
     let db = Database::open(db_path).expect("could not open database");
 
