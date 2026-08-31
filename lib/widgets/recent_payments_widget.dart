@@ -28,7 +28,10 @@ class RecentPayments extends StatefulWidget implements Bleeds {
 }
 
 class _RecentPaymentsState extends State<RecentPayments> {
-  List<OperationSummary> _payments = [];
+  /// Null until the stream's first snapshot: rendering nothing then keeps
+  /// the empty-state text from flashing on every mount before the answer
+  /// arrives — an empty list is a fact, not a default.
+  List<OperationSummary>? _payments;
   StreamSubscription<List<OperationSummary>>? _subscription;
 
   /// Payments in the first snapshot render without the entry animation; only
@@ -45,8 +48,9 @@ class _RecentPaymentsState extends State<RecentPayments> {
     if (!mounted) return;
 
     setState(() {
-      _payments = snapshot.reversed.toList();
-      _initialIds ??= _payments.map((p) => p.operationId).toSet();
+      final payments = snapshot.reversed.toList();
+      _payments = payments;
+      _initialIds ??= payments.map((p) => p.operation.display()).toSet();
     });
   }
 
@@ -74,10 +78,16 @@ class _RecentPaymentsState extends State<RecentPayments> {
 
   @override
   Widget build(BuildContext context) {
+    final payments = _payments;
+
+    if (payments == null) {
+      return const SizedBox.shrink();
+    }
+
     // A BleedColumn so a hosting BleedColumn passes this through uninset:
     // the rows carry their own content padding and must reach the screen
     // edges, while the header and empty-state text take the standard inset.
-    if (_payments.isEmpty) {
+    if (payments.isEmpty) {
       return BleedColumn(
         children: [
           const SizedBox(height: 64),
@@ -103,15 +113,15 @@ class _RecentPaymentsState extends State<RecentPayments> {
         ),
         BorderedList.column(
           children: [
-            for (var i = 0; i < _payments.length; i++)
+            for (final payment in payments)
               KeyedSubtree(
-                key: ValueKey(_payments[i].operationId),
+                key: ValueKey(payment.operation.display()),
                 child: AnimatedEntry(
-                  animate: !_initialIds!.contains(_payments[i].operationId),
+                  animate: !_initialIds!.contains(payment.operation.display()),
                   child: PaymentCard(
                     pico: widget.pico,
-                    event: _payments[i],
-                    onTap: () => widget.onTransactionTap(_payments[i]),
+                    event: payment,
+                    onTap: () => widget.onTransactionTap(payment),
                   ),
                 ),
               ),

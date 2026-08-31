@@ -9,7 +9,6 @@ use iroh::Endpoint;
 use iroh::endpoint::presets::N0;
 use iroh_mdns_address_lookup::MdnsAddressLookup;
 use picomint_client::{Account, Client, Mnemonic, OperationId};
-use picomint_core::bitcoin::hashes::sha256;
 use picomint_core::config::FederationId;
 use picomint_eventlog::EventLogId;
 use picomint_sqlite::{Database, DbRead};
@@ -24,7 +23,9 @@ use crate::events::{
 use crate::exchange::{ExchangeRateCache, FRESHNESS, btc_price, fetch_exchange_rates};
 use crate::frb_generated::StreamSink;
 use crate::lnurl::LnurlWrapper;
-use crate::{DatabaseWrapper, InviteCodeWrapper, MnemonicWrapper};
+use crate::{
+    DatabaseWrapper, FederationIdWrapper, InviteCodeWrapper, MnemonicWrapper, OperationIdWrapper,
+};
 
 #[frb(opaque)]
 pub struct Pico {
@@ -513,22 +514,16 @@ impl Pico {
     /// Live tail of every picomint event for a single operation, parsed
     /// into the rich [`PaymentEvent`] enum for the details drawer timeline.
     /// Replays existing events first (oldest → newest) then yields new
-    /// ones as they're committed. Silently exits if `operation_id` doesn't
-    /// parse as a valid sha256 hash. Operation ids are globally unique so
+    /// ones as they're committed. Operation ids are globally unique so
     /// no federation context is required — reads the daemon-wide eventlog
     /// directly.
     #[frb]
     pub async fn subscribe_payment_events(
         &self,
-        operation_id: String,
+        operation: &OperationIdWrapper,
         sink: StreamSink<PaymentEvent>,
     ) {
-        let Ok(hash) = sha256::Hash::from_str(&operation_id) else {
-            return;
-        };
-        let op = OperationId(hash);
-
-        let mut stream = self.client.subscribe_operation_events(op);
+        let mut stream = self.client.subscribe_operation_events(operation.0);
 
         while let Some(entry) = stream.next().await {
             let Some(event) = parse_payment_event(&entry) else {
@@ -540,23 +535,30 @@ impl Pico {
         }
     }
 
+    /// Whether any picomint state machine is still driving the operation —
+    /// the synchronous initial value for the payment-card spinner, so the
+    /// first frame renders the truth instead of a guess.
+    #[frb(sync)]
+    pub fn operation_is_active(
+        &self,
+        federation: &FederationIdWrapper,
+        operation: &OperationIdWrapper,
+    ) -> bool {
+        self.client.operation_is_active(federation.0, operation.0)
+    }
+
     /// Resolves once no picomint state machine is still driving the
     /// operation — immediately for settled or unknown ones. Backs the
     /// in-progress spinner on payment cards; the outcome itself arrives
-    /// through `subscribe_payment_events`. Resolves immediately if either
-    /// id fails to parse.
+    /// through `subscribe_payment_events`.
     #[frb]
-    pub async fn subscribe_completion(&self, federation_id: String, operation_id: String) {
-        let Ok(federation) = FederationId::from_str(&federation_id) else {
-            return;
-        };
-
-        let Ok(hash) = sha256::Hash::from_str(&operation_id) else {
-            return;
-        };
-
+    pub async fn subscribe_completion(
+        &self,
+        federation: &FederationIdWrapper,
+        operation: &OperationIdWrapper,
+    ) {
         self.client
-            .subscribe_completion(federation, OperationId(hash))
+            .subscribe_completion(federation.0, operation.0)
             .await;
     }
 

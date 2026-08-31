@@ -51,7 +51,7 @@ class _PaymentDetailsDrawerState extends State<PaymentDetailsDrawer> {
   void initState() {
     super.initState();
     _subscription = widget.pico
-        .subscribePaymentEvents(operationId: widget.event.operationId)
+        .subscribePaymentEvents(operation: widget.event.operation)
         .listen((e) {
           if (!mounted) return;
           setState(() => _events.add(e));

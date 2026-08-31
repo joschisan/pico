@@ -141,7 +141,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
           ),
           itemBuilder:
               (context, payment) => PaymentCard(
-                key: ValueKey(payment.operationId),
+                key: ValueKey(payment.operation.display()),
                 pico: widget.pico,
                 event: payment,
                 onTap:

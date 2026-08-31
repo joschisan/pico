@@ -30,6 +30,8 @@ use picomint_core::bitcoin::hex::DisplayHex;
 use picomint_core::config::FederationId;
 use picomint_eventlog::EventLogEntry;
 
+use crate::{FederationIdWrapper, OperationIdWrapper};
+
 #[frb]
 #[derive(Clone)]
 pub enum PaymentType {
@@ -44,8 +46,8 @@ pub enum PaymentType {
 #[frb]
 #[derive(Clone)]
 pub struct OperationSummary {
-    pub operation_id: String,
-    pub federation_id: String,
+    pub operation: OperationIdWrapper,
+    pub federation: FederationIdWrapper,
     pub incoming: bool,
     pub payment_type: PaymentType,
     pub amount_sats: i64,
@@ -274,8 +276,8 @@ pub(crate) fn parse_summary(
     };
 
     Some(OperationSummary {
-        operation_id: entry.operation.to_string(),
-        federation_id: entry.federation.to_string(),
+        operation: OperationIdWrapper(entry.operation),
+        federation: FederationIdWrapper(entry.federation),
         incoming,
         payment_type,
         amount_sats,
