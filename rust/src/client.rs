@@ -106,9 +106,7 @@ impl Pico {
     /// balance the UI shows is millisats floored to sats besides. Missing the
     /// fast path drops the send onto the path that builds a real transaction,
     /// which covers its fees out of the account being emptied, so asking for
-    /// everything fails on a balance the user is looking at. See
-    /// [`Self::mint_transfer_to_primary`], which sends the same way for the
-    /// same reason.
+    /// everything fails on a balance the user is looking at.
     ///
     /// Infallible: `None` is an account holding no notes, which is the empty
     /// wallet the caller shouldn't have offered this on.
@@ -136,44 +134,6 @@ impl Pico {
             .mint_receive(federation.0, account.0, &ecash.0)
             .map(|_| ())
             .map_err(|e| e.to_string())
-    }
-
-    /// Move everything this account holds into its federation's primary
-    /// account, as an ordinary ecash payment between the two. The receive
-    /// leg reissues the notes to primary's own nonces, so a later restore
-    /// from the seed finds them where they now are rather than where they
-    /// were.
-    ///
-    /// Sends by `mint_send_max` rather than by naming the balance in sats —
-    /// see [`Self::mint_send_max`] for why naming it fails on the balance
-    /// the user is looking at.
-    ///
-    /// Both legs run here rather than either side of the bridge: the send
-    /// hands the notes back by value, so until the receive lands they are
-    /// held nowhere else, and a receive that fails puts them back into the
-    /// account they came from.
-    #[frb]
-    pub async fn mint_transfer_to_primary(
-        &self,
-        federation: &FederationIdWrapper,
-        account: &AccountWrapper,
-    ) -> Result<(), String> {
-        let Ok(Some(ecash)) = self.client.mint_send_max(federation.0, account.0) else {
-            return Ok(());
-        };
-
-        if let Err(error) = self
-            .client
-            .mint_receive(federation.0, Account::PRIMARY, &ecash)
-        {
-            // The guard row a receive takes is only committed on success, so
-            // this second attempt isn't refused as a repeat of the first.
-            self.client.mint_receive(federation.0, account.0, &ecash).ok();
-
-            return Err(error.to_string());
-        }
-
-        Ok(())
     }
 
     #[frb]
