@@ -153,26 +153,6 @@ impl Pico {
         self.rows()
     }
 
-    /// Look up a federation's [`Account::PRIMARY`] row. `None` if the user
-    /// isn't joined to it, which is how the ecash drawer tells a bundle from
-    /// a mint the wallet doesn't have.
-    ///
-    /// Primary because a caller reaching for this holds a federation id and
-    /// nothing more — an ecash bundle names no account. It is the fallback,
-    /// not the usual path: the drawer receives into the account on screen
-    /// when the bundle belongs to its federation, and only asks here when it
-    /// doesn't.
-    #[frb(sync)]
-    pub fn account(&self, federation: &FederationIdWrapper) -> Option<PicoAccount> {
-        let config = self.client.config(federation.0)?;
-
-        Some(PicoAccount::new(
-            federation.0,
-            Account::PRIMARY,
-            config.name,
-        ))
-    }
-
     /// Adds a federation, rebuilding whatever this seed already owns there.
     ///
     /// One path, whether or not the seed has been here before: `add` scans

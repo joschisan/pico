@@ -10,13 +10,11 @@ import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/widgets/payment_summary_row_widget.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 
-/// Confirms receiving an out-of-band ecash bundle, into the account resolved
-/// by [_resolveDestination].
+/// Confirms receiving an out-of-band ecash bundle, into the selected account.
 class EcashDrawer extends StatefulWidget {
-  /// The account in view when the bundle arrived. Used when it belongs to the
-  /// bundle's federation — the balance the user is looking at is the one they
-  /// mean — and ignored otherwise, since notes can only be received by the
-  /// federation that issued them.
+  /// The account in view when the bundle arrived — the balance the user is
+  /// looking at is the one they mean. A bundle issued by a different
+  /// federation is rejected by the receive itself with an explicit error.
   final PicoAccount selected;
   final Pico pico;
   final ECashWrapper ecash;
@@ -45,30 +43,10 @@ class EcashDrawer extends StatefulWidget {
 }
 
 class _EcashDrawerState extends State<EcashDrawer> {
-  // Cached so the lookup doesn't re-fire on every rebuild.
-  late final Future<PicoAccount?> _destination = _resolveDestination();
-
-  /// Which account the bundle lands in. The selected one when it belongs to
-  /// the issuing federation, so scanning while parked on a page pays into the
-  /// balance shown on it. Otherwise the bundle names a federation and nothing
-  /// more, and [Pico.account] answers with its primary account — or `null` if
-  /// the user isn't joined to it at all.
-  Future<PicoAccount?> _resolveDestination() async {
-    if (widget.selected.federation.display() ==
-        widget.ecash.federation().display()) {
-      return widget.selected;
-    }
-
-    return widget.pico.account(federation: widget.ecash.federation());
-  }
-
   Future<void> _handleReceive() async {
-    final destination = await _destination;
-    if (destination == null) throw Exception('Mint is unknown');
-
     await widget.pico.mintReceive(
-      federation: destination.federation,
-      account: destination.account,
+      federation: widget.selected.federation,
+      account: widget.selected.account,
       ecash: widget.ecash,
     );
 
@@ -88,8 +66,6 @@ class _EcashDrawerState extends State<EcashDrawer> {
               incoming: true,
               status: 'Receive',
             ),
-            // The exchange-rate cache is app-wide, so the fiat row renders
-            // without waiting on the destination lookup.
             ...amountRows(
               pico: widget.pico,
               amountSats: widget.ecash.amountSats(),
