@@ -19,7 +19,7 @@ use picomint_client::mint::ECash;
 use picomint_client::{Account, Mnemonic, OperationId};
 use picomint_core::config::FederationId;
 use picomint_core::invite::InviteCode;
-use picomint_sqlite::Database;
+use picomint_redb::Database;
 
 pub use app::{Pico, PicoContact};
 pub use client::{GatewayInfoWrapper, PicoAccount};
@@ -70,7 +70,7 @@ pub struct DatabaseWrapper(pub(crate) Database);
 pub async fn open_database(db_path: &str) -> DatabaseWrapper {
     let db_path = PathBuf::from_str(db_path)
         .expect("db_path is a valid path")
-        .join("pico.sqlite");
+        .join("database.redb");
 
     let db = Database::open(db_path).expect("could not open database");
 

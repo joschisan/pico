@@ -1,10 +1,10 @@
-//! Pico's app-level sqlite tables. Everything federation-scoped lives in
+//! Pico's app-level database tables. Everything federation-scoped lives in
 //! tables owned by `picomint_client::Client` (config, notes, state machines,
 //! the daemon-wide event log) — what remains here is app state the client
 //! has no concept of.
 
 use picomint_core::core::OperationId;
-use picomint_sqlite::table;
+use picomint_redb::table;
 
 table!(
     RootEntropy,

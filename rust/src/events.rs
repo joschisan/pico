@@ -9,7 +9,6 @@
 //! - [`parse_payment_event`] — every public picomint event → rich
 //!   [`PaymentEvent`] for the per-op timeline drawer.
 
-
 use flutter_rust_bridge::frb;
 use picomint_client::ln::events::{
     ReceiveEvent as LnReceive, SendEvent as LnSend, SendFailureEvent as LnSendFailureEvent,
