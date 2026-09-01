@@ -68,18 +68,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ahash"
-version = "0.8.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
-dependencies = [
- "cfg-if",
- "once_cell",
- "version_check",
- "zerocopy",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1003,18 +991,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
-name = "fallible-iterator"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
-
-[[package]]
-name = "fallible-streaming-iterator"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
-
-[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1359,15 +1335,6 @@ checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
 name = "hashbrown"
-version = "0.14.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
-dependencies = [
- "ahash",
-]
-
-[[package]]
-name = "hashbrown"
 version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5971ac85611da7067dbfcabef3c70ebb5606018acd9e2a3903a0da507521e0d5"
@@ -1384,15 +1351,6 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash 0.2.0",
-]
-
-[[package]]
-name = "hashlink"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af"
-dependencies = [
- "hashbrown 0.14.5",
 ]
 
 [[package]]
@@ -2154,17 +2112,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
 
 [[package]]
-name = "libsqlite3-sys"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c10584274047cb335c23d3e61bcef8e323adae7c5c8c760540f73610177fc3f"
-dependencies = [
- "cc",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
 name = "lightning-invoice"
 version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2829,7 +2776,7 @@ dependencies = [
  "picomint-eventlog",
  "picomint-fountain",
  "picomint-lnurl",
- "picomint-sqlite",
+ "picomint-redb",
  "regex",
  "reqwest 0.12.22",
  "rustls",
@@ -2841,7 +2788,7 @@ dependencies = [
 [[package]]
 name = "picomint-base32"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "anyhow",
  "picomint-encoding",
@@ -2850,7 +2797,7 @@ dependencies = [
 [[package]]
 name = "picomint-client"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2866,8 +2813,8 @@ dependencies = [
  "picomint-encoding",
  "picomint-eventlog",
  "picomint-lnurl",
+ "picomint-redb",
  "picomint-rpc",
- "picomint-sqlite",
  "picomint-tbs",
  "picomint-tpe",
  "rand 0.8.6",
@@ -2882,7 +2829,7 @@ dependencies = [
 [[package]]
 name = "picomint-core"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "anyhow",
  "backon",
@@ -2909,7 +2856,7 @@ dependencies = [
 [[package]]
 name = "picomint-derive"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2919,7 +2866,7 @@ dependencies = [
 [[package]]
 name = "picomint-encoding"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "bitcoin",
  "bitcoin-io",
@@ -2935,7 +2882,7 @@ dependencies = [
 [[package]]
 name = "picomint-eventlog"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2943,7 +2890,7 @@ dependencies = [
  "futures",
  "picomint-core",
  "picomint-encoding",
- "picomint-sqlite",
+ "picomint-redb",
  "serde",
  "serde_json",
  "tokio",
@@ -2953,7 +2900,7 @@ dependencies = [
 [[package]]
 name = "picomint-fountain"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "bitcoin_hashes",
  "picomint-encoding",
@@ -2964,7 +2911,7 @@ dependencies = [
 [[package]]
 name = "picomint-lnurl"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "bech32",
  "lightning-invoice",
@@ -2974,9 +2921,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "picomint-redb"
+version = "0.1.0"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
+dependencies = [
+ "anyhow",
+ "picomint-encoding",
+ "redb",
+ "tokio",
+]
+
+[[package]]
 name = "picomint-rpc"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "anyhow",
  "futures",
@@ -2989,20 +2947,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "picomint-sqlite"
-version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
-dependencies = [
- "anyhow",
- "picomint-encoding",
- "rusqlite",
- "tokio",
-]
-
-[[package]]
 name = "picomint-tbs"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "bitcoin",
  "bls12_381",
@@ -3017,7 +2964,7 @@ dependencies = [
 [[package]]
 name = "picomint-tpe"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "bitcoin_hashes",
  "bls12_381",
@@ -3032,7 +2979,7 @@ dependencies = [
 [[package]]
 name = "picomint-tss"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#ef99f98a50fa3b177db13f1639b0a8d899f29c35"
+source = "git+https://github.com/joschisan/picomint?branch=main#c70681055dd925c7eb43af6bb4c2e1354eff4749"
 dependencies = [
  "bitcoin",
  "picomint-encoding",
@@ -3077,12 +3024,6 @@ dependencies = [
  "der",
  "spki",
 ]
-
-[[package]]
-name = "pkg-config"
-version = "0.3.34"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "plist"
@@ -3411,6 +3352,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "redb"
+version = "4.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de6c3b63e007e90ce536ec2ae4690826136a20ec8dbbbb400daef1bb999d2e36"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3566,20 +3516,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rusqlite"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b838eba278d213a8beaf485bd313fd580ca4505a00d5871caeb1457c55322cae"
-dependencies = [
- "bitflags",
- "fallible-iterator",
- "fallible-streaming-iterator",
- "hashlink",
- "libsqlite3-sys",
- "smallvec",
 ]
 
 [[package]]
@@ -4591,12 +4527,6 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
-
-[[package]]
-name = "vcpkg"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "version_check"

@@ -10,7 +10,7 @@ use iroh_mdns_address_lookup::MdnsAddressLookup;
 use picomint_client::{Account, Client, Mnemonic, OperationId};
 use picomint_core::config::FederationId;
 use picomint_eventlog::EventLogId;
-use picomint_sqlite::{Database, DbRead};
+use picomint_redb::{Database, DbRead};
 use tokio::sync::{Mutex, Notify};
 
 use crate::client::PicoAccount;
@@ -166,7 +166,11 @@ impl Pico {
     pub fn account(&self, federation: &FederationIdWrapper) -> Option<PicoAccount> {
         let config = self.client.config(federation.0)?;
 
-        Some(PicoAccount::new(federation.0, Account::PRIMARY, config.name))
+        Some(PicoAccount::new(
+            federation.0,
+            Account::PRIMARY,
+            config.name,
+        ))
     }
 
     /// Adds a federation, rebuilding whatever this seed already owns there.

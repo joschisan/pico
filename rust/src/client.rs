@@ -18,8 +18,8 @@ use picomint_core::ln::gateway::{GatewayInfo, GatewayPk};
 use crate::app::Pico;
 use crate::frb_generated::StreamSink;
 use crate::{
-    AccountWrapper, BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper,
-    FederationIdWrapper, InviteCodeWrapper,
+    AccountWrapper, BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, FederationIdWrapper,
+    InviteCodeWrapper,
 };
 
 /// Holds a caller-selected gateway plus its routing info, returned by
