@@ -529,12 +529,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Receive Onchain derives the address from the mirrored wallet state, so
+  /// like the lnurl it needs no round trip and the screen opens with the
+  /// address already in hand. The bridge throws only while the initial
+  /// derivation is still running, which surfaces as a notification here.
   void _onReceiveBitcoin() {
     final account = _selectedAccount();
+
+    final String address;
+    try {
+      address = widget.pico.walletDepositAddress(
+        federation: account.federation,
+        account: account.account,
+      );
+    } catch (error) {
+      NotificationUtils.showError(context, error.toString());
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (_) => WalletV2ReceiveScreen(account: account, pico: widget.pico),
+        builder: (_) => WalletV2ReceiveScreen(address: address),
       ),
     );
   }
