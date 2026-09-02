@@ -501,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Receive Lightning leads with the reusable code. The lnurl is read from
   /// the mint's locally mirrored gateway set, so this needs no round trip.
-  void _onReceiveLightning() {
+  Future<void> _onReceiveLightning() async {
     final account = _selectedAccount();
 
     Navigator.of(context).push(
@@ -520,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _onSendEcash() {
+  Future<void> _onSendEcash() async {
     final account = _selectedAccount();
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -529,12 +529,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _onReceiveBitcoin() {
+  /// Receive Onchain asks the mint for a fresh deposit address first, so the
+  /// button spins for the round trip and the screen opens with the address
+  /// already in hand rather than onto a placeholder. A failure never leaves
+  /// the home screen: the button's mixin reports it as a notification.
+  Future<void> _onReceiveBitcoin() async {
     final account = _selectedAccount();
+
+    final address = await widget.pico.walletDepositAddress(
+      federation: account.federation,
+      account: account.account,
+    );
+
+    if (!mounted) return;
+
+    // Not awaited: the button should stop spinning the moment the screen is
+    // pushed, not when the user later pops back out of it.
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (_) => WalletV2ReceiveScreen(account: account, pico: widget.pico),
+        builder: (_) => WalletV2ReceiveScreen(address: address),
       ),
     );
   }
@@ -562,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _onScan() {
+  Future<void> _onScan() async {
     ScannerDrawer.show(context, account: _selectedAccount(), pico: widget.pico);
   }
 
