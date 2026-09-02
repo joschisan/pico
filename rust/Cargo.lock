@@ -2788,7 +2788,7 @@ dependencies = [
 [[package]]
 name = "picomint-base32"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "anyhow",
  "picomint-encoding",
@@ -2797,7 +2797,7 @@ dependencies = [
 [[package]]
 name = "picomint-client"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2829,7 +2829,7 @@ dependencies = [
 [[package]]
 name = "picomint-core"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "anyhow",
  "backon",
@@ -2856,7 +2856,7 @@ dependencies = [
 [[package]]
 name = "picomint-derive"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2866,7 +2866,7 @@ dependencies = [
 [[package]]
 name = "picomint-encoding"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "bitcoin",
  "bitcoin-io",
@@ -2882,7 +2882,7 @@ dependencies = [
 [[package]]
 name = "picomint-eventlog"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2900,7 +2900,7 @@ dependencies = [
 [[package]]
 name = "picomint-fountain"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "bitcoin_hashes",
  "picomint-encoding",
@@ -2911,7 +2911,7 @@ dependencies = [
 [[package]]
 name = "picomint-lnurl"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "bech32",
  "lightning-invoice",
@@ -2923,7 +2923,7 @@ dependencies = [
 [[package]]
 name = "picomint-redb"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "anyhow",
  "picomint-encoding",
@@ -2934,7 +2934,7 @@ dependencies = [
 [[package]]
 name = "picomint-rpc"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "anyhow",
  "futures",
@@ -2949,7 +2949,7 @@ dependencies = [
 [[package]]
 name = "picomint-tbs"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "bitcoin",
  "bls12_381",
@@ -2964,7 +2964,7 @@ dependencies = [
 [[package]]
 name = "picomint-tpe"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "bitcoin_hashes",
  "bls12_381",
@@ -2979,7 +2979,7 @@ dependencies = [
 [[package]]
 name = "picomint-tss"
 version = "0.1.0"
-source = "git+https://github.com/joschisan/picomint?branch=main#c4d6133a4cf7b175a0dcb872ac95839c3485fbd6"
+source = "git+https://github.com/joschisan/picomint?branch=main#f4fa6dd065284bfe420269ea2c1de68f05db2a20"
 dependencies = [
  "bitcoin",
  "picomint-encoding",

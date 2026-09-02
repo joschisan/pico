@@ -350,15 +350,17 @@ impl Pico {
             .map_err(|e| e.to_string())
     }
 
-    #[frb]
-    pub async fn wallet_deposit_address(
+    /// `account`'s next unused deposit address, derived locally from the
+    /// mirrored wallet state, so it never touches the network. Errors only
+    /// while the initial address derivation has not completed yet.
+    #[frb(sync)]
+    pub fn wallet_deposit_address(
         &self,
         federation: &FederationIdWrapper,
         account: &AccountWrapper,
     ) -> Result<String, String> {
         self.client
             .wallet_deposit_address(federation.0, account.0)
-            .await
             .map(|address| address.to_string())
             .map_err(|e| e.to_string())
     }
