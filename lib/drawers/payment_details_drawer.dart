@@ -143,7 +143,7 @@ class _TimelineRow extends StatelessWidget {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: desc.tone,
+                    color: scheme.primary,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -203,15 +203,9 @@ class _TimelineRow extends StatelessWidget {
 class _Description {
   final String label;
   final String? subtitle;
-  final Color tone;
   final VoidCallback? onTap;
 
-  const _Description({
-    required this.label,
-    required this.tone,
-    this.subtitle,
-    this.onTap,
-  });
+  const _Description({required this.label, this.subtitle, this.onTap});
 }
 
 String _sats(int n) => '${NumberFormat('#,###').format(n)} sat';
@@ -264,12 +258,6 @@ _Description _describe(
   Pico pico,
   BuildContext context,
 ) {
-  final scheme = Theme.of(context).colorScheme;
-  final neutral = scheme.onSurfaceVariant;
-  final success = scheme.primary;
-  final failure = Colors.red;
-  final warning = warningColor;
-
   // Renders amounts in sats, fiat, or masked per the active toggle.
   final amount = _amountFormatter(context, summary);
 
@@ -278,103 +266,76 @@ _Description _describe(
     PaymentEvent_TxCreate(:final changeSats, :final feeSats) => _Description(
       label: 'Transaction Created',
       subtitle: '${amount(changeSats.toInt())} · ${amount(feeSats.toInt())}',
-      tone: neutral,
     ),
-    PaymentEvent_TxAccept() => _Description(
-      label: 'Transaction Accepted',
-      tone: neutral,
-    ),
-    PaymentEvent_TxReject() => _Description(
-      label: 'Transaction Rejected',
-      tone: failure,
-    ),
+    PaymentEvent_TxAccept() => _Description(label: 'Transaction Accepted'),
+    PaymentEvent_TxReject() => _Description(label: 'Transaction Rejected'),
 
     // ── Lightning ───────────────────────────────────────────────────────
     PaymentEvent_LnSend(:final amountSats, :final feeSats) => _Description(
       label: 'Send Lightning',
       subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
-      tone: neutral,
     ),
     PaymentEvent_LnSendSuccess(:final preimage) => _Description(
       label: 'Send Success',
       subtitle: 'Tap to share Preimage',
-      tone: success,
       onTap: () => _share(preimage),
     ),
     PaymentEvent_LnSendRefund(:final expired) => _Description(
       label: 'Refund',
       subtitle: expired ? 'contract expired' : 'gateway cancelled',
-      tone: warning,
     ),
     PaymentEvent_LnSendFailure() => _Description(
       label: 'Send Failure',
       subtitle: 'missing preimage',
-      tone: failure,
     ),
     PaymentEvent_LnReceive(:final amountSats, :final feeSats) => _Description(
       label: 'Receive Lightning',
       subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
-      tone: neutral,
     ),
 
     // ── Mint (ECash) ────────────────────────────────────────────────────
     PaymentEvent_MintSend(:final amountSats) => _Description(
       label: 'Send eCash',
       subtitle: amount(amountSats.toInt()),
-      tone: neutral,
     ),
     PaymentEvent_MintSendSuccess(:final ecash) => _Description(
       label: 'Send Success',
       subtitle: 'Tap to share eCash',
-      tone: success,
       onTap: () => _share(ecash),
     ),
-    PaymentEvent_MintSendFailure() => _Description(
-      label: 'Send Failure',
-      tone: failure,
-    ),
-    PaymentEvent_MintRemint() => _Description(
-      label: 'Remint eCash',
-      tone: neutral,
-    ),
+    PaymentEvent_MintSendFailure() => _Description(label: 'Send Failure'),
+    PaymentEvent_MintRemint() => _Description(label: 'Remint eCash'),
     PaymentEvent_MintReceive(:final amountSats) => _Description(
       label: 'Receive eCash',
       subtitle: amount(amountSats.toInt()),
-      tone: neutral,
     ),
     PaymentEvent_MintSuccess(:final amountSats) => _Description(
       label: 'Mint Success',
       subtitle: amount(amountSats.toInt()),
-      tone: success,
     ),
     PaymentEvent_MintFailure() => _Description(
       label: 'Mint Failure',
       subtitle: 'threshold signature invalid',
-      tone: failure,
     ),
 
     // ── Wallet (on-chain) ───────────────────────────────────────────────
     PaymentEvent_WalletSend(:final amountSats, :final feeSats) => _Description(
       label: 'Send Onchain',
       subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
-      tone: neutral,
     ),
     PaymentEvent_WalletSendSuccess(:final txid) => _Description(
       label: 'Send Success',
       subtitle: 'Tap to share txid',
-      tone: success,
       onTap: () => _share(txid),
     ),
     PaymentEvent_WalletSendFailure() => _Description(
       label: 'Send Failure',
       subtitle: 'missing txid',
-      tone: failure,
     ),
     PaymentEvent_WalletReceive(:final amountSats, :final feeSats) =>
       _Description(
         label: 'Receive Onchain',
         subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
-        tone: neutral,
       ),
   };
 }
