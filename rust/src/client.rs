@@ -82,6 +82,15 @@ impl PicoAccount {
     }
 }
 
+/// Federation-wide wallet stats shown in the receive screen's details
+/// drawer. The feerate is in sats per 1000 vbytes (kvB).
+#[frb]
+pub struct FederationStats {
+    pub total_value_sat: i64,
+    pub block_count: i64,
+    pub feerate: Option<i64>,
+}
+
 impl Pico {
     #[frb]
     pub async fn mint_send(
@@ -363,6 +372,38 @@ impl Pico {
             .wallet_deposit_address(federation.0, account.0)
             .map(|address| address.to_string())
             .map_err(|e| e.to_string())
+    }
+
+    /// Federation-wide wallet stats for the receive screen's details drawer:
+    /// bitcoin in custody, consensus block count and consensus feerate.
+    #[frb]
+    pub async fn federation_stats(
+        &self,
+        federation: &FederationIdWrapper,
+    ) -> Result<FederationStats, String> {
+        let total_value = self
+            .client
+            .wallet_total_value(federation.0)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let block_count = self
+            .client
+            .block_count(federation.0)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let feerate = self
+            .client
+            .wallet_feerate(federation.0)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(FederationStats {
+            total_value_sat: total_value.to_sat() as i64,
+            block_count: i64::from(block_count),
+            feerate: feerate.map(i64::from),
+        })
     }
 
     /// Live per-guardian reachability, one entry per guardian in
