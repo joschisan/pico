@@ -549,7 +549,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => WalletV2ReceiveScreen(address: address),
+        builder:
+            (_) => WalletV2ReceiveScreen(
+              address: address,
+              pico: widget.pico,
+              federation: account.federation,
+            ),
       ),
     );
   }
