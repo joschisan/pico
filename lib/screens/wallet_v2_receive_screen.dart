@@ -1,5 +1,14 @@
+import 'dart:async';
+
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:pico/bridge_generated.dart/app.dart';
+import 'package:pico/bridge_generated.dart/client.dart';
+import 'package:pico/bridge_generated.dart/lib.dart';
+import 'package:pico/drawers/wallet_v2_wallet_details_drawer.dart';
+import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
+import 'package:pico/widgets/async_icon_button_widget.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/shareable_row_widget.dart';
@@ -11,12 +20,47 @@ import 'package:pico/widgets/scrollable_body_widget.dart';
 /// reads it before pushing this route and the screen has nothing to load.
 class WalletV2ReceiveScreen extends StatelessWidget {
   final String address;
+  final Pico pico;
+  final FederationIdWrapper federation;
 
-  const WalletV2ReceiveScreen({super.key, required this.address});
+  const WalletV2ReceiveScreen({
+    super.key,
+    required this.address,
+    required this.pico,
+    required this.federation,
+  });
+
+  Future<void> _showDetails(BuildContext context) async {
+    final FederationStats stats;
+    try {
+      stats = await pico.federationStats(federation: federation);
+    } catch (error) {
+      if (context.mounted) {
+        NotificationUtils.showError(context, error.toString());
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    // Don't await the drawer's dismissal here, otherwise the icon's spinner
+    // keeps running for as long as the drawer stays open.
+    unawaited(
+      WalletV2WalletDetailsDrawer.show(context, pico: pico, stats: stats),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Receive Onchain')),
+    appBar: AppBar(
+      title: const Text('Receive Onchain'),
+      actions: [
+        AsyncIconButton(
+          icon: PhosphorIconsRegular.dotsThreeVertical,
+          onPressed: () => _showDetails(context),
+        ),
+      ],
+    ),
     body: ScrollableBody(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16.0),
