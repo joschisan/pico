@@ -59,7 +59,7 @@ class WalletV2WalletDetailsDrawer extends StatelessWidget {
             if (fiat != null)
               DetailRow(
                 icon: PhosphorIconsRegular.currencyDollar,
-                label: '${fiat.currency.code} in Custody',
+                label: '${fiat.currency.name} in Custody',
                 value: formatFiat(fiat.currency, fiat.value),
               ),
             DetailRow(
