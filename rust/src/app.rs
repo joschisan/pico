@@ -670,6 +670,7 @@ fn snapshot_fiat(
 
 async fn bind_endpoint() -> anyhow::Result<Endpoint> {
     Endpoint::builder(N0)
+        .transport_config(picomint_rpc::transport_config())
         .address_lookup(MdnsAddressLookup::builder())
         .bind()
         .await
