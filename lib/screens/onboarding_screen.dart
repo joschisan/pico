@@ -4,17 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/drawers/scanner_drawer.dart';
+import 'package:pico/screens/scanner_screen.dart';
 import 'package:pico/screens/home_screen.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/balanced_text_widget.dart';
 import 'package:pico/widgets/circular_action_button_widget.dart';
 
-/// Where a wallet with no federation lands. Scanning an invite is the only
+/// Where a wallet with no mint lands. Scanning an invite is the only
 /// thing to do here, so the screen is just that: the reason and the action.
 ///
-/// Watches for the first federation and hands the wallet to [HomeScreen] for
-/// good — leaving the last federation is blocked, so nothing comes back here
+/// Watches for the first mint and hands the wallet to [HomeScreen] for
+/// good — removing the last mint is blocked, so nothing comes back here
 /// short of a restart with an empty wallet.
 class OnboardingScreen extends StatefulWidget {
   final Pico pico;
@@ -73,11 +73,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             CircularActionButton(
               icon: PhosphorIconsRegular.qrCode,
               label: 'Scan',
-              // No account to hand the scanner — with none joined it accepts
+              // No account to hand the scanner — with none added it accepts
               // invite codes only, which is exactly the one input this screen
               // is here to take.
               onTap:
-                  () => ScannerDrawer.show(
+                  () => ScannerScreen.show(
                     context,
                     account: null,
                     pico: widget.pico,

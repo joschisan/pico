@@ -4,7 +4,7 @@ import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/async_button_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/detail_row_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
 import 'package:pico/widgets/shareable_row_widget.dart';
@@ -45,14 +45,14 @@ class _ConfirmOnchainSendScreenState extends State<ConfirmOnchainSendScreen> {
     await requireBiometricAuth(context);
 
     if (widget.isMax) {
-      await widget.pico.walletSendMax(
-        federation: widget.account.federation,
+      await widget.pico.onchainSendMax(
+        mint: widget.account.mint,
         account: widget.account.account,
         address: widget.address,
       );
     } else {
-      await widget.pico.walletSend(
-        federation: widget.account.federation,
+      await widget.pico.onchainSend(
+        mint: widget.account.mint,
         account: widget.account.account,
         address: widget.address,
         amountSats: widget.amountSats,
@@ -73,7 +73,7 @@ class _ConfirmOnchainSendScreenState extends State<ConfirmOnchainSendScreen> {
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: BleedColumn(
             children: [
-              BorderedList.column(
+              BleedList.column(
                 children: [
                   ...amountRows(
                     pico: widget.pico,

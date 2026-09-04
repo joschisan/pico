@@ -3,7 +3,7 @@ import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
@@ -14,10 +14,10 @@ import 'package:pico/bridge_generated.dart/events.dart';
 class EcashDrawer extends StatefulWidget {
   /// The account in view when the bundle arrived — the balance the user is
   /// looking at is the one they mean. A bundle issued by a different
-  /// federation is rejected by the receive itself with an explicit error.
+  /// mint is rejected by the receive itself with an explicit error.
   final PicoAccount selected;
   final Pico pico;
-  final ECashWrapper ecash;
+  final EcashWrapper ecash;
 
   const EcashDrawer({
     super.key,
@@ -30,7 +30,7 @@ class EcashDrawer extends StatefulWidget {
     BuildContext context, {
     required PicoAccount selected,
     required Pico pico,
-    required ECashWrapper ecash,
+    required EcashWrapper ecash,
   }) {
     return DrawerUtils.show<bool>(
       context: context,
@@ -44,8 +44,8 @@ class EcashDrawer extends StatefulWidget {
 
 class _EcashDrawerState extends State<EcashDrawer> {
   Future<void> _handleReceive() async {
-    await widget.pico.mintReceive(
-      federation: widget.selected.federation,
+    await widget.pico.ecashReceive(
+      mint: widget.selected.mint,
       account: widget.selected.account,
       ecash: widget.ecash,
     );
@@ -59,7 +59,7 @@ class _EcashDrawerState extends State<EcashDrawer> {
   Widget build(BuildContext context) {
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [
             const PaymentSummaryRow(
               paymentType: PaymentType.ecash,

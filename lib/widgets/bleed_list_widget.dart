@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 /// A full-bleed list: rows run edge-to-edge with no outer border or dividers.
-class BorderedList extends StatelessWidget {
+class BleedList extends StatelessWidget {
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
   final bool shrinkWrap;
   final ScrollPhysics? physics;
 
-  const BorderedList({
+  const BleedList({
     super.key,
     required this.itemCount,
     required this.itemBuilder,
@@ -15,8 +15,8 @@ class BorderedList extends StatelessWidget {
     this.physics,
   });
 
-  factory BorderedList.column({Key? key, required List<Widget> children}) {
-    return BorderedList(
+  factory BleedList.column({Key? key, required List<Widget> children}) {
+    return BleedList(
       key: key,
       itemCount: children.length,
       itemBuilder: (_, index) => children[index],

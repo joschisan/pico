@@ -35,9 +35,9 @@ void main() async {
     return;
   }
 
-  // Same shape as the root-secret check above: a wallet without a federation
+  // Same shape as the root-secret check above: a wallet without a mint
   // can't transact, so it starts on onboarding. The home screen is only ever
-  // mounted with a federation in hand, which is what lets it assume it has
+  // mounted with a mint in hand, which is what lets it assume it has
   // one.
   final accounts = pico.accounts();
 

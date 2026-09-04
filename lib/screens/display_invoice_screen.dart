@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/shareable_row_widget.dart';
 import 'package:pico/widgets/detail_row_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
@@ -34,7 +34,7 @@ class DisplayInvoiceScreen extends StatelessWidget {
           children: [
             QrCodeWidget(data: invoice),
             const SizedBox(height: 16),
-            BorderedList.column(
+            BleedList.column(
               children: [
                 ShareableRow(data: invoice, label: 'Lightning Invoice'),
                 ...amountRows(pico: pico, amountSats: amount),

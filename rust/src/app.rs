@@ -7,14 +7,14 @@ use futures::stream::{self, BoxStream};
 use iroh::Endpoint;
 use iroh::endpoint::presets::N0;
 use iroh_mdns_address_lookup::MdnsAddressLookup;
+use picomint_client::eventlog::{EventLogEntry, EventLogId};
 use picomint_client::{Account, Client, Mnemonic, OperationId};
-use picomint_core::config::FederationId;
-use picomint_eventlog::EventLogId;
+use picomint_core::config::MintId;
 use picomint_redb::{Database, DbRead};
 use tokio::sync::{Mutex, Notify};
 
 use crate::client::PicoAccount;
-use crate::db::{CONTACT, OperationFiat, RootEntropy, SelectedCurrency};
+use crate::db::{ContactTable, OperationFiatTable, RootEntropyTable, SelectedCurrencyTable};
 use crate::events::{
     Notification, OperationSummary, PaymentEvent, is_summary_trigger, parse_notification,
     parse_payment_event, parse_summary,
@@ -23,7 +23,7 @@ use crate::exchange::{ExchangeRateCache, FRESHNESS, btc_price, fetch_exchange_ra
 use crate::frb_generated::StreamSink;
 use crate::lnurl::LnurlWrapper;
 use crate::{
-    AccountWrapper, DatabaseWrapper, FederationIdWrapper, InviteCodeWrapper, MnemonicWrapper,
+    AccountWrapper, DatabaseWrapper, InviteCodeWrapper, MintIdWrapper, MnemonicWrapper,
     OperationIdWrapper,
 };
 
@@ -31,18 +31,18 @@ use crate::{
 pub struct Pico {
     db: Database,
     mnemonic: Mnemonic,
-    /// The one picomint client, holding every joined federation as data.
-    /// It owns the shared iroh endpoint, the federation configs and the
-    /// daemon-wide event log; every operation names the federation it
+    /// The one picomint client, holding every added mint as data.
+    /// It owns the shared iroh endpoint, the mint configs and the
+    /// daemon-wide event log; every operation names the mint it
     /// acts on. The money methods mirroring its `mint_` / `wallet_` / `ln_`
     /// surface live in `crate::client`.
     pub(crate) client: Arc<Client>,
     /// Wakes anyone iterating the client set when membership changes.
     /// `notify_waiters` is fire-and-forget; subscribers re-snapshot the
-    /// joined set after waking.
+    /// added set after waking.
     set_changed: Arc<Notify>,
     /// Single exchange-rate cache shared by every client (the BTC price is
-    /// global, not per-federation) and by the fiat-snapshot recorder. One
+    /// global, not per-mint) and by the fiat-snapshot recorder. One
     /// fetch warms it for all consumers.
     exchange_rate_cache: ExchangeRateCache,
 }
@@ -79,7 +79,7 @@ impl Pico {
     pub async fn init(db: &DatabaseWrapper, mnemonic: &MnemonicWrapper) -> Result<Self, String> {
         let dbtx = db.0.begin_write();
 
-        dbtx.insert(&RootEntropy, &(), &mnemonic.0.to_entropy().to_vec());
+        dbtx.insert(&RootEntropyTable, &(), &mnemonic.0.to_entropy().to_vec());
 
         dbtx.commit();
 
@@ -90,7 +90,7 @@ impl Pico {
 
     #[frb]
     pub async fn try_load(db: &DatabaseWrapper) -> Option<Self> {
-        let entropy = db.0.begin_read().get(&RootEntropy, &())?;
+        let entropy = db.0.begin_read().get(&RootEntropyTable, &())?;
 
         let mnemonic = Mnemonic::from_entropy(&entropy).ok()?;
 
@@ -99,25 +99,15 @@ impl Pico {
         Self::assemble(db.0.clone(), mnemonic, endpoint).await.ok()
     }
 
-    /// Build the factory and bring every joined federation up. `connect` is
-    /// pico's eager path — the gateway leaves federations dormant, but every
-    /// federation in this wallet has a balance on screen, so all of them
-    /// come up at startup.
+    /// Build the app handle. `Client::new` itself brings every added mint
+    /// up — every mint in this wallet has a balance on screen, so eager
+    /// bring-up is exactly what pico wants.
     async fn assemble(
         db: Database,
         mnemonic: Mnemonic,
         endpoint: Endpoint,
     ) -> Result<Self, String> {
-        let client = Arc::new(Client::new(
-            endpoint,
-            db.clone(),
-            mnemonic.clone(),
-            Some(crate::payout::fee_config()),
-        ));
-
-        for fed_id in client.federations() {
-            client.connect(fed_id).map_err(|e| e.to_string())?;
-        }
+        let client = Arc::new(Client::new(endpoint, db.clone(), mnemonic.clone()));
 
         Ok(Self {
             db,
@@ -128,14 +118,14 @@ impl Pico {
         })
     }
 
-    /// One row per joined `(federation, account)` pair, federation-major
+    /// One row per added `(mint, account)` pair, mint-major
     /// and account-minor — the order the home pager swipes in.
     fn rows(&self) -> Vec<PicoAccount> {
         self.client
-            .federation_configs()
+            .mint_configs()
             .into_iter()
             .flat_map(|entry| {
-                Account::USER_ACCOUNTS
+                Account::ALL
                     .into_iter()
                     .map(move |account| PicoAccount::new(entry.0, account, entry.1.name.clone()))
             })
@@ -147,73 +137,62 @@ impl Pico {
         self.mnemonic.words().map(|s| s.to_string()).collect()
     }
 
-    /// Every joined `(federation, account)` pair, as plain data.
+    /// Every added `(mint, account)` pair, as plain data.
     #[frb(sync)]
     pub fn accounts(&self) -> Vec<PicoAccount> {
         self.rows()
     }
 
-    /// Adds a federation, rebuilding whatever this seed already owns there.
+    /// Adds a mint, rebuilding whatever this seed already owns there.
     ///
-    /// One path, whether or not the seed has been here before: `add` scans
-    /// every account before anything is opened or written, and a seed that
-    /// never held anything scans to nothing. There is no question to put to
-    /// the user and so nothing for them to get wrong — answering "new mint"
-    /// for a federation this seed has used would write counter zero over an
-    /// account that has issued and strand every note behind the nonces it
-    /// re-derives.
+    /// One path, whether or not the seed has been here before: `add_mint`
+    /// scans every account before anything is opened or written, and a seed
+    /// that never held anything scans to nothing. There is no question to
+    /// put to the user and so nothing for them to get wrong — answering
+    /// "new mint" for a mint this seed has used would write counter zero
+    /// over an account that has issued and strand every note behind the
+    /// nonces it re-derives.
     ///
     /// Returns only once the notes are back, so there is no progress to
-    /// report and no half-joined federation to detect on the next launch.
+    /// report and no half-added mint to detect on the next launch.
     #[frb]
-    pub async fn add(&self, invite: &InviteCodeWrapper) -> Result<PicoAccount, String> {
+    pub async fn add_mint(&self, invite: &InviteCodeWrapper) -> Result<PicoAccount, String> {
         // Rejected before the scan rather than after it. The invite code
-        // commits to the federation id — `add` below refuses a config that
+        // commits to the mint id — `add_mint` below refuses a config that
         // computes to any other — so a duplicate is knowable up front, and
-        // there is no reason to make the user wait out four account scans to
-        // be told what the code alone already said. The check inside `add`
-        // is atomic with the write, so it is the authority; this one only
-        // spares the wait.
-        if self.client.config(invite.0.federation).is_some() {
+        // there is no reason to make the user wait out the account scans to
+        // be told what the code alone already said. The check inside
+        // `add_mint` is atomic with the write, so it is the authority; this
+        // one only spares the wait.
+        if self.client.config(invite.0.mint).is_some() {
             return Err("This mint is already added".to_string());
         }
 
         // Downloads the config, scans every account, and lands config,
-        // counter marks and restored notes in one dbtx: either the
-        // federation is joined with every counter in place and its balance
-        // already there, or it isn't joined at all. A failure leaves the
-        // wallet exactly as it was.
-        let federation_id = self
+        // counter marks and restored notes in one dbtx: either the mint is
+        // added with every counter in place and its balance already there,
+        // or it isn't added at all. A failure leaves the wallet exactly as
+        // it was.
+        let mint = self
             .client
-            .add(&invite.0, None)
+            .add_mint(&invite.0, None)
             .await
             .map_err(|e| e.to_string())?;
 
-        self.client
-            .connect(federation_id)
-            .map_err(|e| e.to_string())?;
-
-        let config = self
-            .client
-            .config(federation_id)
-            .expect("the federation was just added");
+        let config = self.client.config(mint).expect("the mint was just added");
 
         self.set_changed.notify_waiters();
 
-        // Primary is what a caller that just joined gets handed: it is the
+        // Primary is what a caller that just added gets handed: it is the
         // account the pager lands on.
-        Ok(PicoAccount::new(
-            federation_id,
-            Account::PRIMARY,
-            config.name,
-        ))
+        Ok(PicoAccount::new(mint, Account::Primary, config.name))
     }
 
     #[frb(sync)]
     pub fn set_currency(&self, currency_code: &str) {
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(&SelectedCurrency, &(), &currency_code.to_string());
+        dbtx.insert(&SelectedCurrencyTable, &(), &currency_code.to_string());
 
         dbtx.commit();
     }
@@ -222,7 +201,7 @@ impl Pico {
     pub fn currency_code(&self) -> String {
         self.db
             .begin_read()
-            .get(&SelectedCurrency, &())
+            .get(&SelectedCurrencyTable, &())
             .unwrap_or_else(|| "USD".to_string())
     }
 
@@ -269,32 +248,34 @@ impl Pico {
         Some((amount_sats as f64 / 100_000_000.0) * rate)
     }
 
-    /// Drop a federation: `Client::remove` shuts its runtime down, then
-    /// wipes its rows and drops its config in one dbtx, so a crash
-    /// mid-leave can never leave orphan client state behind a missing
-    /// config row. Re-joining the same federation later starts from a
-    /// fresh ledger.
+    /// Drop a mint: `begin_remove_mint` shuts its runtime down, then wipes
+    /// its rows and drops its config in the dbtx it hands back, so a crash
+    /// mid-remove can never leave orphan client state behind a missing
+    /// config row. Pico keeps no mint-scoped rows of its own, so the dbtx
+    /// commits as is. Re-adding the same mint later starts from a fresh
+    /// ledger.
     #[frb]
-    pub async fn remove(&self, federation: &FederationIdWrapper) -> Result<(), String> {
-        // A federation that is already gone is a removal that already
+    pub async fn remove_mint(&self, mint: &MintIdWrapper) -> Result<(), String> {
+        // A mint that is already gone is a removal that already
         // succeeded, not an error to surface — the drawer may fire twice.
-        if self.client.config(federation.0).is_none() {
+        if self.client.config(mint.0).is_none() {
             return Ok(());
         }
 
         // Every account goes at once — accounts are a split of one
-        // federation's client state, not something a user joins or leaves
+        // mint's client state, not something a user adds or removes
         // individually.
         self.client
-            .remove(federation.0)
+            .begin_remove_mint(mint.0)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?
+            .commit();
 
         self.set_changed.notify_waiters();
         Ok(())
     }
 
-    /// Live snapshot of every joined `(federation, account)` row; re-emits
+    /// Live snapshot of every added `(mint, account)` row; re-emits
     /// on every set change (`add`/`remove`). Subscribers re-render passively
     /// instead of re-fetching `accounts()` after each navigation pop.
     #[frb]
@@ -310,38 +291,34 @@ impl Pico {
         }
     }
 
-    /// Aggregated balance across every joined federation, in sats. Re-emits
+    /// Aggregated balance across every added mint, in sats. Re-emits
     /// on any per-account balance change AND on set changes
     /// (`add`/`remove`). The totals map survives rebuilds so an
     /// add/remove doesn't reset the running sum to zero.
     #[frb]
     pub async fn subscribe_global_balance(&self, sink: StreamSink<i64>) {
-        let mut totals: HashMap<(FederationId, Account), i64> = HashMap::new();
+        let mut totals: HashMap<(MintId, Account), i64> = HashMap::new();
 
         loop {
-            // Snapshot the joined set; build a tagged stream per account so
+            // Snapshot the added set; build a tagged stream per account so
             // we can attribute incoming balances back to an account and
-            // discard departed federations on the next rebuild.
-            let snapshot: Vec<(FederationId, Account)> = self
+            // discard departed mints on the next rebuild.
+            let snapshot: Vec<(MintId, Account)> = self
                 .client
-                .federations()
+                .mints()
                 .into_iter()
-                .flat_map(|fed_id| {
-                    Account::USER_ACCOUNTS
-                        .into_iter()
-                        .map(move |account| (fed_id, account))
-                })
+                .flat_map(|mint| Account::ALL.into_iter().map(move |account| (mint, account)))
                 .collect();
 
-            let alive: HashSet<(FederationId, Account)> = snapshot.iter().copied().collect();
+            let alive: HashSet<(MintId, Account)> = snapshot.iter().copied().collect();
             totals.retain(|key, _| alive.contains(key));
 
-            let mut tagged: Vec<BoxStream<'static, ((FederationId, Account), i64)>> =
+            let mut tagged: Vec<BoxStream<'static, ((MintId, Account), i64)>> =
                 Vec::with_capacity(snapshot.len());
             for key in snapshot {
                 let stream = self
                     .client
-                    .mint_subscribe_balance(key.0, key.1)
+                    .ecash_subscribe_balance(key.0, key.1)
                     .map(move |amt| (key, (amt.msat / 1000) as i64));
                 tagged.push(stream.boxed());
             }
@@ -371,7 +348,7 @@ impl Pico {
         }
     }
 
-    /// One-shot history of the operations `(federation, account)` ran, in
+    /// One-shot history of the operations `(mint, account)` ran, in
     /// chronological order (oldest first — Dart reverses for display).
     /// Filtered here rather than in Dart so only the account's rows cross
     /// the bridge. Cards rendered from this snapshot stay static; live
@@ -379,13 +356,13 @@ impl Pico {
     #[frb(sync)]
     pub fn list_operations(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
     ) -> Vec<OperationSummary> {
-        self.drain_summaries(Some((federation.0, account.0))).0
+        self.drain_summaries(Some((mint.0, account.0))).0
     }
 
-    /// The last three operations across every federation, oldest first —
+    /// The last three operations across every mint, oldest first —
     /// the synchronous initial value for the recent-payments list, so its
     /// first frame renders the truth; `subscribe_recent_operations` then
     /// carries every change.
@@ -402,46 +379,58 @@ impl Pico {
 
     /// Drain the full event log into summaries, returning them with the
     /// log position the drain reached — the tail point a live subscription
-    /// continues from. `scope` narrows to one `(federation, account)`;
+    /// continues from. `scope` narrows to one `(mint, account)`;
     /// `None` spans everything.
     fn drain_summaries(
         &self,
-        scope: Option<(FederationId, Account)>,
+        scope: Option<(MintId, Account)>,
     ) -> (Vec<OperationSummary>, EventLogId) {
-        let mut position = EventLogId::LOG_START;
         let mut summaries: Vec<OperationSummary> = Vec::new();
 
+        let position = self.walk_event_log(EventLogId::LOG_START, |entry| {
+            if let Some(scope) = scope
+                && (entry.mint, entry.account) != scope
+            {
+                return;
+            }
+            let fiat = self
+                .db
+                .begin_read()
+                .get(&OperationFiatTable, &entry.operation)
+                .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
+            if let Some(summary) = parse_summary(entry, fiat) {
+                summaries.push(summary);
+            }
+        });
+
+        (summaries, position)
+    }
+
+    /// Walk the event log from `position` to its current end, handing every
+    /// entry to `f`, and return the position the walk reached — the tail
+    /// point a live subscription continues from.
+    fn walk_event_log(
+        &self,
+        mut position: EventLogId,
+        mut f: impl FnMut(&EventLogEntry),
+    ) -> EventLogId {
         loop {
             let batch = self.client.get_event_log(position, 1000);
 
             for entry in &batch {
-                if let Some(scope) = scope
-                    && (entry.1.federation, entry.1.account) != scope
-                {
-                    continue;
-                }
-                let fiat = self
-                    .db
-                    .begin_read()
-                    .get(&OperationFiat, &entry.1.operation)
-                    .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
-                if let Some(summary) = parse_summary(&entry.1, fiat) {
-                    summaries.push(summary);
-                }
+                f(&entry.1);
             }
 
             position = position.saturating_add(batch.len() as u64);
 
             if batch.len() < 1000 {
-                break;
+                return position;
             }
         }
-
-        (summaries, position)
     }
 
     /// Live ordered list of operation summaries (newest first) across
-    /// every federation. Emits once after the historical replay
+    /// every mint. Emits once after the historical replay
     /// completes, then re-emits whenever a new trigger event lands.
     /// Follow-up events that only change live status do not re-emit —
     /// those reach the UI through `subscribe_payment_events` when the
@@ -499,7 +488,7 @@ impl Pico {
     /// into the rich [`PaymentEvent`] enum for the details drawer timeline.
     /// Replays existing events first (oldest → newest) then yields new
     /// ones as they're committed. Operation ids are globally unique so
-    /// no federation context is required — reads the daemon-wide eventlog
+    /// no mint context is required — reads the daemon-wide eventlog
     /// directly.
     #[frb]
     pub async fn subscribe_payment_events(
@@ -521,14 +510,11 @@ impl Pico {
 
     /// Whether any picomint state machine is still driving the operation —
     /// the synchronous initial value for the payment-card spinner, so the
-    /// first frame renders the truth instead of a guess.
+    /// first frame renders the truth instead of a guess. Operation ids are
+    /// globally unique, so no mint context is needed.
     #[frb(sync)]
-    pub fn operation_is_active(
-        &self,
-        federation: &FederationIdWrapper,
-        operation: &OperationIdWrapper,
-    ) -> bool {
-        self.client.operation_is_active(federation.0, operation.0)
+    pub fn operation_is_active(&self, operation: &OperationIdWrapper) -> bool {
+        self.client.operation_is_active(operation.0)
     }
 
     /// Resolves once no picomint state machine is still driving the
@@ -536,34 +522,18 @@ impl Pico {
     /// in-progress spinner on payment cards; the outcome itself arrives
     /// through `subscribe_payment_events`.
     #[frb]
-    pub async fn subscribe_completion(
-        &self,
-        federation: &FederationIdWrapper,
-        operation: &OperationIdWrapper,
-    ) {
-        self.client
-            .subscribe_completion(federation.0, operation.0)
-            .await;
+    pub async fn subscribe_completion(&self, operation: &OperationIdWrapper) {
+        self.client.subscribe_completion(operation.0).await;
     }
 
     /// Toast/haptic stream — fires per matching event committed after
-    /// the historical replay. Spans every federation, since the picomint
+    /// the historical replay. Spans every mint, since the picomint
     /// eventlog is daemon-wide.
     #[frb]
     pub async fn subscribe_notifications(&self, sink: StreamSink<Notification>) {
         // Phase 1: drain history to find the live position. No
         // notifications fire — these are old events.
-        let mut position = EventLogId::LOG_START;
-
-        loop {
-            let batch = self.client.get_event_log(position, 1000);
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                break;
-            }
-        }
+        let mut position = self.walk_event_log(EventLogId::LOG_START, |_| {});
 
         // Phase 2: tail live events; every match fires a notification.
         let notify: Arc<Notify> = self.client.event_notify();
@@ -593,19 +563,19 @@ impl Pico {
     pub fn save_contact(&self, lnurl: &LnurlWrapper, name: &str) {
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(&CONTACT, &lnurl.0, &name.to_string());
+        dbtx.insert(&ContactTable, &lnurl.0, &name.to_string());
 
         dbtx.commit();
     }
 
     #[frb(sync)]
     pub fn get_contact_name(&self, lnurl: &LnurlWrapper) -> Option<String> {
-        self.db.begin_read().get(&CONTACT, &lnurl.0)
+        self.db.begin_read().get(&ContactTable, &lnurl.0)
     }
 
     #[frb(sync)]
     pub fn list_contacts(&self) -> Vec<PicoContact> {
-        let mut contacts: Vec<_> = self.db.begin_read().iter(&CONTACT, |it| {
+        let mut contacts: Vec<_> = self.db.begin_read().iter(&ContactTable, |it| {
             it.map(|(lnurl, name)| PicoContact {
                 lnurl: LnurlWrapper(lnurl),
                 name,
@@ -622,7 +592,7 @@ impl Pico {
     pub fn delete_contact(&self, lnurl: &LnurlWrapper) {
         let dbtx = self.db.begin_write();
 
-        dbtx.remove(&CONTACT, &lnurl.0);
+        dbtx.remove(&ContactTable, &lnurl.0);
 
         dbtx.commit();
     }
@@ -640,13 +610,13 @@ fn snapshot_fiat(
     cache: &ExchangeRateCache,
     op: &OperationId,
 ) -> Option<(String, f64)> {
-    if let Some(existing) = db.begin_read().get(&OperationFiat, op) {
+    if let Some(existing) = db.begin_read().get(&OperationFiatTable, op) {
         return Some((existing.0, f64::from_bits(existing.1)));
     }
 
     let currency = db
         .begin_read()
-        .get(&SelectedCurrency, &())
+        .get(&SelectedCurrencyTable, &())
         .unwrap_or_else(|| "USD".to_string());
 
     // Derive the selected currency's rate from the cached map without hitting
@@ -662,7 +632,7 @@ fn snapshot_fiat(
     };
 
     let dbtx = db.begin_write();
-    dbtx.insert(&OperationFiat, op, &(currency.clone(), rate.to_bits()));
+    dbtx.insert(&OperationFiatTable, op, &(currency.clone(), rate.to_bits()));
     dbtx.commit();
 
     Some((currency, rate))

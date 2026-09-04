@@ -20,9 +20,9 @@ class WarningCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.amber.withValues(alpha: 0.15),
+          color: warningColor.withValues(alpha: 0.15),
           borderRadius: cornerRadius,
-          border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+          border: Border.all(color: warningColor.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [

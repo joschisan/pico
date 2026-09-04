@@ -8,29 +8,26 @@ pub struct FiatCurrency {
     pub decimal_digits: i32,
 }
 
+fn to_fiat_currency(entry: &(&str, &str, &str, i32)) -> FiatCurrency {
+    FiatCurrency {
+        code: entry.0.to_string(),
+        name: entry.1.to_string(),
+        symbol: entry.2.to_string(),
+        decimal_digits: entry.3,
+    }
+}
+
 #[frb(sync)]
 pub fn list_fiat_currencies() -> Vec<FiatCurrency> {
-    CURRENCIES
-        .iter()
-        .map(|&(code, name, symbol, decimal_digits)| FiatCurrency {
-            code: code.to_string(),
-            name: name.to_string(),
-            symbol: symbol.to_string(),
-            decimal_digits,
-        })
-        .collect()
+    CURRENCIES.iter().map(to_fiat_currency).collect()
 }
 
 #[frb(sync)]
 pub fn find_fiat_currency(code: &str) -> Option<FiatCurrency> {
-    CURRENCIES.iter().find(|&&(c, _, _, _)| c == code).map(
-        |&(code, name, symbol, decimal_digits)| FiatCurrency {
-            code: code.to_string(),
-            name: name.to_string(),
-            symbol: symbol.to_string(),
-            decimal_digits,
-        },
-    )
+    CURRENCIES
+        .iter()
+        .find(|entry| entry.0 == code)
+        .map(to_fiat_currency)
 }
 
 const CURRENCIES: &[(&str, &str, &str, i32)] = &[

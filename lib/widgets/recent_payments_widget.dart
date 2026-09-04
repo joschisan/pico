@@ -6,7 +6,7 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/animated_entry_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/payment_card_widget.dart';
 import 'package:pico/widgets/section_header_widget.dart';
 import 'package:pico/utils/styles.dart';
@@ -75,7 +75,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
               operations:
                   widget.pico
                       .listOperations(
-                        federation: account.federation,
+                        mint: account.mint,
                         account: account.account,
                       )
                       .reversed
@@ -116,7 +116,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
           action: 'History',
           onAction: _openHistory,
         ),
-        BorderedList.column(
+        BleedList.column(
           children: [
             for (final payment in payments)
               KeyedSubtree(

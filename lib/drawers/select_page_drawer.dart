@@ -4,13 +4,13 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/utils/drawer_utils.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
 /// One page of the pager as the list sees it: the account to page to when it
 /// is chosen, and the balance to show while choosing — live, since the page
-/// it describes keeps updating behind the sheet. The federation name rides on
+/// it describes keeps updating behind the sheet. The mint name rides on
 /// the account itself.
 typedef PageOption = ({PicoAccount account, ValueListenable<int?> balance});
 
@@ -19,8 +19,8 @@ typedef PageOption = ({PicoAccount account, ValueListenable<int?> balance});
 ///
 /// The same pages in the same order — this is the swipe written out as a
 /// list, which is what a wallet holding several mints wants once the page it
-/// is after is two or three swipes away. Federation-wide, unlike
-/// [SelectAccountDrawer], which stays inside the federation in view and is
+/// is after is two or three swipes away. Mint-wide, unlike
+/// [SelectAccountDrawer], which stays inside the mint in view and is
 /// the only place an account without a page can be reached.
 class SelectPageDrawer extends StatelessWidget {
   /// Every page the pager carries, in the order it swipes them.
@@ -70,7 +70,7 @@ class SelectPageDrawer extends StatelessWidget {
         // sheet can show, and the list is the whole sheet.
         Flexible(
           child: SingleChildScrollView(
-            child: BorderedList.column(
+            child: BleedList.column(
               children: [for (final page in pages) _row(context, page)],
             ),
           ),
@@ -88,10 +88,10 @@ class SelectPageDrawer extends StatelessWidget {
         return SettingsCard(
           icon: PhosphorIconsRegular.stack,
           iconColor: selected ? Theme.of(context).colorScheme.primary : null,
-          // The federation leads, as it does on the row this opens from:
+          // The mint leads, as it does on the row this opens from:
           // across mints it is what tells two pages apart, and the
           // account is the qualifier under it.
-          title: page.account.federationName,
+          title: page.account.mintName,
           subtitle: _subtitle(page.account.account.display(), sats),
           // Every row picks, including the page already in view — landing
           // back where you started is a fair answer to opening the list.

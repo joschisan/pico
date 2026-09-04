@@ -36,8 +36,8 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
       amountSats: amountSats,
     );
 
-    final gateway = await widget.pico.lnSelectGateway(
-      federation: widget.account.federation,
+    final gateway = await widget.pico.lightningSelectGateway(
+      mint: widget.account.mint,
     );
 
     final feeSats = gateway.gatewayFeeForInvoice(invoice: invoice);
@@ -62,12 +62,12 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   /// payment capped to the payee's limit would leave notes behind, and the
   /// max path exists precisely to leave none.
   Future<void> _handleConfirmMax() async {
-    final gateway = await widget.pico.lnSelectGateway(
-      federation: widget.account.federation,
+    final gateway = await widget.pico.lightningSelectGateway(
+      mint: widget.account.mint,
     );
 
-    final amountSats = await widget.pico.lnSendMaxAmount(
-      federation: widget.account.federation,
+    final amountSats = await widget.pico.lightningSendMaxAmount(
+      mint: widget.account.mint,
       account: widget.account.account,
       gateway: gateway,
     );

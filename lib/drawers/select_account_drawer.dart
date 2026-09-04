@@ -4,22 +4,22 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/utils/drawer_utils.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
-/// One of a federation's accounts as the picker sees it: the account to hand
+/// One of a mint's accounts as the picker sees it: the account to hand
 /// back when it is chosen, and the live balance to show while choosing.
 typedef AccountOption = ({PicoAccount account, ValueListenable<int?> balance});
 
-/// Picks which of a federation's three accounts the pager sits on.
+/// Picks which of a mint's three accounts the pager sits on.
 ///
 /// The pager only carries the accounts worth carrying — primary, plus
 /// whichever others hold money or have been asked for — so this is the one
 /// place all three are listed. Choosing an empty one is how it gets a page:
 /// there is nothing to create, only a balance to start showing.
 class SelectAccountDrawer extends StatelessWidget {
-  /// Every account of the federation in view, in the order the pager would
+  /// Every account of the mint in view, in the order the pager would
   /// swipe them.
   final List<AccountOption> accounts;
 
@@ -46,7 +46,7 @@ class SelectAccountDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [for (final option in accounts) _row(option)],
         ),
       ],

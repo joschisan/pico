@@ -1,7 +1,7 @@
 //! The flat money surface, mirroring the picomint client: every operation
-//! is a method on [`Pico`] named for the module that serves it — `mint_send`,
-//! `wallet_send`, `ln_receive` — and takes the `(federation, account)` it
-//! acts on as arguments. There is no per-account handle to hold or leak;
+//! is a method on [`Pico`] named for the module that serves it —
+//! `ecash_send`, `onchain_send`, `lightning_receive` — and takes the
+//! `(mint, account)` it acts on as arguments. There is no per-account handle to hold or leak;
 //! [`PicoAccount`] is the plain data row the home pager renders.
 
 use std::collections::BTreeMap;
@@ -11,20 +11,22 @@ use flutter_rust_bridge::frb;
 use futures::StreamExt;
 use picomint_client::{Account, ConnStatus};
 use picomint_core::Amount;
-use picomint_core::PeerId;
-use picomint_core::config::FederationId;
-use picomint_core::ln::gateway::{GatewayInfo, GatewayPk};
+use picomint_core::NodeId;
+use picomint_core::config::MintId;
+use picomint_core::lightning::gateway::{GatewayInfo, GatewayPk};
+
+use picomint_core::NumNodesExt;
 
 use crate::app::Pico;
 use crate::frb_generated::StreamSink;
 use crate::{
-    AccountWrapper, BitcoinAddressWrapper, Bolt11InvoiceWrapper, ECashWrapper, FederationIdWrapper,
-    InviteCodeWrapper,
+    AccountWrapper, BitcoinAddressWrapper, Bolt11InvoiceWrapper, EcashWrapper, InviteCodeWrapper,
+    MintIdWrapper,
 };
 
 /// Holds a caller-selected gateway plus its routing info, returned by
-/// [`Pico::ln_select_gateway`] and handed back to
-/// [`Pico::ln_send`] so the fee we previewed is the fee we pay.
+/// [`Pico::lightning_select_gateway`] and handed back to
+/// [`Pico::lightning_send`] so the fee we previewed is the fee we pay.
 /// Opaque on purpose — Dart only needs the two fee getters.
 #[frb(opaque)]
 #[derive(Clone)]
@@ -61,31 +63,58 @@ impl GatewayInfoWrapper {
     }
 }
 
-/// One `(federation, account)` row of the wallet, as plain data — every
+/// The lnurl daemon that serves this wallet's reusable receive codes.
+/// Self-hosted infrastructure, named here as the one deliberate constant
+/// rather than buried at the call site: the daemon holds no funds — it
+/// relays lnurl requests to the recipient's mint — so swapping it only
+/// changes who serves the codes, not who can spend them.
+const LNURL_DAEMON_URL: &str = "http://159.223.25.182:8082/";
+
+/// One `(mint, account)` row of the wallet, as plain data — every
 /// money method on [`Pico`] takes the typed pair back. The name rides along
 /// so the pager renders without a config lookup per page.
 #[frb]
 #[derive(Clone)]
 pub struct PicoAccount {
-    pub federation: FederationIdWrapper,
+    pub mint: MintIdWrapper,
     pub account: AccountWrapper,
-    pub federation_name: String,
+    pub mint_name: String,
 }
 
 impl PicoAccount {
-    pub(crate) fn new(federation: FederationId, account: Account, name: String) -> PicoAccount {
+    pub(crate) fn new(mint: MintId, account: Account, name: String) -> PicoAccount {
         PicoAccount {
-            federation: FederationIdWrapper(federation),
+            mint: MintIdWrapper(mint),
             account: AccountWrapper(account),
-            federation_name: name,
+            mint_name: name,
         }
     }
 }
 
-/// Federation-wide wallet stats shown in the receive screen's details
+/// One node of a mint as the connectivity surfaces show it: its name and,
+/// while connected, the live link's round-trip time in milliseconds.
+#[frb]
+#[derive(Clone)]
+pub struct NodeStatus {
+    pub name: String,
+    pub rtt_ms: Option<f64>,
+}
+
+/// One connectivity snapshot: the per-node statuses in `NodeId` order,
+/// and whether enough nodes are reachable for the mint to sign — judged
+/// against the same `2f + 1` threshold picomint-core defines, computed
+/// on this side of the bridge so the app can never drift from it.
+#[frb]
+#[derive(Clone)]
+pub struct MintConnectivity {
+    pub nodes: Vec<NodeStatus>,
+    pub operational: bool,
+}
+
+/// Mint-wide wallet stats shown in the receive screen's details
 /// drawer. The feerate is in sats per 1000 vbytes (kvB).
 #[frb]
-pub struct FederationStats {
+pub struct MintStats {
     pub total_value_sat: i64,
     pub block_count: i64,
     pub feerate: Option<i64>,
@@ -93,16 +122,16 @@ pub struct FederationStats {
 
 impl Pico {
     #[frb]
-    pub async fn mint_send(
+    pub async fn ecash_send(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
-        amount_sat: i64,
-    ) -> Result<ECashWrapper, String> {
+        amount_sats: i64,
+    ) -> Result<EcashWrapper, String> {
         self.client
-            .mint_send(federation.0, account.0, Amount::from_sat(amount_sat as u64))
+            .ecash_send(mint.0, account.0, Amount::from_sat(amount_sats as u64))
             .await
-            .map(ECashWrapper)
+            .map(EcashWrapper)
             .map_err(|e| e.to_string())
     }
 
@@ -120,39 +149,39 @@ impl Pico {
     /// Infallible: `None` is an account holding no notes, which is the empty
     /// wallet the caller shouldn't have offered this on.
     #[frb]
-    pub async fn mint_send_max(
+    pub async fn ecash_send_max(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
-    ) -> Option<ECashWrapper> {
+    ) -> Option<EcashWrapper> {
         self.client
-            .mint_send_max(federation.0, account.0)
+            .ecash_send_max(mint.0, account.0)
             .ok()
             .flatten()
-            .map(ECashWrapper)
+            .map(EcashWrapper)
     }
 
     #[frb]
-    pub async fn mint_receive(
+    pub async fn ecash_receive(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
-        ecash: &ECashWrapper,
+        ecash: &EcashWrapper,
     ) -> Result<(), String> {
         self.client
-            .mint_receive(federation.0, account.0, &ecash.0)
+            .ecash_receive(mint.0, account.0, &ecash.0)
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
 
     #[frb]
-    pub async fn mint_subscribe_balance(
+    pub async fn ecash_subscribe_balance(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
         sink: StreamSink<i64>,
     ) {
-        let mut stream = self.client.mint_subscribe_balance(federation.0, account.0);
+        let mut stream = self.client.ecash_subscribe_balance(mint.0, account.0);
 
         while let Some(amount) = stream.next().await {
             if sink.add((amount.msat / 1000) as i64).is_err() {
@@ -165,13 +194,13 @@ impl Pico {
     /// charges the same fee however a payment settles, so there is nothing
     /// about an invoice to select one by.
     #[frb]
-    pub async fn ln_select_gateway(
+    pub async fn lightning_select_gateway(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
     ) -> Result<GatewayInfoWrapper, String> {
         let (gateway_pk, gateway_info) = self
             .client
-            .ln_select_gateway(federation.0)
+            .lightning_select_gateway(mint.0)
             .map_err(|e| e.to_string())?;
 
         Ok(GatewayInfoWrapper {
@@ -181,16 +210,16 @@ impl Pico {
     }
 
     #[frb]
-    pub async fn ln_send(
+    pub async fn lightning_send(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
         invoice: &Bolt11InvoiceWrapper,
     ) -> Result<String, String> {
         self.client
-            .ln_send(
-                federation.0,
+            .lightning_send(
+                mint.0,
                 account.0,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
@@ -202,21 +231,21 @@ impl Pico {
     }
 
     #[frb]
-    pub async fn ln_receive(
+    pub async fn lightning_receive(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
-        amount_sat: i64,
+        amount_sats: i64,
     ) -> Result<String, String> {
         let invoice = self
             .client
-            .ln_receive(
-                federation.0,
+            .lightning_receive(
+                mint.0,
                 account.0,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
-                Amount::from_sat(amount_sat as u64),
+                Amount::from_sat(amount_sats as u64),
             )
             .await
             .map_err(|e| e.to_string())?;
@@ -234,14 +263,14 @@ impl Pico {
     /// mints no change at exactly this amount, so the sizing has to live
     /// where the spending does.
     #[frb]
-    pub async fn ln_send_max_amount(
+    pub async fn lightning_send_max_amount(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
     ) -> i64 {
         self.client
-            .ln_send_max_amount(federation.0, account.0, &gateway.gateway_info)
+            .lightning_send_max_amount(mint.0, account.0, &gateway.gateway_info)
             .map(|amount| (amount.msat / 1000) as i64)
             .unwrap_or(0)
     }
@@ -249,20 +278,20 @@ impl Pico {
     /// Empties the account to `lnurl` through `gateway`: picomint resolves
     /// the one invoice it pays, sized fresh by the same code that spends it,
     /// so every note goes in and no change comes back. The figure
-    /// [`Self::ln_send_max_amount`] previewed through this gateway is the
+    /// [`Self::lightning_send_max_amount`] previewed through this gateway is the
     /// figure paid, short of the balance moving in between — which moves the
     /// payment with it.
     #[frb]
-    pub async fn ln_send_max(
+    pub async fn lightning_send_max(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
         lnurl: String,
     ) -> Result<String, String> {
         self.client
-            .ln_send_max(
-                federation.0,
+            .lightning_send_max(
+                mint.0,
                 account.0,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
@@ -275,42 +304,38 @@ impl Pico {
 
     /// Reads the locally mirrored gateway set, so it never touches the network.
     #[frb(sync)]
-    pub fn ln_generate_lnurl(
+    pub fn lightning_generate_lnurl(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
     ) -> String {
         self.client
-            .ln_generate_lnurl(
-                federation.0,
-                account.0,
-                "http://159.223.25.182:8082/".to_string(),
-            )
+            .lightning_generate_lnurl(mint.0, account.0, LNURL_DAEMON_URL.to_string())
             .unwrap_or_default()
     }
 
     /// The current flat per-tx fee for sending onchain, independent of
     /// address and amount.
     #[frb]
-    pub async fn wallet_send_fee(&self, federation: &FederationIdWrapper) -> Result<i64, String> {
+    pub async fn onchain_send_fee(&self, mint: &MintIdWrapper) -> Result<i64, String> {
         self.client
-            .wallet_send_fee(federation.0)
+            .onchain_send_fee(mint.0)
             .await
             .map(|fee| fee.to_sat() as i64)
             .map_err(|e| e.to_string())
     }
 
     #[frb]
-    pub async fn wallet_send(
+    pub async fn onchain_send(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
         address: &BitcoinAddressWrapper,
         amount_sats: i64,
     ) -> Result<(), String> {
         self.client
-            .wallet_send(
-                federation.0,
+            .onchain_send(
+                mint.0,
                 account.0,
                 address.0.clone(),
                 BtcAmount::from_sat(amount_sats as u64),
@@ -325,18 +350,18 @@ impl Pico {
     /// notes deliver when spent in full, less the onchain fee at the current
     /// consensus feerate, the transaction fee and the app's cut.
     ///
-    /// Picomint's quote, from the same code [`Self::wallet_send_max`] sizes
+    /// Picomint's quote, from the same code [`Self::onchain_send_max`] sizes
     /// with. The two can differ by a feerate that moved in between — the
     /// send recomputes at the moment it is submitted, and that figure is the
     /// one that goes out.
     #[frb]
-    pub async fn wallet_send_max_amount(
+    pub async fn onchain_send_max_amount(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
     ) -> Result<i64, String> {
         self.client
-            .wallet_send_max_amount(federation.0, account.0)
+            .onchain_send_max_amount(mint.0, account.0)
             .await
             .map(|amount| amount.to_sat() as i64)
             .map_err(|e| e.to_string())
@@ -346,135 +371,134 @@ impl Pico {
     /// picomint's to compute — it funds from every note and sizes the output
     /// to what they cover — so nothing is passed in but where it goes.
     #[frb]
-    pub async fn wallet_send_max(
+    pub async fn onchain_send_max(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
         address: &BitcoinAddressWrapper,
     ) -> Result<(), String> {
         self.client
-            .wallet_send_max(federation.0, account.0, address.0.clone())
+            .onchain_send_max(mint.0, account.0, address.0.clone())
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
 
     /// `account`'s next unused deposit address, derived locally from the
-    /// mirrored wallet state, so it never touches the network. Errors only
+    /// mirrored onchain state, so it never touches the network. Errors only
     /// while the initial address derivation has not completed yet.
     #[frb(sync)]
-    pub fn wallet_deposit_address(
+    pub fn onchain_receive(
         &self,
-        federation: &FederationIdWrapper,
+        mint: &MintIdWrapper,
         account: &AccountWrapper,
     ) -> Result<String, String> {
         self.client
-            .wallet_deposit_address(federation.0, account.0)
+            .onchain_receive(mint.0, account.0)
             .map(|address| address.to_string())
             .map_err(|e| e.to_string())
     }
 
-    /// Federation-wide wallet stats for the receive screen's details drawer:
+    /// Mint-wide wallet stats for the receive screen's details drawer:
     /// bitcoin in custody, consensus block count and consensus feerate.
     #[frb]
-    pub async fn federation_stats(
-        &self,
-        federation: &FederationIdWrapper,
-    ) -> Result<FederationStats, String> {
+    pub async fn mint_stats(&self, mint: &MintIdWrapper) -> Result<MintStats, String> {
         let total_value = self
             .client
-            .wallet_total_value(federation.0)
+            .onchain_total_value(mint.0)
             .await
             .map_err(|e| e.to_string())?;
 
         let block_count = self
             .client
-            .block_count(federation.0)
+            .block_count(mint.0)
             .await
             .map_err(|e| e.to_string())?;
 
         let feerate = self
             .client
-            .wallet_feerate(federation.0)
+            .onchain_feerate(mint.0)
             .await
             .map_err(|e| e.to_string())?;
 
-        Ok(FederationStats {
+        Ok(MintStats {
             total_value_sat: total_value.to_sat() as i64,
             block_count: i64::from(block_count),
             feerate: feerate.map(i64::from),
         })
     }
 
-    /// Live per-guardian reachability, one entry per guardian in
-    /// `config().peers` (PeerId) order: `(name, rtt_ms)` where `rtt_ms` is
-    /// `Some(round-trip millis)` while connected and `None` while
-    /// disconnected. Sourced from the client's `connection_status_stream`,
-    /// which is backed by the same kept-alive connections requests travel
-    /// over and emits the current snapshot first — so a freshly-opened
-    /// screen never shows a cold-start flicker. Multiple subscribers (home
-    /// ring + connection-status screen) each get their own cheap view of
-    /// the shared connections; subscribing starts no new polling.
+    /// Live per-mint connectivity, one [`MintConnectivity`] snapshot per
+    /// change. Sourced from the client's `connection_status_stream`, which
+    /// is backed by the same kept-alive connections requests travel over
+    /// and emits the current snapshot first — so a freshly-opened screen
+    /// never shows a cold-start flicker. Multiple subscribers (home ring +
+    /// connection-status screen) each get their own cheap view of the
+    /// shared connections; subscribing starts no new polling.
     #[frb]
-    pub async fn subscribe_connection_status(
+    pub async fn subscribe_connectivity(
         &self,
-        federation: &FederationIdWrapper,
-        sink: StreamSink<Vec<(String, Option<f64>)>>,
+        mint: &MintIdWrapper,
+        sink: StreamSink<MintConnectivity>,
     ) {
-        let Some(config) = self.client.config(federation.0) else {
+        let Some(config) = self.client.config(mint.0) else {
             return;
         };
 
-        // Guardian names keyed by PeerId so every emission renders all
-        // guardians (even before their first status lands) in a stable order.
-        let names: BTreeMap<PeerId, String> = config
-            .peers
+        let threshold = config.nodes.to_num_nodes().threshold();
+
+        // Node names keyed by NodeId so every emission renders all
+        // nodes (even before their first status lands) in a stable order.
+        let names: BTreeMap<NodeId, String> = config
+            .nodes
             .iter()
             .map(|entry| (*entry.0, entry.1.name.clone()))
             .collect();
 
-        let Ok(mut stream) = self.client.connection_status_stream(federation.0) else {
+        let Ok(mut stream) = self.client.connection_status_stream(mint.0) else {
             return;
         };
 
         while let Some(status_map) = stream.next().await {
-            let statuses: Vec<(String, Option<f64>)> = names
+            let nodes: Vec<NodeStatus> = names
                 .iter()
-                .map(|(peer, name)| {
-                    let rtt_ms = match status_map.get(peer) {
+                .map(|(node, name)| NodeStatus {
+                    name: name.clone(),
+                    rtt_ms: match status_map.get(node) {
                         Some(ConnStatus::Connected(rtt)) => Some(rtt.as_secs_f64() * 1000.0),
                         _ => None,
-                    };
-                    (name.clone(), rtt_ms)
+                    },
                 })
                 .collect();
 
-            if sink.add(statuses).is_err() {
+            let snapshot = MintConnectivity {
+                operational: nodes.iter().filter(|node| node.rtt_ms.is_some()).count() >= threshold,
+                nodes,
+            };
+
+            if sink.add(snapshot).is_err() {
                 break;
             }
         }
     }
 
-    /// The federation's announced expiry date (unix seconds), from the
+    /// The mint's announced expiry date (unix seconds), from the
     /// expiry-status cache populated at bring-up. `None` until that fetch
-    /// completes or for a federation that has not announced an expiry —
+    /// completes or for a mint that has not announced an expiry —
     /// either way the UI screens that key off this stay dormant.
     #[frb]
-    pub async fn expiration_date(&self, federation: &FederationIdWrapper) -> Option<i64> {
+    pub async fn expiration_date(&self, mint: &MintIdWrapper) -> Option<i64> {
         self.client
-            .expiry_status(federation.0)
+            .expiry_status(mint.0)
             .map(|status| status.timestamp as i64)
     }
 
-    /// Invite for the announced successor federation, if the expiring
-    /// federation named one. Same cache as [`Self::expiration_date`].
+    /// Invite for the announced successor mint, if the expiring
+    /// mint named one. Same cache as [`Self::expiration_date`].
     #[frb]
-    pub async fn expiration_successor(
-        &self,
-        federation: &FederationIdWrapper,
-    ) -> Option<InviteCodeWrapper> {
+    pub async fn expiration_successor(&self, mint: &MintIdWrapper) -> Option<InviteCodeWrapper> {
         self.client
-            .expiry_status(federation.0)?
+            .expiry_status(mint.0)?
             .successor
             .map(InviteCodeWrapper)
     }

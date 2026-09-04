@@ -6,7 +6,7 @@ import 'package:pico/screens/invoice_amount_screen.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/balanced_text_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
@@ -68,7 +68,7 @@ class DisplayLnurlScreen extends StatelessWidget {
           children: [
             QrCodeWidget(data: lnurl),
             const SizedBox(height: 16),
-            BorderedList.column(
+            BleedList.column(
               children: [
                 ShareableRow(data: lnurl, label: 'Lightning Url'),
                 SettingsCard(

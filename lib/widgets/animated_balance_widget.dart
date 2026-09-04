@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 
 /// Tweens between balance values when `sats` changes — smooth counter
 /// animation instead of a jarring text swap. Style-agnostic so the
-/// same widget works for the hero balance, federation row cards, etc.
+/// same widget works for the hero balance, mint row cards, etc.
 class AnimatedBalance extends StatefulWidget {
   // Null while the balance is still resolving (e.g. before the stream's first
   // value). Distinguishing this from a genuine 0 matters: an actual 0 balance

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/utils/styles.dart';
 
 /// Bottom-sheet scaffold. Lists run full-bleed to the sheet edges: a
-/// [BorderedList] child gets no horizontal inset, while every other child
+/// [BleedList] child gets no horizontal inset, while every other child
 /// (headers, buttons, text) keeps the standard 16px side padding.
 class DrawerShell extends StatelessWidget {
   final List<Widget> children;
@@ -24,8 +24,7 @@ class DrawerShell extends StatelessWidget {
 
     // Flex children pass through uninset so they keep working inside the
     // column; they manage their own horizontal padding.
-    bool passesThrough(Widget child) =>
-        child is BorderedList || child is Flexible;
+    bool passesThrough(Widget child) => child is BleedList || child is Flexible;
 
     return Container(
       padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
@@ -59,7 +58,7 @@ class DrawerShell extends StatelessWidget {
       return scrolled != null && _isList(scrolled);
     }
 
-    return child is BorderedList;
+    return child is BleedList;
   }
 
   static Widget _inset(Widget child) => Padding(

@@ -4,12 +4,12 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/connection_status_header_widget.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
 import 'package:pico/widgets/section_header_widget.dart';
 
-/// Per-guardian reachability for one federation. Leaving it lives in the
+/// Per-node reachability for one mint. Removing it lives in the
 /// settings drawer alongside the row that opens this screen, so there is no
 /// destructive action up here.
 class ConnectionStatusScreen extends StatefulWidget {
@@ -27,15 +27,14 @@ class ConnectionStatusScreen extends StatefulWidget {
 }
 
 class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
-  // The same stream the home ring reads — backed by the client's kept-alive
-  // connections and emitting the current snapshot first, so dots don't
-  // flicker in. Each entry is `(name, rttMs)`: a non-null RTT means that
-  // guardian is connected, and carries its round-trip time in milliseconds.
-  late final Stream<List<(String, double?)>> _stream = widget.pico
-      .subscribeConnectionStatus(federation: widget.account.federation);
+  // The same stream the home row reads — backed by the client's kept-alive
+  // connections and emitting the current snapshot first, so statuses don't
+  // flicker in.
+  late final Stream<MintConnectivity> _stream = widget.pico
+      .subscribeConnectivity(mint: widget.account.mint);
 
   // Round-trip time, sampled at connect. Sub-10ms links keep one decimal so
-  // a fast guardian doesn't collapse to a misleading "0 ms".
+  // a fast node doesn't collapse to a misleading "0 ms".
   String _formatRtt(double ms) =>
       '${ms < 10 ? ms.toStringAsFixed(1) : ms.round()} ms';
 
@@ -45,15 +44,13 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Connectivity')),
-      body: StreamBuilder<List<(String, double?)>>(
+      body: StreamBuilder<MintConnectivity>(
         stream: _stream,
         builder: (context, snapshot) {
-          final statuses = snapshot.data;
-          if (statuses == null) {
+          final connectivity = snapshot.data;
+          if (connectivity == null) {
             return const Center(child: smallSpinner);
           }
-
-          final online = statuses.where((s) => s.$2 != null).length;
 
           return SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -62,25 +59,24 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SectionHeader(title: 'Mint'),
-                BorderedList.column(
+                BleedList.column(
                   children: [
                     ConnectionStatusHeader(
-                      name: widget.account.federationName,
-                      online: online,
-                      total: statuses.length,
+                      name: widget.account.mintName,
+                      operational: connectivity.operational,
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                const SectionHeader(title: 'Guardians'),
-                BorderedList.column(
+                const SectionHeader(title: 'Nodes'),
+                BleedList.column(
                   children: [
-                    for (final (name, rttMs) in statuses)
+                    for (final node in connectivity.nodes)
                       ListTile(
                         contentPadding: listTilePadding,
                         leading: IconChip(
                           icon: PhosphorIconsRegular.hardDrives,
-                          color: rttMs != null ? null : Colors.amber,
+                          color: node.rttMs != null ? null : warningColor,
                         ),
                         // Stack name/status in the title (not subtitle) to
                         // keep the single-line tile height.
@@ -89,21 +85,21 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(name, style: mediumStyle),
+                            Text(node.name, style: mediumStyle),
                             Text(
-                              rttMs != null ? 'Online' : 'Offline',
+                              node.rttMs != null ? 'Online' : 'Offline',
                               style: smallStyle.copyWith(
-                                color: rttMs != null ? color : null,
+                                color: node.rttMs != null ? color : null,
                               ),
                             ),
                           ],
                         ),
-                        // Pico measures the link, so the round-trip time
-                        // rides along where conduit shows nothing.
-                        trailing:
-                            rttMs != null
-                                ? Text(_formatRtt(rttMs), style: smallStyle)
-                                : null,
+                        // The round-trip time of the live link, measured
+                        // over the same kept-alive connection requests use.
+                        trailing: switch (node.rttMs) {
+                          null => null,
+                          final rtt => Text(_formatRtt(rtt), style: smallStyle),
+                        },
                       ),
                   ],
                 ),

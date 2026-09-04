@@ -1,4 +1,4 @@
-//! Pico's app-level database tables. Everything federation-scoped lives in
+//! Pico's app-level database tables. Everything mint-scoped lives in
 //! tables owned by `picomint_client::Client` (config, notes, state machines,
 //! the daemon-wide event log) — what remains here is app state the client
 //! has no concept of.
@@ -7,13 +7,13 @@ use picomint_core::core::OperationId;
 use picomint_redb::table;
 
 table!(
-    RootEntropy,
+    RootEntropyTable,
     () => Vec<u8>,
     "root-entropy",
 );
 
 table!(
-    SelectedCurrency,
+    SelectedCurrencyTable,
     () => String,
     "selected-currency",
 );
@@ -25,13 +25,13 @@ table!(
 // exactly. Absent for operations that predate the feature or landed with no
 // fresh rate cached.
 table!(
-    OperationFiat,
+    OperationFiatTable,
     OperationId => (String, u64),
     "operation-fiat",
 );
 
 table!(
-    CONTACT,
+    ContactTable,
     String => String,
     "contact",
 );

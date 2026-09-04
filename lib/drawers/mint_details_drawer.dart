@@ -4,29 +4,25 @@ import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/detail_row_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/currency_utils.dart';
 
-class WalletV2WalletDetailsDrawer extends StatelessWidget {
+class MintDetailsDrawer extends StatelessWidget {
   final Pico pico;
-  final FederationStats stats;
+  final MintStats stats;
 
-  const WalletV2WalletDetailsDrawer({
-    super.key,
-    required this.pico,
-    required this.stats,
-  });
+  const MintDetailsDrawer({super.key, required this.pico, required this.stats});
 
   static Future<void> show(
     BuildContext context, {
     required Pico pico,
-    required FederationStats stats,
+    required MintStats stats,
   }) {
     return DrawerUtils.show(
       context: context,
-      child: WalletV2WalletDetailsDrawer(pico: pico, stats: stats),
+      child: MintDetailsDrawer(pico: pico, stats: stats),
     );
   }
 
@@ -49,7 +45,7 @@ class WalletV2WalletDetailsDrawer extends StatelessWidget {
 
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [
             DetailRow(
               icon: PhosphorIconsRegular.currencyBtc,

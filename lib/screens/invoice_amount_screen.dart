@@ -20,17 +20,17 @@ class InvoiceAmountScreen extends StatefulWidget {
 
 class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
   Future<void> _handleConfirm(int amountSats) async {
-    final gateway = await widget.pico.lnSelectGateway(
-      federation: widget.account.federation,
+    final gateway = await widget.pico.lightningSelectGateway(
+      mint: widget.account.mint,
     );
 
     final feeSats = gateway.gatewayFeeForReceiveAmount(amountSats: amountSats);
 
-    final invoice = await widget.pico.lnReceive(
-      federation: widget.account.federation,
+    final invoice = await widget.pico.lightningReceive(
+      mint: widget.account.mint,
       account: widget.account.account,
       gateway: gateway,
-      amountSat: amountSats,
+      amountSats: amountSats,
     );
 
     if (!mounted) return;
@@ -54,7 +54,7 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
       appBar: AppBar(title: const Text('Receive Lightning')),
       body: SafeArea(
         child: AmountEntryWidget(
-          key: ValueKey(widget.account.federation.display()),
+          key: ValueKey(widget.account.mint.display()),
           pico: widget.pico,
           onConfirm: _handleConfirm,
         ),

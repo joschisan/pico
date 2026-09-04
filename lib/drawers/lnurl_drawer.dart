@@ -4,7 +4,7 @@ import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/payment_summary_row_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/screens/lnurl_amount_screen.dart';
@@ -85,7 +85,7 @@ class _LnurlDrawerState extends State<LnurlDrawer> {
         // No amount row yet: a variable-amount lnurl has none until the
         // amount screen, and a fixed-amount one only after its limits are
         // fetched — both of which happen behind the button below.
-        BorderedList.column(
+        BleedList.column(
           children: const [
             PaymentSummaryRow(
               paymentType: PaymentType.lightning,
