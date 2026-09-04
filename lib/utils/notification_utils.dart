@@ -77,7 +77,7 @@ class NotificationUtils {
       'Error',
       message,
       PhosphorIconsRegular.warning,
-      Colors.amber,
+      warningColor,
       _defaultNotificationDuration,
     );
   }

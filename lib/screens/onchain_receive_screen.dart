@@ -10,7 +10,7 @@ import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/async_icon_button_widget.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/shareable_row_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
@@ -45,9 +45,7 @@ class OnchainReceiveScreen extends StatelessWidget {
 
     // Don't await the drawer's dismissal here, otherwise the icon's spinner
     // keeps running for as long as the drawer stays open.
-    unawaited(
-      MintDetailsDrawer.show(context, pico: pico, stats: stats),
-    );
+    unawaited(MintDetailsDrawer.show(context, pico: pico, stats: stats));
   }
 
   @override
@@ -68,7 +66,7 @@ class OnchainReceiveScreen extends StatelessWidget {
           children: [
             QrCodeWidget(data: address),
             const SizedBox(height: 16),
-            BorderedList.column(
+            BleedList.column(
               children: [ShareableRow(data: address, label: 'Bitcoin Address')],
             ),
             Expanded(

@@ -45,7 +45,6 @@ class _PaymentCardState extends State<PaymentCard> {
   // in either direction flickers for the other case while the answer
   // round-trips the bridge.
   late bool _inProgress = widget.pico.operationIsActive(
-    mint: widget.event.mint,
     operation: widget.event.operation,
   );
 
@@ -66,14 +65,11 @@ class _PaymentCardState extends State<PaymentCard> {
           if (next != null) setState(() => _status = next);
         });
     if (_inProgress) {
-      widget.pico
-          .subscribeCompletion(
-            mint: widget.event.mint,
-            operation: widget.event.operation,
-          )
-          .then((_) {
-            if (mounted) setState(() => _inProgress = false);
-          });
+      widget.pico.subscribeCompletion(operation: widget.event.operation).then((
+        _,
+      ) {
+        if (mounted) setState(() => _inProgress = false);
+      });
     }
     // A relative label goes stale where the mint name it replaced never
     // could: a settled payment emits no further events, so a row built as

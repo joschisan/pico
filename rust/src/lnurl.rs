@@ -1,6 +1,9 @@
-use crate::Bolt11InvoiceWrapper;
+use std::sync::LazyLock;
+
 use flutter_rust_bridge::frb;
 use regex::Regex;
+
+use crate::Bolt11InvoiceWrapper;
 
 #[frb]
 pub struct LnurlWrapper(pub(crate) String);
@@ -25,23 +28,28 @@ fn strict_uri_encode(input: &str) -> String {
         .collect()
 }
 
-/// Merchant patterns following blink-client approach (MoneyBadger)
-const MERCHANT_PATTERNS: &[&str] = &[
-    r"(?i)za\.co\.electrum\.picknpay",
-    r"(?i)za\.co\.ecentric",
-    r"(wigroup\.co|yoyogroup\.co)",
-    r"(zapper\.com|\d+\.zap\.pe)",
-    r"payat\.io",
-    r"paynow\.netcash\.co\.za",
-    r"paynow\.sagepay\.co\.za",
-    r"^SK-\d{1,}-\d{23}$",
-    r"transactionjunction\.co\.za",
-    r"^CRSTPC-\d+-\d+-\d+-\d+-\d+$",
-    r"scantopay\.io",
-    r"snapscan",
-    r"^\d{10}$",
-    r"^.{2}/.{4}/.{20}$",
-];
+/// Merchant patterns following blink-client approach (MoneyBadger),
+/// compiled once — `parse_lnurl` runs per scanner frame and keystroke.
+static MERCHANT_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    [
+        r"(?i)za\.co\.electrum\.picknpay",
+        r"(?i)za\.co\.ecentric",
+        r"(wigroup\.co|yoyogroup\.co)",
+        r"(zapper\.com|\d+\.zap\.pe)",
+        r"payat\.io",
+        r"paynow\.netcash\.co\.za",
+        r"paynow\.sagepay\.co\.za",
+        r"^SK-\d{1,}-\d{23}$",
+        r"transactionjunction\.co\.za",
+        r"^CRSTPC-\d+-\d+-\d+-\d+-\d+$",
+        r"scantopay\.io",
+        r"snapscan",
+        r"^\d{10}$",
+        r"^.{2}/.{4}/.{20}$",
+    ]
+    .map(|pattern| Regex::new(pattern).expect("the merchant patterns are hand-written literals"))
+    .to_vec()
+});
 
 #[frb(sync)]
 pub fn parse_lnurl(request: &str) -> Option<LnurlWrapper> {
@@ -75,7 +83,7 @@ pub fn parse_lnurl(request: &str) -> Option<LnurlWrapper> {
     // Check if input matches MoneyBadger merchant pattern
     if MERCHANT_PATTERNS
         .iter()
-        .any(|pattern| Regex::new(pattern).unwrap().is_match(request))
+        .any(|regex| regex.is_match(request))
     {
         let address = format!("{}@cryptoqr.net", strict_uri_encode(request));
 

@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/utils/drawer_utils.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
@@ -46,7 +46,7 @@ class SelectAccountDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [for (final option in accounts) _row(option)],
         ),
       ],

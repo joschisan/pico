@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/widgets/async_button_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
@@ -53,7 +53,7 @@ class _DeleteContactDrawerState extends State<DeleteContactDrawer> {
   Widget build(BuildContext context) {
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [
             SettingsCard(
               icon: PhosphorIconsRegular.trash,

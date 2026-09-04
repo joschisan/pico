@@ -271,10 +271,11 @@ _Description _describe(
     PaymentEvent_TxReject() => _Description(label: 'Transaction Rejected'),
 
     // ── Lightning ───────────────────────────────────────────────────────
-    PaymentEvent_LightningSend(:final amountSats, :final feeSats) => _Description(
-      label: 'Send Lightning',
-      subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
-    ),
+    PaymentEvent_LightningSend(:final amountSats, :final feeSats) =>
+      _Description(
+        label: 'Send Lightning',
+        subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
+      ),
     PaymentEvent_LightningSendSuccess(:final preimage) => _Description(
       label: 'Send Success',
       subtitle: 'Tap to share Preimage',
@@ -288,37 +289,38 @@ _Description _describe(
       label: 'Send Failure',
       subtitle: 'missing preimage',
     ),
-    PaymentEvent_LightningReceive(:final amountSats, :final feeSats) => _Description(
-      label: 'Receive Lightning',
-      subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
-    ),
+    PaymentEvent_LightningReceive(:final amountSats, :final feeSats) =>
+      _Description(
+        label: 'Receive Lightning',
+        subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
+      ),
 
-    // ── Mint (Ecash) ────────────────────────────────────────────────────
+    // ── Ecash ───────────────────────────────────────────────────────────
     PaymentEvent_EcashSend(:final amountSats) => _Description(
-      label: 'Send eCash',
+      label: 'Send Ecash',
       subtitle: amount(amountSats.toInt()),
     ),
     PaymentEvent_EcashSendSuccess(:final ecash) => _Description(
       label: 'Send Success',
-      subtitle: 'Tap to share eCash',
+      subtitle: 'Tap to share Ecash',
       onTap: () => _share(ecash),
     ),
     PaymentEvent_EcashSendFailure() => _Description(label: 'Send Failure'),
-    PaymentEvent_EcashRemint() => _Description(label: 'Remint eCash'),
+    PaymentEvent_EcashRemint() => _Description(label: 'Remint Ecash'),
     PaymentEvent_EcashReceive(:final amountSats) => _Description(
-      label: 'Receive eCash',
+      label: 'Receive Ecash',
       subtitle: amount(amountSats.toInt()),
     ),
     PaymentEvent_EcashSuccess(:final amountSats) => _Description(
-      label: 'Mint Success',
+      label: 'Issuance Success',
       subtitle: amount(amountSats.toInt()),
     ),
     PaymentEvent_EcashFailure() => _Description(
-      label: 'Mint Failure',
+      label: 'Issuance Failure',
       subtitle: 'threshold signature invalid',
     ),
 
-    // ── Wallet (on-chain) ───────────────────────────────────────────────
+    // ── Onchain ─────────────────────────────────────────────────────────
     PaymentEvent_OnchainSend(:final amountSats, :final feeSats) => _Description(
       label: 'Send Onchain',
       subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',

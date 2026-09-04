@@ -6,7 +6,7 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/payment_summary_row_widget.dart';
 import 'package:pico/widgets/detail_row_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
@@ -108,7 +108,7 @@ class _LightningSendDrawerState extends State<LightningSendDrawer> {
 
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [
             const PaymentSummaryRow(
               paymentType: PaymentType.lightning,

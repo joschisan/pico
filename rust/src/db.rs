@@ -7,13 +7,13 @@ use picomint_core::core::OperationId;
 use picomint_redb::table;
 
 table!(
-    RootEntropy,
+    RootEntropyTable,
     () => Vec<u8>,
     "root-entropy",
 );
 
 table!(
-    SelectedCurrency,
+    SelectedCurrencyTable,
     () => String,
     "selected-currency",
 );
@@ -25,13 +25,13 @@ table!(
 // exactly. Absent for operations that predate the feature or landed with no
 // fresh rate cached.
 table!(
-    OperationFiat,
+    OperationFiatTable,
     OperationId => (String, u64),
     "operation-fiat",
 );
 
 table!(
-    CONTACT,
+    ContactTable,
     String => String,
     "contact",
 );

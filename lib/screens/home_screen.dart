@@ -9,14 +9,9 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/events.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
-import 'package:pico/bridge_generated.dart/lnurl.dart';
-import 'package:pico/drawers/ecash_drawer.dart';
-import 'package:pico/drawers/lightning_send_drawer.dart';
-import 'package:pico/drawers/lnurl_drawer.dart';
-import 'package:pico/drawers/invite_drawer.dart';
 import 'package:pico/drawers/remove_mint_drawer.dart';
 import 'package:pico/drawers/payment_details_drawer.dart';
-import 'package:pico/drawers/scanner_drawer.dart';
+import 'package:pico/screens/scanner_screen.dart';
 import 'package:pico/drawers/select_account_drawer.dart';
 import 'package:pico/drawers/select_page_drawer.dart';
 import 'package:pico/drawers/settings_drawer.dart';
@@ -28,22 +23,20 @@ import 'package:pico/screens/display_recovery_phrase_screen.dart';
 import 'package:pico/screens/lightning_address_entry_screen.dart';
 import 'package:pico/screens/select_currency_screen.dart';
 import 'package:pico/screens/onchain_receive_screen.dart';
-import 'package:pico/utils/account_utils.dart';
 import 'package:pico/utils/auth_utils.dart';
+import 'package:pico/utils/input_router.dart';
 import 'package:pico/utils/currency_utils.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/amount_visibility.dart';
 import 'package:pico/widgets/amount_headline_widget.dart';
 import 'package:pico/widgets/animated_balance_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/recent_payments_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
 import 'package:pico/widgets/circular_action_button_widget.dart';
-import 'package:pico/utils/mint_utils.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
-import 'package:pico/screens/onchain_amount_screen.dart';
 
 /// How the pager slides onto a page it was sent to rather than swiped to.
 /// Long enough to read as travel across the pages in between — which is the
@@ -116,12 +109,15 @@ class _HomeScreenState extends State<HomeScreen> {
   // every action routes through, so this controller is the only place it is
   // recorded. Starts on the first mint's first account.
   final PageController _pageController = PageController();
-  // One session per account: this is where an account's
-  // two streams are listened to, so everything below is a pure function of
-  // the values they carry. Keyed by [_accountKey] and kept in step with
-  // [_accounts] by [_syncSessions], so an account in that list always has an
-  // entry here.
-  final Map<String, _MintSession> _sessions = {};
+  // One session per account: this is where an account's balance stream is
+  // listened to, so everything below is a pure function of the values it
+  // carries. Keyed by [_accountKey] and kept in step with [_accounts] by
+  // [_syncSessions], so an account in that list always has an entry here.
+  final Map<String, _AccountSession> _sessions = {};
+  // One connectivity subscription per mint, shared by every account page
+  // of that mint — connectivity is mint-wide state, so three pages carry
+  // one stream instead of one each. Keyed by the mint id's display form.
+  final Map<String, _ConnectivitySession> _connectivity = {};
   // Single cycling control over how balances read: sats → fiat → hidden.
   BalanceDisplay _balanceDisplay = BalanceDisplay.sats;
 
@@ -183,9 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         if (arrived.isNotEmpty) {
           _pageTo(
-            _visible.indexWhere(
-              (a) => arrived.contains(a.mint.display()),
-            ),
+            _visible.indexWhere((a) => arrived.contains(a.mint.display())),
             animate: true,
           );
         }
@@ -208,6 +202,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _accountsSubscription?.cancel();
     _pageController.dispose();
     for (final session in _sessions.values) {
+      session.dispose();
+    }
+    for (final session in _connectivity.values) {
       session.dispose();
     }
     super.dispose();
@@ -241,72 +238,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleDeepLink(Uri uri) => _handleInput(uri.toString());
 
-  /// Routes a pasted or deep-linked string to the matching flow, the same job
-  /// the scanner does for a camera frame. Returns whether anything recognised
-  /// it, so the caller can say so when nothing did.
+  /// Routes a pasted or deep-linked string to the matching flow, through
+  /// the same table the scanner uses for a camera frame. Returns whether
+  /// anything recognised it, so the caller can say so when nothing did.
   bool _handleInput(String input) {
-    final account = _selectedAccount();
+    final action = matchInput(
+      context,
+      pico: widget.pico,
+      input: input,
+      account: _selectedAccount(),
+    );
 
-    final parsers = [
-      (
-        // Invite codes route to the add drawer, which owns the whole
-        // lifecycle — pasting an invite is a first-class way to add a mint.
-        parseInviteCode(invite: input),
-        (dynamic result) =>
-            InviteDrawer.show(context, invite: result, pico: widget.pico),
-      ),
-      (
-        parseBolt11Invoice(invoice: input),
-        (dynamic result) => LightningSendDrawer.show(
-          context,
-          account: account,
-          pico: widget.pico,
-          invoice: result,
-        ),
-      ),
-      (
-        parseEcash(ecash: input),
-        (dynamic result) => EcashDrawer.show(
-          context,
-          selected: account,
-          pico: widget.pico,
-          ecash: result,
-        ),
-      ),
-      (
-        parseBitcoinAddress(address: input),
-        // An address carries no amount, so there is nothing to confirm before
-        // asking for one — go straight to the amount entry.
-        (dynamic result) => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder:
-                (_) => OnchainAmountScreen(
-                  account: account,
-                  pico: widget.pico,
-                  address: result,
-                ),
-          ),
-        ),
-      ),
-      (
-        parseLnurl(request: input),
-        (dynamic result) => LnurlDrawer.show(
-          context,
-          account: account,
-          pico: widget.pico,
-          lnurl: result,
-        ),
-      ),
-    ];
+    if (action == null) return false;
 
-    for (final (result, showDrawer) in parsers) {
-      if (result != null) {
-        showDrawer(result);
-        return true;
-      }
-    }
-
-    return false;
+    action();
+    return true;
   }
 
   /// The app-bar counterpart to the scanner: same inputs, same flows, without
@@ -392,10 +338,15 @@ class _HomeScreenState extends State<HomeScreen> {
   /// builds.
   void _syncSessions(List<PicoAccount> accounts) {
     for (final account in accounts) {
+      _connectivity.putIfAbsent(
+        account.mint.display(),
+        () => _ConnectivitySession(widget.pico, account.mint),
+      );
+
       final key = _accountKey(account);
       if (_sessions.containsKey(key)) continue;
 
-      final session = _MintSession(widget.pico, account);
+      final session = _AccountSession(widget.pico, account);
       // The balance as it stood the last time the listener below ran, so the
       // first value can be told from the ones after it: the first is the
       // account being read, and only a move past it is money arriving or
@@ -433,6 +384,11 @@ class _HomeScreenState extends State<HomeScreen> {
     for (final key in _sessions.keys.toList()) {
       if (!keys.contains(key)) _sessions.remove(key)!.dispose();
     }
+
+    final mints = accounts.map((a) => a.mint.display()).toSet();
+    for (final key in _connectivity.keys.toList()) {
+      if (!mints.contains(key)) _connectivity.remove(key)!.dispose();
+    }
   }
 
   /// Whether [account] gets a page.
@@ -446,7 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// opened surface them instead of swallowing them. Either way the page is
   /// held for the session — spending the account empty doesn't take it.
   bool _isVisible(PicoAccount account) {
-    if (account.account.display() == primaryAccount) return true;
+    if (account.account.isPrimary()) return true;
 
     return _opened.contains(_accountKey(account));
   }
@@ -491,9 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final mintId = key.split('/').first;
 
     final index = accounts.indexWhere(
-      (a) =>
-          a.mint.display() == mintId &&
-          a.account.display() == primaryAccount,
+      (a) => a.mint.display() == mintId && a.account.isPrimary(),
     );
 
     return index < 0 ? 0 : index;
@@ -533,7 +487,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// like the lnurl it needs no round trip and the screen opens with the
   /// address already in hand. The bridge throws only while the initial
   /// derivation is still running, which surfaces as a notification here.
-  void _onReceiveBitcoin() {
+  void _onReceiveOnchain() {
     final account = _selectedAccount();
 
     final String address;
@@ -583,7 +537,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onScan() {
-    ScannerDrawer.show(context, account: _selectedAccount(), pico: widget.pico);
+    ScannerScreen.show(context, account: _selectedAccount(), pico: widget.pico);
   }
 
   void _onSettings() {
@@ -766,6 +720,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   accounts: _visible,
                   pico: widget.pico,
                   sessions: _sessions,
+                  connectivity: _connectivity,
                   controller: _pageController,
                   display: _balanceDisplay,
                   onBalanceTap: _cycleBalanceDisplay,
@@ -795,13 +750,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: CircularActionButton(
                           icon: PhosphorIconsRegular.link,
                           label: 'Onchain',
-                          onTap: _onReceiveBitcoin,
+                          onTap: _onReceiveOnchain,
                         ),
                       ),
                       Expanded(
                         child: CircularActionButton(
                           icon: PhosphorIconsRegular.coinVertical,
-                          label: 'eCash',
+                          label: 'Ecash',
                           onTap: _onSendEcash,
                         ),
                       ),
@@ -831,49 +786,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// The UI's half of one account: its two streams, listened to once and held
-/// open for as long as that account's mint is added. Held by
-/// [_HomeScreenState._sessions], one per added `(mint, account)` row —
-/// so three per mint, each carrying its own account's balance and all
-/// three carrying the same connectivity.
+/// The UI's half of one account: its balance stream, listened to once and
+/// held open for as long as that account's mint is added. Held by
+/// [_HomeScreenState._sessions], one per added `(mint, account)` row.
 ///
 /// The bridge hands back a single-subscription stream per call, so a stream
 /// passed down the tree would throw the second time a widget listened to it.
-/// Listening here instead turns each into a value that any number of widgets
+/// Listening here instead turns it into a value that any number of widgets
 /// can read, rebuild from, and stop reading without consequence — which is
 /// what lets every page below be stateless.
-class _MintSession {
+class _AccountSession {
   // Null until the first value lands: an unresolved balance is not a zero
-  // one, and no status yet is not "offline".
+  // one.
   final ValueNotifier<int?> balance = ValueNotifier(null);
-  // Each entry is `(name, rttMs)`: a non-null RTT means that node is
-  // connected. The stream replays its current snapshot, so this fills in on
-  // the first frame rather than after a round trip.
-  final ValueNotifier<List<(String, double?)>?> connection = ValueNotifier(
-    null,
-  );
 
-  late final StreamSubscription<int> _balanceSubscription;
-  late final StreamSubscription<List<(String, double?)>>
-  _connectionSubscription;
+  late final StreamSubscription<int> _subscription;
 
-  _MintSession(Pico pico, PicoAccount account) {
-    _balanceSubscription = pico
-        .ecashSubscribeBalance(
-          mint: account.mint,
-          account: account.account,
-        )
+  _AccountSession(Pico pico, PicoAccount account) {
+    _subscription = pico
+        .ecashSubscribeBalance(mint: account.mint, account: account.account)
         .listen((sats) => balance.value = sats);
-    _connectionSubscription = pico
-        .subscribeConnectionStatus(mint: account.mint)
-        .listen((statuses) => connection.value = statuses);
   }
 
   void dispose() {
-    _balanceSubscription.cancel();
-    _connectionSubscription.cancel();
+    _subscription.cancel();
     balance.dispose();
-    connection.dispose();
+  }
+}
+
+/// One mint's connectivity, shared by every account page of that mint.
+/// Null until the first snapshot lands: no status yet is not "offline".
+/// The stream replays its current snapshot, so this fills in on the first
+/// frame rather than after a round trip.
+class _ConnectivitySession {
+  final ValueNotifier<MintConnectivity?> latest = ValueNotifier(null);
+
+  late final StreamSubscription<MintConnectivity> _subscription;
+
+  _ConnectivitySession(Pico pico, MintIdWrapper mint) {
+    _subscription = pico
+        .subscribeConnectivity(mint: mint)
+        .listen((snapshot) => latest.value = snapshot);
+  }
+
+  void dispose() {
+    _subscription.cancel();
+    latest.dispose();
   }
 }
 
@@ -957,13 +915,13 @@ class _BalanceHero extends StatelessWidget {
 class _MintRow extends StatelessWidget {
   final String name;
   final String account;
-  final ValueListenable<List<(String, double?)>?> connection;
+  final ValueListenable<MintConnectivity?> connectivity;
   final VoidCallback onTap;
 
   const _MintRow({
     required this.name,
     required this.account,
-    required this.connection,
+    required this.connectivity,
     required this.onTap,
   });
 
@@ -971,25 +929,20 @@ class _MintRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return ValueListenableBuilder<List<(String, double?)>?>(
-      valueListenable: connection,
-      builder: (context, statuses, _) {
-        final operational =
-            statuses != null &&
-            mintOperational(
-              online: statuses.where((s) => s.$2 != null).length,
-              total: statuses.length,
-            );
-
+    return ValueListenableBuilder<MintConnectivity?>(
+      valueListenable: connectivity,
+      builder: (context, snapshot, _) {
         return ListTile(
           contentPadding: listTilePadding,
           onTap: onTap,
           leading: IconChip(
             icon: PhosphorIconsRegular.stack,
-            // Untinted until the first status lands, so amber only ever means
-            // "too few nodes to sign".
-            color:
-                statuses == null ? null : (operational ? null : Colors.amber),
+            // Untinted until the first snapshot lands, so amber only ever
+            // means "too few nodes to sign".
+            color: switch (snapshot?.operational) {
+              null || true => null,
+              false => warningColor,
+            },
           ),
           // Both texts go in the title slot so ListTile sees a single-line
           // tile (56dp min) instead of the 72dp two-line tile a populated
@@ -1013,12 +966,13 @@ class _MintRow extends StatelessWidget {
 }
 
 /// One account's page: its balance over the row naming it, both read from
-/// that account's [_MintSession]. Stateless, so the pager is free to
+/// that account's [_AccountSession]. Stateless, so the pager is free to
 /// build and drop pages as they scroll.
 class _MintPage extends StatelessWidget {
   final PicoAccount account;
   final Pico pico;
-  final _MintSession session;
+  final _AccountSession session;
+  final ValueListenable<MintConnectivity?> connectivity;
   final BalanceDisplay display;
   final VoidCallback onBalanceTap;
   final VoidCallback onAccountTap;
@@ -1027,6 +981,7 @@ class _MintPage extends StatelessWidget {
     required this.account,
     required this.pico,
     required this.session,
+    required this.connectivity,
     required this.display,
     required this.onBalanceTap,
     required this.onAccountTap,
@@ -1054,12 +1009,12 @@ class _MintPage extends StatelessWidget {
             ),
           ),
         ),
-        BorderedList.column(
+        BleedList.column(
           children: [
             _MintRow(
               name: account.mintName,
               account: account.account.display(),
-              connection: session.connection,
+              connectivity: connectivity,
               onTap: onAccountTap,
             ),
           ],
@@ -1070,8 +1025,8 @@ class _MintPage extends StatelessWidget {
 }
 
 /// One page per shown account — its balance over the row naming it — swiped
-/// through to choose the account every action routes through. Ordered as the
-/// factory's map is, so a mint's accounts sit together and swiping runs
+/// through to choose the account every action routes through. Ordered as
+/// the account list is, so a mint's accounts sit together and swiping runs
 /// through one mint before reaching the next.
 ///
 /// Replaces a picker: at the two or three mints a wallet actually holds, a
@@ -1083,7 +1038,9 @@ class _MintPager extends StatelessWidget implements Bleeds {
   final List<PicoAccount> accounts;
   final Pico pico;
   // Keyed by [_accountKey], one entry per account in [accounts].
-  final Map<String, _MintSession> sessions;
+  final Map<String, _AccountSession> sessions;
+  // Keyed by the mint id's display form, shared by that mint's pages.
+  final Map<String, _ConnectivitySession> connectivity;
   final PageController controller;
   final BalanceDisplay display;
   final VoidCallback onBalanceTap;
@@ -1093,6 +1050,7 @@ class _MintPager extends StatelessWidget implements Bleeds {
     required this.accounts,
     required this.pico,
     required this.sessions,
+    required this.connectivity,
     required this.controller,
     required this.display,
     required this.onBalanceTap,
@@ -1103,6 +1061,7 @@ class _MintPager extends StatelessWidget implements Bleeds {
     account: account,
     pico: pico,
     session: sessions[_accountKey(account)]!,
+    connectivity: connectivity[account.mint.display()]!.latest,
     display: display,
     onBalanceTap: onBalanceTap,
     onAccountTap: onAccountTap,

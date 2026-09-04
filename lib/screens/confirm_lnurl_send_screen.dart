@@ -7,7 +7,7 @@ import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/screens/contact_name_entry_screen.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/async_button_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/detail_row_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
 import 'package:pico/widgets/warning_card_widget.dart';
@@ -112,7 +112,7 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: BleedColumn(
             children: [
-              BorderedList.column(
+              BleedList.column(
                 children: [
                   ...amountRows(
                     pico: widget.pico,

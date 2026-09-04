@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/drawers/scanner_drawer.dart';
+import 'package:pico/screens/scanner_screen.dart';
 import 'package:pico/screens/home_screen.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/balanced_text_widget.dart';
@@ -77,7 +77,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               // invite codes only, which is exactly the one input this screen
               // is here to take.
               onTap:
-                  () => ScannerDrawer.show(
+                  () => ScannerScreen.show(
                     context,
                     account: null,
                     pico: widget.pico,

@@ -30,7 +30,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
       await widget.pico.ecashSend(
         mint: widget.account.mint,
         account: widget.account.account,
-        amountSat: amountSats,
+        amountSats: amountSats,
       ),
     );
   }
@@ -75,7 +75,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Send eCash'),
+        title: const Text('Send Ecash'),
         actions: [MaxAction(onPressed: _handleConfirmMax)],
       ),
       body: SafeArea(

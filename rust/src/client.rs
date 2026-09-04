@@ -1,7 +1,7 @@
 //! The flat money surface, mirroring the picomint client: every operation
-//! is a method on [`Pico`] named for the module that serves it — `mint_send`,
-//! `wallet_send`, `ln_receive` — and takes the `(mint, account)` it
-//! acts on as arguments. There is no per-account handle to hold or leak;
+//! is a method on [`Pico`] named for the module that serves it —
+//! `ecash_send`, `onchain_send`, `lightning_receive` — and takes the
+//! `(mint, account)` it acts on as arguments. There is no per-account handle to hold or leak;
 //! [`PicoAccount`] is the plain data row the home pager renders.
 
 use std::collections::BTreeMap;
@@ -14,6 +14,8 @@ use picomint_core::Amount;
 use picomint_core::NodeId;
 use picomint_core::config::MintId;
 use picomint_core::lightning::gateway::{GatewayInfo, GatewayPk};
+
+use picomint_core::NumNodesExt;
 
 use crate::app::Pico;
 use crate::frb_generated::StreamSink;
@@ -61,6 +63,13 @@ impl GatewayInfoWrapper {
     }
 }
 
+/// The lnurl daemon that serves this wallet's reusable receive codes.
+/// Self-hosted infrastructure, named here as the one deliberate constant
+/// rather than buried at the call site: the daemon holds no funds — it
+/// relays lnurl requests to the recipient's mint — so swapping it only
+/// changes who serves the codes, not who can spend them.
+const LNURL_DAEMON_URL: &str = "http://159.223.25.182:8082/";
+
 /// One `(mint, account)` row of the wallet, as plain data — every
 /// money method on [`Pico`] takes the typed pair back. The name rides along
 /// so the pager renders without a config lookup per page.
@@ -82,6 +91,26 @@ impl PicoAccount {
     }
 }
 
+/// One node of a mint as the connectivity surfaces show it: its name and,
+/// while connected, the live link's round-trip time in milliseconds.
+#[frb]
+#[derive(Clone)]
+pub struct NodeStatus {
+    pub name: String,
+    pub rtt_ms: Option<f64>,
+}
+
+/// One connectivity snapshot: the per-node statuses in `NodeId` order,
+/// and whether enough nodes are reachable for the mint to sign — judged
+/// against the same `2f + 1` threshold picomint-core defines, computed
+/// on this side of the bridge so the app can never drift from it.
+#[frb]
+#[derive(Clone)]
+pub struct MintConnectivity {
+    pub nodes: Vec<NodeStatus>,
+    pub operational: bool,
+}
+
 /// Mint-wide wallet stats shown in the receive screen's details
 /// drawer. The feerate is in sats per 1000 vbytes (kvB).
 #[frb]
@@ -97,10 +126,10 @@ impl Pico {
         &self,
         mint: &MintIdWrapper,
         account: &AccountWrapper,
-        amount_sat: i64,
+        amount_sats: i64,
     ) -> Result<EcashWrapper, String> {
         self.client
-            .ecash_send(mint.0, account.0, Amount::from_sat(amount_sat as u64))
+            .ecash_send(mint.0, account.0, Amount::from_sat(amount_sats as u64))
             .await
             .map(EcashWrapper)
             .map_err(|e| e.to_string())
@@ -207,7 +236,7 @@ impl Pico {
         mint: &MintIdWrapper,
         account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
-        amount_sat: i64,
+        amount_sats: i64,
     ) -> Result<String, String> {
         let invoice = self
             .client
@@ -216,7 +245,7 @@ impl Pico {
                 account.0,
                 gateway.gateway_pk,
                 gateway.gateway_info.clone(),
-                Amount::from_sat(amount_sat as u64),
+                Amount::from_sat(amount_sats as u64),
             )
             .await
             .map_err(|e| e.to_string())?;
@@ -281,7 +310,7 @@ impl Pico {
         account: &AccountWrapper,
     ) -> String {
         self.client
-            .lightning_generate_lnurl(mint.0, account.0, "http://159.223.25.182:8082/".to_string())
+            .lightning_generate_lnurl(mint.0, account.0, LNURL_DAEMON_URL.to_string())
             .unwrap_or_default()
     }
 
@@ -399,24 +428,24 @@ impl Pico {
         })
     }
 
-    /// Live per-node reachability, one entry per node in
-    /// `config().nodes` (NodeId) order: `(name, rtt_ms)` where `rtt_ms` is
-    /// `Some(round-trip millis)` while connected and `None` while
-    /// disconnected. Sourced from the client's `connection_status_stream`,
-    /// which is backed by the same kept-alive connections requests travel
-    /// over and emits the current snapshot first — so a freshly-opened
-    /// screen never shows a cold-start flicker. Multiple subscribers (home
-    /// ring + connection-status screen) each get their own cheap view of
-    /// the shared connections; subscribing starts no new polling.
+    /// Live per-mint connectivity, one [`MintConnectivity`] snapshot per
+    /// change. Sourced from the client's `connection_status_stream`, which
+    /// is backed by the same kept-alive connections requests travel over
+    /// and emits the current snapshot first — so a freshly-opened screen
+    /// never shows a cold-start flicker. Multiple subscribers (home ring +
+    /// connection-status screen) each get their own cheap view of the
+    /// shared connections; subscribing starts no new polling.
     #[frb]
-    pub async fn subscribe_connection_status(
+    pub async fn subscribe_connectivity(
         &self,
         mint: &MintIdWrapper,
-        sink: StreamSink<Vec<(String, Option<f64>)>>,
+        sink: StreamSink<MintConnectivity>,
     ) {
         let Some(config) = self.client.config(mint.0) else {
             return;
         };
+
+        let threshold = config.nodes.to_num_nodes().threshold();
 
         // Node names keyed by NodeId so every emission renders all
         // nodes (even before their first status lands) in a stable order.
@@ -431,18 +460,23 @@ impl Pico {
         };
 
         while let Some(status_map) = stream.next().await {
-            let statuses: Vec<(String, Option<f64>)> = names
+            let nodes: Vec<NodeStatus> = names
                 .iter()
-                .map(|(node, name)| {
-                    let rtt_ms = match status_map.get(node) {
+                .map(|(node, name)| NodeStatus {
+                    name: name.clone(),
+                    rtt_ms: match status_map.get(node) {
                         Some(ConnStatus::Connected(rtt)) => Some(rtt.as_secs_f64() * 1000.0),
                         _ => None,
-                    };
-                    (name.clone(), rtt_ms)
+                    },
                 })
                 .collect();
 
-            if sink.add(statuses).is_err() {
+            let snapshot = MintConnectivity {
+                operational: nodes.iter().filter(|node| node.rtt_ms.is_some()).count() >= threshold,
+                nodes,
+            };
+
+            if sink.add(snapshot).is_err() {
                 break;
             }
         }

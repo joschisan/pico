@@ -7,14 +7,14 @@ use futures::stream::{self, BoxStream};
 use iroh::Endpoint;
 use iroh::endpoint::presets::N0;
 use iroh_mdns_address_lookup::MdnsAddressLookup;
-use picomint_client::eventlog::EventLogId;
+use picomint_client::eventlog::{EventLogEntry, EventLogId};
 use picomint_client::{Account, Client, Mnemonic, OperationId};
 use picomint_core::config::MintId;
 use picomint_redb::{Database, DbRead};
 use tokio::sync::{Mutex, Notify};
 
 use crate::client::PicoAccount;
-use crate::db::{CONTACT, OperationFiat, RootEntropy, SelectedCurrency};
+use crate::db::{ContactTable, OperationFiatTable, RootEntropyTable, SelectedCurrencyTable};
 use crate::events::{
     Notification, OperationSummary, PaymentEvent, is_summary_trigger, parse_notification,
     parse_payment_event, parse_summary,
@@ -79,7 +79,7 @@ impl Pico {
     pub async fn init(db: &DatabaseWrapper, mnemonic: &MnemonicWrapper) -> Result<Self, String> {
         let dbtx = db.0.begin_write();
 
-        dbtx.insert(&RootEntropy, &(), &mnemonic.0.to_entropy().to_vec());
+        dbtx.insert(&RootEntropyTable, &(), &mnemonic.0.to_entropy().to_vec());
 
         dbtx.commit();
 
@@ -90,7 +90,7 @@ impl Pico {
 
     #[frb]
     pub async fn try_load(db: &DatabaseWrapper) -> Option<Self> {
-        let entropy = db.0.begin_read().get(&RootEntropy, &())?;
+        let entropy = db.0.begin_read().get(&RootEntropyTable, &())?;
 
         let mnemonic = Mnemonic::from_entropy(&entropy).ok()?;
 
@@ -99,7 +99,7 @@ impl Pico {
         Self::assemble(db.0.clone(), mnemonic, endpoint).await.ok()
     }
 
-    /// Build the factory. `Client::new` itself brings every added mint
+    /// Build the app handle. `Client::new` itself brings every added mint
     /// up — every mint in this wallet has a balance on screen, so eager
     /// bring-up is exactly what pico wants.
     async fn assemble(
@@ -192,7 +192,7 @@ impl Pico {
     pub fn set_currency(&self, currency_code: &str) {
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(&SelectedCurrency, &(), &currency_code.to_string());
+        dbtx.insert(&SelectedCurrencyTable, &(), &currency_code.to_string());
 
         dbtx.commit();
     }
@@ -201,7 +201,7 @@ impl Pico {
     pub fn currency_code(&self) -> String {
         self.db
             .begin_read()
-            .get(&SelectedCurrency, &())
+            .get(&SelectedCurrencyTable, &())
             .unwrap_or_else(|| "USD".to_string())
     }
 
@@ -385,36 +385,48 @@ impl Pico {
         &self,
         scope: Option<(MintId, Account)>,
     ) -> (Vec<OperationSummary>, EventLogId) {
-        let mut position = EventLogId::LOG_START;
         let mut summaries: Vec<OperationSummary> = Vec::new();
 
+        let position = self.walk_event_log(EventLogId::LOG_START, |entry| {
+            if let Some(scope) = scope
+                && (entry.mint, entry.account) != scope
+            {
+                return;
+            }
+            let fiat = self
+                .db
+                .begin_read()
+                .get(&OperationFiatTable, &entry.operation)
+                .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
+            if let Some(summary) = parse_summary(entry, fiat) {
+                summaries.push(summary);
+            }
+        });
+
+        (summaries, position)
+    }
+
+    /// Walk the event log from `position` to its current end, handing every
+    /// entry to `f`, and return the position the walk reached — the tail
+    /// point a live subscription continues from.
+    fn walk_event_log(
+        &self,
+        mut position: EventLogId,
+        mut f: impl FnMut(&EventLogEntry),
+    ) -> EventLogId {
         loop {
             let batch = self.client.get_event_log(position, 1000);
 
             for entry in &batch {
-                if let Some(scope) = scope
-                    && (entry.1.mint, entry.1.account) != scope
-                {
-                    continue;
-                }
-                let fiat = self
-                    .db
-                    .begin_read()
-                    .get(&OperationFiat, &entry.1.operation)
-                    .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
-                if let Some(summary) = parse_summary(&entry.1, fiat) {
-                    summaries.push(summary);
-                }
+                f(&entry.1);
             }
 
             position = position.saturating_add(batch.len() as u64);
 
             if batch.len() < 1000 {
-                break;
+                return position;
             }
         }
-
-        (summaries, position)
     }
 
     /// Live ordered list of operation summaries (newest first) across
@@ -498,14 +510,11 @@ impl Pico {
 
     /// Whether any picomint state machine is still driving the operation —
     /// the synchronous initial value for the payment-card spinner, so the
-    /// first frame renders the truth instead of a guess.
+    /// first frame renders the truth instead of a guess. Operation ids are
+    /// globally unique, so no mint context is needed.
     #[frb(sync)]
-    pub fn operation_is_active(
-        &self,
-        mint: &MintIdWrapper,
-        operation: &OperationIdWrapper,
-    ) -> bool {
-        self.client.operation_is_active(mint.0, operation.0)
+    pub fn operation_is_active(&self, operation: &OperationIdWrapper) -> bool {
+        self.client.operation_is_active(operation.0)
     }
 
     /// Resolves once no picomint state machine is still driving the
@@ -513,8 +522,8 @@ impl Pico {
     /// in-progress spinner on payment cards; the outcome itself arrives
     /// through `subscribe_payment_events`.
     #[frb]
-    pub async fn subscribe_completion(&self, mint: &MintIdWrapper, operation: &OperationIdWrapper) {
-        self.client.subscribe_completion(mint.0, operation.0).await;
+    pub async fn subscribe_completion(&self, operation: &OperationIdWrapper) {
+        self.client.subscribe_completion(operation.0).await;
     }
 
     /// Toast/haptic stream — fires per matching event committed after
@@ -524,17 +533,7 @@ impl Pico {
     pub async fn subscribe_notifications(&self, sink: StreamSink<Notification>) {
         // Phase 1: drain history to find the live position. No
         // notifications fire — these are old events.
-        let mut position = EventLogId::LOG_START;
-
-        loop {
-            let batch = self.client.get_event_log(position, 1000);
-
-            position = position.saturating_add(batch.len() as u64);
-
-            if batch.len() < 1000 {
-                break;
-            }
-        }
+        let mut position = self.walk_event_log(EventLogId::LOG_START, |_| {});
 
         // Phase 2: tail live events; every match fires a notification.
         let notify: Arc<Notify> = self.client.event_notify();
@@ -564,19 +563,19 @@ impl Pico {
     pub fn save_contact(&self, lnurl: &LnurlWrapper, name: &str) {
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(&CONTACT, &lnurl.0, &name.to_string());
+        dbtx.insert(&ContactTable, &lnurl.0, &name.to_string());
 
         dbtx.commit();
     }
 
     #[frb(sync)]
     pub fn get_contact_name(&self, lnurl: &LnurlWrapper) -> Option<String> {
-        self.db.begin_read().get(&CONTACT, &lnurl.0)
+        self.db.begin_read().get(&ContactTable, &lnurl.0)
     }
 
     #[frb(sync)]
     pub fn list_contacts(&self) -> Vec<PicoContact> {
-        let mut contacts: Vec<_> = self.db.begin_read().iter(&CONTACT, |it| {
+        let mut contacts: Vec<_> = self.db.begin_read().iter(&ContactTable, |it| {
             it.map(|(lnurl, name)| PicoContact {
                 lnurl: LnurlWrapper(lnurl),
                 name,
@@ -593,7 +592,7 @@ impl Pico {
     pub fn delete_contact(&self, lnurl: &LnurlWrapper) {
         let dbtx = self.db.begin_write();
 
-        dbtx.remove(&CONTACT, &lnurl.0);
+        dbtx.remove(&ContactTable, &lnurl.0);
 
         dbtx.commit();
     }
@@ -611,13 +610,13 @@ fn snapshot_fiat(
     cache: &ExchangeRateCache,
     op: &OperationId,
 ) -> Option<(String, f64)> {
-    if let Some(existing) = db.begin_read().get(&OperationFiat, op) {
+    if let Some(existing) = db.begin_read().get(&OperationFiatTable, op) {
         return Some((existing.0, f64::from_bits(existing.1)));
     }
 
     let currency = db
         .begin_read()
-        .get(&SelectedCurrency, &())
+        .get(&SelectedCurrencyTable, &())
         .unwrap_or_else(|| "USD".to_string());
 
     // Derive the selected currency's rate from the cached map without hitting
@@ -633,7 +632,7 @@ fn snapshot_fiat(
     };
 
     let dbtx = db.begin_write();
-    dbtx.insert(&OperationFiat, op, &(currency.clone(), rate.to_bits()));
+    dbtx.insert(&OperationFiatTable, op, &(currency.clone(), rate.to_bits()));
     dbtx.commit();
 
     Some((currency, rate))

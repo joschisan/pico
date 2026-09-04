@@ -8,7 +8,7 @@ class PaymentTypeUtils {
   static IconData getIcon(PaymentType type) {
     return switch (type) {
       PaymentType.lightning => PhosphorIconsRegular.lightning,
-      PaymentType.bitcoin => PhosphorIconsRegular.link,
+      PaymentType.onchain => PhosphorIconsRegular.link,
       PaymentType.ecash => PhosphorIconsRegular.coinVertical,
     };
   }
@@ -20,8 +20,8 @@ class PaymentTypeUtils {
   static String getLabel(PaymentType type) {
     return switch (type) {
       PaymentType.lightning => 'Lightning',
-      PaymentType.bitcoin => 'Onchain',
-      PaymentType.ecash => 'eCash',
+      PaymentType.onchain => 'Onchain',
+      PaymentType.ecash => 'Ecash',
     };
   }
 }

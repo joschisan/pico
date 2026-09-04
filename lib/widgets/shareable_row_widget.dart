@@ -5,10 +5,10 @@ import 'package:ellipsized_text/ellipsized_text.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
 
-/// A tappable row that displays shareable data (address, invoice, eCash token,
-/// txid) middle-ellipsized in monospace over a [label] describing what it is,
+/// A tappable row that displays shareable data (address, invoice, ecash
+/// bundle, txid) middle-ellipsized in monospace over a [label] describing what it is,
 /// sharing it on tap. Mirrors the detail rows so it sits naturally inside a
-/// [BorderedList].
+/// [BleedList].
 class ShareableRow extends StatelessWidget {
   final String data;
   final String label;

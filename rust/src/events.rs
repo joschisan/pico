@@ -1,11 +1,10 @@
 //! Map picomint event log entries onto the flat shapes the Dart UI consumes.
 //!
 //! Three projections live here:
-//! - [`parse_summary`] — six trigger events (`*Send`/`*Receive`) → static
-//!   [`OperationSummary`] for the recent-payments / history card.
-//! - [`parse_outcome`] — terminal events → `Some(success)` for one-shot
-//!   notifications. Trigger events that the mint has nothing further
-//!   to do for ("immediately terminal") also return `Some(true)` here.
+//! - [`parse_summary`] — the six trigger events (`*Send`/`*Receive`) →
+//!   static [`OperationSummary`] for the recent-payments / history card.
+//! - [`parse_notification`] — the events whose payload alone carries a
+//!   toast → [`Notification`].
 //! - [`parse_payment_event`] — every public picomint event → rich
 //!   [`PaymentEvent`] for the per-op timeline drawer.
 
@@ -33,7 +32,7 @@ use crate::{MintIdWrapper, OperationIdWrapper};
 #[derive(Clone)]
 pub enum PaymentType {
     Lightning,
-    Bitcoin,
+    Onchain,
     Ecash,
 }
 
@@ -75,7 +74,7 @@ pub enum Notification {
 
 /// One-to-one mirror of every public picomint client event, flattened for
 /// transport over the frb bridge. Variant names follow `<Module><Event>`
-/// (e.g. `LightningSend`, `MintIssuanceComplete`) so the Dart side can match the
+/// (e.g. `LightningSend`, `EcashRemint`) so the Dart side can match the
 /// picomint source on sight. All amounts are converted to sats; all hashes
 /// (txids, preimages, signatures) are rendered as lowercase hex.
 #[frb]
@@ -98,7 +97,7 @@ pub enum PaymentEvent {
         error: String,
     },
 
-    // ── Lightning (`picomint_client::ln`) ────────────────────────────────
+    // ── Lightning (`picomint_client::lightning`) ─────────────────────────
     LightningSend {
         timestamp: i64,
         txid: String,
@@ -124,7 +123,7 @@ pub enum PaymentEvent {
         fee_sats: i64,
     },
 
-    // ── Mint / Ecash (`picomint_client::mint`) ───────────────────────────
+    // ── Ecash (`picomint_client::ecash`) ─────────────────────────────────
     EcashSend {
         timestamp: i64,
         amount_sats: i64,
@@ -160,7 +159,7 @@ pub enum PaymentEvent {
         timestamp: i64,
     },
 
-    // ── Wallet / on-chain (`picomint_client::wallet`) ────────────────────
+    // ── Onchain (`picomint_client::onchain`) ─────────────────────────────
     OnchainSend {
         timestamp: i64,
         txid: String,
@@ -182,7 +181,7 @@ pub enum PaymentEvent {
     },
 }
 
-/// The `(incoming, payment_type, amount_sats)` carried by the seven trigger
+/// The `(incoming, payment_type, amount_sats)` carried by the six trigger
 /// events that materialize a card. `None` for any other event. The single
 /// source of truth for "is this a summary trigger", shared by `parse_summary`
 /// and `is_summary_trigger` so the snapshot recorder and the card parser
@@ -207,10 +206,10 @@ fn trigger_fields(entry: &EventLogEntry) -> Option<(bool, PaymentType, i64)> {
         return Some((true, PaymentType::Lightning, (e.amount.msat / 1000) as i64));
     }
     if let Some(e) = entry.to_event::<OnchainSend>() {
-        return Some((false, PaymentType::Bitcoin, e.amount.to_sat() as i64));
+        return Some((false, PaymentType::Onchain, e.amount.to_sat() as i64));
     }
     if let Some(e) = entry.to_event::<OnchainReceive>() {
-        return Some((true, PaymentType::Bitcoin, e.amount.to_sat() as i64));
+        return Some((true, PaymentType::Onchain, e.amount.to_sat() as i64));
     }
     None
 }
@@ -339,7 +338,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         });
     }
 
-    // ── Mint (Ecash) ────────────────────────────────────────────────────
+    // ── Ecash ───────────────────────────────────────────────────────────
     if let Some(e) = entry.to_event::<EcashSend>() {
         return Some(PaymentEvent::EcashSend {
             timestamp,
@@ -379,7 +378,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::EcashFailure { timestamp });
     }
 
-    // ── Wallet (on-chain) ───────────────────────────────────────────────
+    // ── Onchain ─────────────────────────────────────────────────────────
     if let Some(e) = entry.to_event::<OnchainSend>() {
         return Some(PaymentEvent::OnchainSend {
             timestamp,

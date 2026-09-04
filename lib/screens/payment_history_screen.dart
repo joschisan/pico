@@ -27,7 +27,7 @@ class PaymentHistoryScreen extends StatefulWidget {
 
 class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   bool _lightning = false;
-  bool _bitcoin = false;
+  bool _onchain = false;
   bool _ecash = false;
   bool _incoming = false;
   bool _outgoing = false;
@@ -48,7 +48,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
     };
   }
 
-  bool get _anyType => _lightning || _bitcoin || _ecash;
+  bool get _anyType => _lightning || _onchain || _ecash;
   bool get _anyDirection => _incoming || _outgoing;
 
   List<OperationSummary> get _filteredOperations {
@@ -56,7 +56,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
       if (_anyType) {
         final matchesType = switch (p.paymentType) {
           PaymentType.lightning => _lightning,
-          PaymentType.bitcoin => _bitcoin,
+          PaymentType.onchain => _onchain,
           PaymentType.ecash => _ecash,
         };
         if (!matchesType) return false;
@@ -111,8 +111,8 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                 Expanded(
                   child: _FilterButton(
                     icon: PhosphorIconsRegular.link,
-                    active: _bitcoin,
-                    onTap: () => setState(() => _bitcoin = !_bitcoin),
+                    active: _onchain,
+                    onTap: () => setState(() => _onchain = !_onchain),
                   ),
                 ),
                 Expanded(

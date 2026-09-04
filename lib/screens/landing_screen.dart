@@ -13,7 +13,7 @@ import 'package:pico/widgets/scrollable_body_widget.dart';
 const _variants = [
   (PhosphorIconsRegular.lightning, 'Lightning'),
   (PhosphorIconsRegular.link, 'Onchain'),
-  (PhosphorIconsRegular.coinVertical, 'eCash'),
+  (PhosphorIconsRegular.coinVertical, 'Ecash'),
 ];
 
 class LandingScreen extends StatefulWidget {

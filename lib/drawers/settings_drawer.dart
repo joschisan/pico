@@ -4,8 +4,8 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
 import 'package:pico/utils/drawer_utils.dart';
-import 'package:pico/utils/mint_utils.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/utils/styles.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
@@ -65,10 +65,9 @@ class SettingsDrawer extends StatefulWidget {
 }
 
 class _SettingsDrawerState extends State<SettingsDrawer> {
-  // Cached so rebuilds don't re-subscribe. Each entry is `(name, rttMs)`: a
-  // non-null RTT means that node is connected.
-  late final Stream<List<(String, double?)>> _connectionStream = widget.pico
-      .subscribeConnectionStatus(mint: widget.account.mint);
+  // Cached so rebuilds don't re-subscribe.
+  late final Stream<MintConnectivity> _connectionStream = widget.pico
+      .subscribeConnectivity(mint: widget.account.mint);
 
   late final String? _currencyName =
       findFiatCurrency(code: widget.pico.currencyCode())?.name;
@@ -85,7 +84,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
 
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [
             SettingsCard(
               icon: PhosphorIconsRegular.key,
@@ -124,27 +123,25 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
   /// Carries the same amber/plain split as the home row, so opening settings
   /// on a degraded mint says so before the screen behind it is gone.
   Widget _buildConnectivityCard() {
-    return StreamBuilder<List<(String, double?)>>(
+    return StreamBuilder<MintConnectivity>(
       stream: _connectionStream,
       builder: (context, snapshot) {
-        final statuses = snapshot.data;
-
-        final operational =
-            statuses != null &&
-            mintOperational(
-              online: statuses.where((s) => s.$2 != null).length,
-              total: statuses.length,
-            );
+        final connectivity = snapshot.data;
 
         return SettingsCard(
           icon: PhosphorIconsRegular.broadcast,
-          // Left untinted until the first status lands, so amber only ever
-          // means "too few nodes to sign".
-          iconColor:
-              statuses == null ? null : (operational ? null : Colors.amber),
+          // Left untinted until the first snapshot lands, so amber only
+          // ever means "too few nodes to sign".
+          iconColor: switch (connectivity?.operational) {
+            null || true => null,
+            false => warningColor,
+          },
           title: 'Connectivity',
-          subtitle:
-              statuses == null ? null : (operational ? 'Online' : 'Offline'),
+          subtitle: switch (connectivity?.operational) {
+            null => null,
+            true => 'Online',
+            false => 'Offline',
+          },
           onTap: () => _select(widget.onSelectConnectivity),
         );
       },

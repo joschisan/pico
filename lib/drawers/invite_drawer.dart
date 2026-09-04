@@ -4,7 +4,7 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/widgets/async_button_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
@@ -12,7 +12,7 @@ import 'package:pico/widgets/settings_card_widget.dart';
 /// do: `add` rebuilds whatever this seed already owns at the mint, so adding
 /// and restoring are the same act. Asking the user to remember whether they
 /// had used this mint before was asking them to answer for the wallet — and
-/// the wrong answer stranded the eCash a restore would have found.
+/// the wrong answer stranded the Ecash a restore would have found.
 ///
 /// Calls into [Pico] itself rather than firing caller callbacks; the
 /// scanner that pushed this drawer has already popped, so the drawer's own
@@ -48,7 +48,7 @@ class InviteDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: const [
             SettingsCard(
               icon: PhosphorIconsRegular.stack,

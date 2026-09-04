@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/detail_row_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/currency_utils.dart';
@@ -13,11 +13,7 @@ class MintDetailsDrawer extends StatelessWidget {
   final Pico pico;
   final MintStats stats;
 
-  const MintDetailsDrawer({
-    super.key,
-    required this.pico,
-    required this.stats,
-  });
+  const MintDetailsDrawer({super.key, required this.pico, required this.stats});
 
   static Future<void> show(
     BuildContext context, {
@@ -49,7 +45,7 @@ class MintDetailsDrawer extends StatelessWidget {
 
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [
             DetailRow(
               icon: PhosphorIconsRegular.currencyBtc,

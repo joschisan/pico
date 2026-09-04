@@ -30,7 +30,7 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
       mint: widget.account.mint,
       account: widget.account.account,
       gateway: gateway,
-      amountSat: amountSats,
+      amountSats: amountSats,
     );
 
     if (!mounted) return;

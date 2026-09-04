@@ -3,7 +3,7 @@ import 'package:pico/bridge_generated.dart/lib.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
 import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
@@ -59,7 +59,7 @@ class _EcashDrawerState extends State<EcashDrawer> {
   Widget build(BuildContext context) {
     return DrawerShell(
       children: [
-        BorderedList.column(
+        BleedList.column(
           children: [
             const PaymentSummaryRow(
               paymentType: PaymentType.ecash,

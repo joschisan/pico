@@ -5,7 +5,7 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/fountain.dart';
 import 'package:pico/widgets/qr_code_widget.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
 import 'package:pico/widgets/async_button_widget.dart';
@@ -19,7 +19,7 @@ Stream<String> _createFrameStream(EcashEncoder encoder) async* {
   }
 }
 
-class DisplayEcashScreen extends StatelessWidget {
+class DisplayEcashScreen extends StatefulWidget {
   // Optional so the payment-details drawer can replay an old ecash
   // bundle even after the user has removed the issuing mint — in
   // that case we drop the cancel action since reissuing requires an
@@ -37,31 +37,40 @@ class DisplayEcashScreen extends StatelessWidget {
     required this.encoder,
   });
 
-  /// Reclaim the unsent eCash back into the balance, then return home.
-  Future<void> _handleCancel(BuildContext context, PicoAccount account) async {
-    await pico.ecashReceive(
+  @override
+  State<DisplayEcashScreen> createState() => _DisplayEcashScreenState();
+}
+
+class _DisplayEcashScreenState extends State<DisplayEcashScreen> {
+  // Held across rebuilds: a stream built inside `build` would restart the
+  // frame sequence on every repaint instead of fountain-cycling on.
+  late final Stream<String> _frames = _createFrameStream(widget.encoder);
+
+  /// Reclaim the unsent ecash back into the balance, then return home.
+  Future<void> _handleCancel(PicoAccount account) async {
+    await widget.pico.ecashReceive(
       mint: account.mint,
       account: account.account,
-      ecash: ecash,
+      ecash: widget.ecash,
     );
 
-    if (!context.mounted) return;
+    if (!mounted) return;
 
     Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final account = this.account;
+    final account = widget.account;
     return Scaffold(
-      appBar: AppBar(title: const Text('Send eCash')),
+      appBar: AppBar(title: const Text('Send Ecash')),
       body: ScrollableBody(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           child: BleedColumn(
             children: [
               StreamBuilder<String>(
-                stream: _createFrameStream(encoder),
+                stream: _frames,
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return const Center(child: smallSpinner);
@@ -75,14 +84,17 @@ class DisplayEcashScreen extends StatelessWidget {
               if (account != null) ...[
                 AsyncButton(
                   text: 'Cancel',
-                  onPressed: () => _handleCancel(context, account),
+                  onPressed: () => _handleCancel(account),
                 ),
                 const SizedBox(height: 16),
               ],
-              BorderedList.column(
+              BleedList.column(
                 children: [
-                  ShareableRow(data: ecash.toString(), label: 'eCash'),
-                  ...amountRows(pico: pico, amountSats: ecash.amountSats()),
+                  ShareableRow(data: widget.ecash.toString(), label: 'Ecash'),
+                  ...amountRows(
+                    pico: widget.pico,
+                    amountSats: widget.ecash.amountSats(),
+                  ),
                 ],
               ),
             ],

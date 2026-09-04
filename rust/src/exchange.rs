@@ -39,6 +39,11 @@ pub(crate) fn btc_price(prices: &BTreeMap<String, f64>, currency_code: &str) -> 
     }
 }
 
+/// Fedi's public price feed: one GET returns every `{currency}/USD` pair
+/// at once. The one external service the app talks to besides the mints
+/// and lnurl endpoints — losing it degrades to sats-only display.
+const PRICE_FEED_URL: &str = "https://price-feed.dev.fedibtc.com/latest";
+
 /// Refresh the cached rate map if it's missing or stale, leaving a fresh
 /// snapshot untouched. One fetch warms every currency at once.
 pub(crate) async fn fetch_exchange_rates(cache: ExchangeRateCache) -> Result<(), String> {
@@ -50,7 +55,7 @@ pub(crate) async fn fetch_exchange_rates(cache: ExchangeRateCache) -> Result<(),
         return Ok(());
     }
 
-    let response = reqwest::get("https://price-feed.dev.fedibtc.com/latest")
+    let response = reqwest::get(PRICE_FEED_URL)
         .await
         .map_err(|_| "Failed to fetch exchange rates".to_string())?
         .json::<FediPriceResponse>()

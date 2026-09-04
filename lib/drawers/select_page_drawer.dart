@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/utils/drawer_utils.dart';
-import 'package:pico/widgets/bordered_list_widget.dart';
+import 'package:pico/widgets/bleed_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
@@ -70,7 +70,7 @@ class SelectPageDrawer extends StatelessWidget {
         // sheet can show, and the list is the whole sheet.
         Flexible(
           child: SingleChildScrollView(
-            child: BorderedList.column(
+            child: BleedList.column(
               children: [for (final page in pages) _row(context, page)],
             ),
           ),

@@ -111,6 +111,13 @@ impl AccountWrapper {
     pub fn display(&self) -> String {
         self.0.to_string()
     }
+
+    /// Whether this is the primary account — the one every mint shows and
+    /// none can remove: where an add lands, and where the pager starts.
+    #[frb(sync)]
+    pub fn is_primary(&self) -> bool {
+        self.0 == Account::Primary
+    }
 }
 
 #[frb(opaque)]

@@ -24,9 +24,7 @@ class OnchainAmountScreen extends StatefulWidget {
 
 class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
   Future<void> _handleConfirm(int amountSats) async {
-    final feeSats = await widget.pico.onchainSendFee(
-      mint: widget.account.mint,
-    );
+    final feeSats = await widget.pico.onchainSendFee(mint: widget.account.mint);
 
     _confirm(amountSats: amountSats, feeSats: feeSats, isMax: false);
   }
@@ -44,9 +42,7 @@ class _OnchainAmountScreenState extends State<OnchainAmountScreen> {
 
     if (amountSats <= 0) throw 'This account cannot cover the onchain fee';
 
-    final feeSats = await widget.pico.onchainSendFee(
-      mint: widget.account.mint,
-    );
+    final feeSats = await widget.pico.onchainSendFee(mint: widget.account.mint);
 
     _confirm(amountSats: amountSats, feeSats: feeSats, isMax: true);
   }
