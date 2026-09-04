@@ -41,7 +41,7 @@ String relativeTime(DateTime time) {
   final elapsed = now.difference(time);
 
   // Also catches a timestamp slightly in the future, which clock skew between
-  // the guardians and the phone can produce.
+  // the nodes and the phone can produce.
   if (elapsed.inMinutes < 1) return 'Just now';
   if (elapsed.inHours < 1) return '${elapsed.inMinutes}m';
   if (elapsed.inHours < 24) return '${elapsed.inHours}h';

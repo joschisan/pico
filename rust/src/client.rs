@@ -356,7 +356,7 @@ impl Pico {
     }
 
     /// `account`'s next unused deposit address, derived locally from the
-    /// mirrored wallet state, so it never touches the network. Errors only
+    /// mirrored onchain state, so it never touches the network. Errors only
     /// while the initial address derivation has not completed yet.
     #[frb(sync)]
     pub fn onchain_receive(

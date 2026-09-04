@@ -38,7 +38,7 @@ class ExpirationDrawer extends StatelessWidget {
     );
   }
 
-  Future<void> _joinSuccessor(BuildContext context) async {
+  Future<void> _addSuccessor(BuildContext context) async {
     await pico.addMint(invite: successor!);
 
     if (!context.mounted) return;
@@ -67,7 +67,7 @@ class ExpirationDrawer extends StatelessWidget {
           const SizedBox(height: 16),
           AsyncButton(
             text: 'Add Successor Mint',
-            onPressed: () => _joinSuccessor(context),
+            onPressed: () => _addSuccessor(context),
           ),
         ],
       ],

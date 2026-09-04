@@ -7,7 +7,7 @@ import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
 /// Confirms removing a contact: the row states the action over who it lands
-/// on. Same shape as the leave-mint drawer.
+/// on. Same shape as the remove-mint drawer.
 class DeleteContactDrawer extends StatefulWidget {
   final String? name;
   final VoidCallback onDelete;

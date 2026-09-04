@@ -31,7 +31,7 @@ use crate::{
 pub struct Pico {
     db: Database,
     mnemonic: Mnemonic,
-    /// The one picomint client, holding every joined mint as data.
+    /// The one picomint client, holding every added mint as data.
     /// It owns the shared iroh endpoint, the mint configs and the
     /// daemon-wide event log; every operation names the mint it
     /// acts on. The money methods mirroring its `mint_` / `wallet_` / `ln_`
@@ -39,7 +39,7 @@ pub struct Pico {
     pub(crate) client: Arc<Client>,
     /// Wakes anyone iterating the client set when membership changes.
     /// `notify_waiters` is fire-and-forget; subscribers re-snapshot the
-    /// joined set after waking.
+    /// added set after waking.
     set_changed: Arc<Notify>,
     /// Single exchange-rate cache shared by every client (the BTC price is
     /// global, not per-mint) and by the fiat-snapshot recorder. One
@@ -118,7 +118,7 @@ impl Pico {
         })
     }
 
-    /// One row per joined `(mint, account)` pair, mint-major
+    /// One row per added `(mint, account)` pair, mint-major
     /// and account-minor — the order the home pager swipes in.
     fn rows(&self) -> Vec<PicoAccount> {
         self.client
@@ -137,7 +137,7 @@ impl Pico {
         self.mnemonic.words().map(|s| s.to_string()).collect()
     }
 
-    /// Every joined `(mint, account)` pair, as plain data.
+    /// Every added `(mint, account)` pair, as plain data.
     #[frb(sync)]
     pub fn accounts(&self) -> Vec<PicoAccount> {
         self.rows()
@@ -183,7 +183,7 @@ impl Pico {
 
         self.set_changed.notify_waiters();
 
-        // Primary is what a caller that just joined gets handed: it is the
+        // Primary is what a caller that just added gets handed: it is the
         // account the pager lands on.
         Ok(PicoAccount::new(mint, Account::Primary, config.name))
     }
@@ -250,7 +250,7 @@ impl Pico {
 
     /// Drop a mint: `begin_remove_mint` shuts its runtime down, then wipes
     /// its rows and drops its config in the dbtx it hands back, so a crash
-    /// mid-leave can never leave orphan client state behind a missing
+    /// mid-remove can never leave orphan client state behind a missing
     /// config row. Pico keeps no mint-scoped rows of its own, so the dbtx
     /// commits as is. Re-adding the same mint later starts from a fresh
     /// ledger.
@@ -263,7 +263,7 @@ impl Pico {
         }
 
         // Every account goes at once — accounts are a split of one
-        // mint's client state, not something a user joins or leaves
+        // mint's client state, not something a user adds or removes
         // individually.
         self.client
             .begin_remove_mint(mint.0)
@@ -275,7 +275,7 @@ impl Pico {
         Ok(())
     }
 
-    /// Live snapshot of every joined `(mint, account)` row; re-emits
+    /// Live snapshot of every added `(mint, account)` row; re-emits
     /// on every set change (`add`/`remove`). Subscribers re-render passively
     /// instead of re-fetching `accounts()` after each navigation pop.
     #[frb]
@@ -291,7 +291,7 @@ impl Pico {
         }
     }
 
-    /// Aggregated balance across every joined mint, in sats. Re-emits
+    /// Aggregated balance across every added mint, in sats. Re-emits
     /// on any per-account balance change AND on set changes
     /// (`add`/`remove`). The totals map survives rebuilds so an
     /// add/remove doesn't reset the running sum to zero.
@@ -300,7 +300,7 @@ impl Pico {
         let mut totals: HashMap<(MintId, Account), i64> = HashMap::new();
 
         loop {
-            // Snapshot the joined set; build a tagged stream per account so
+            // Snapshot the added set; build a tagged stream per account so
             // we can attribute incoming balances back to an account and
             // discard departed mints on the next rebuild.
             let snapshot: Vec<(MintId, Account)> = self

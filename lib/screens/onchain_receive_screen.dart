@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/lib.dart';
-import 'package:pico/drawers/wallet_v2_wallet_details_drawer.dart';
+import 'package:pico/drawers/mint_details_drawer.dart';
 import 'package:pico/utils/notification_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/async_icon_button_widget.dart';
@@ -16,14 +16,14 @@ import 'package:pico/widgets/bleed_column_widget.dart';
 import 'package:pico/widgets/scrollable_body_widget.dart';
 
 /// Shows a deposit address the caller has already derived. The address comes
-/// from the mirrored wallet state without a round trip, so the home screen
+/// from the mirrored onchain state without a round trip, so the home screen
 /// reads it before pushing this route and the screen has nothing to load.
-class WalletV2ReceiveScreen extends StatelessWidget {
+class OnchainReceiveScreen extends StatelessWidget {
   final String address;
   final Pico pico;
   final MintIdWrapper mint;
 
-  const WalletV2ReceiveScreen({
+  const OnchainReceiveScreen({
     super.key,
     required this.address,
     required this.pico,
@@ -46,7 +46,7 @@ class WalletV2ReceiveScreen extends StatelessWidget {
     // Don't await the drawer's dismissal here, otherwise the icon's spinner
     // keeps running for as long as the drawer stays open.
     unawaited(
-      WalletV2WalletDetailsDrawer.show(context, pico: pico, stats: stats),
+      MintDetailsDrawer.show(context, pico: pico, stats: stats),
     );
   }
 

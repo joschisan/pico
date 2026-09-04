@@ -9,11 +9,11 @@ import 'package:pico/widgets/detail_row_widget.dart';
 import 'package:pico/utils/drawer_utils.dart';
 import 'package:pico/utils/currency_utils.dart';
 
-class WalletV2WalletDetailsDrawer extends StatelessWidget {
+class MintDetailsDrawer extends StatelessWidget {
   final Pico pico;
   final MintStats stats;
 
-  const WalletV2WalletDetailsDrawer({
+  const MintDetailsDrawer({
     super.key,
     required this.pico,
     required this.stats,
@@ -26,7 +26,7 @@ class WalletV2WalletDetailsDrawer extends StatelessWidget {
   }) {
     return DrawerUtils.show(
       context: context,
-      child: WalletV2WalletDetailsDrawer(pico: pico, stats: stats),
+      child: MintDetailsDrawer(pico: pico, stats: stats),
     );
   }
 

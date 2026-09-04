@@ -10,7 +10,7 @@ import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
 
 /// Bottom-sheet settings: app-wide rows (recovery phrase, currency) above the
-/// selected account's own (which account, connectivity, and leaving the
+/// selected account's own (which account, connectivity, and removing the
 /// mint). Each row pops the drawer
 /// and hands off to a caller callback, whose stable context owns the
 /// navigation — this drawer's own context dies with the pop.
@@ -21,9 +21,9 @@ class SettingsDrawer extends StatefulWidget {
   final VoidCallback onSelectCurrency;
   final VoidCallback onSelectAccount;
   final VoidCallback onSelectConnectivity;
-  // Null with only one mint joined: leaving the last one would strand
+  // Null with only one mint added: removing the last one would strand
   // the wallet on onboarding, so the row is left out entirely.
-  final VoidCallback? onSelectLeave;
+  final VoidCallback? onSelectRemove;
 
   const SettingsDrawer({
     super.key,
@@ -33,7 +33,7 @@ class SettingsDrawer extends StatefulWidget {
     required this.onSelectCurrency,
     required this.onSelectAccount,
     required this.onSelectConnectivity,
-    required this.onSelectLeave,
+    required this.onSelectRemove,
   });
 
   static Future<void> show(
@@ -44,7 +44,7 @@ class SettingsDrawer extends StatefulWidget {
     required VoidCallback onSelectCurrency,
     required VoidCallback onSelectAccount,
     required VoidCallback onSelectConnectivity,
-    required VoidCallback? onSelectLeave,
+    required VoidCallback? onSelectRemove,
   }) {
     return DrawerUtils.show(
       context: context,
@@ -55,7 +55,7 @@ class SettingsDrawer extends StatefulWidget {
         onSelectCurrency: onSelectCurrency,
         onSelectAccount: onSelectAccount,
         onSelectConnectivity: onSelectConnectivity,
-        onSelectLeave: onSelectLeave,
+        onSelectRemove: onSelectRemove,
       ),
     );
   }
@@ -66,7 +66,7 @@ class SettingsDrawer extends StatefulWidget {
 
 class _SettingsDrawerState extends State<SettingsDrawer> {
   // Cached so rebuilds don't re-subscribe. Each entry is `(name, rttMs)`: a
-  // non-null RTT means that guardian is connected.
+  // non-null RTT means that node is connected.
   late final Stream<List<(String, double?)>> _connectionStream = widget.pico
       .subscribeConnectionStatus(mint: widget.account.mint);
 
@@ -81,7 +81,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    final onSelectLeave = widget.onSelectLeave;
+    final onSelectRemove = widget.onSelectRemove;
 
     return DrawerShell(
       children: [
@@ -108,12 +108,12 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
             _buildConnectivityCard(),
             // Destroys what the mint still holds, so it sits at the bottom
             // away from the rows that only navigate.
-            if (onSelectLeave != null)
+            if (onSelectRemove != null)
               SettingsCard(
                 icon: PhosphorIconsRegular.trash,
                 title: 'Remove Mint',
                 subtitle: widget.account.mintName,
-                onTap: () => _select(onSelectLeave),
+                onTap: () => _select(onSelectRemove),
               ),
           ],
         ),
@@ -139,7 +139,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
         return SettingsCard(
           icon: PhosphorIconsRegular.broadcast,
           // Left untinted until the first status lands, so amber only ever
-          // means "too few guardians to sign".
+          // means "too few nodes to sign".
           iconColor:
               statuses == null ? null : (operational ? null : Colors.amber),
           title: 'Connectivity',

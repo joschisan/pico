@@ -11,12 +11,12 @@ import 'package:pico/widgets/settings_card_widget.dart';
 /// Confirms removing a mint: the row names the mint over what is about to
 /// happen to it, and the confirm button carries the caution amber rather than
 /// relying on the wording alone. Same shape as the delete-contact drawer.
-class LeaveMintDrawer extends StatefulWidget {
+class RemoveMintDrawer extends StatefulWidget {
   final PicoAccount account;
   final Pico pico;
   final VoidCallback onSuccess;
 
-  const LeaveMintDrawer({
+  const RemoveMintDrawer({
     super.key,
     required this.account,
     required this.pico,
@@ -31,7 +31,7 @@ class LeaveMintDrawer extends StatefulWidget {
   }) {
     return DrawerUtils.show(
       context: context,
-      child: LeaveMintDrawer(
+      child: RemoveMintDrawer(
         account: account,
         pico: pico,
         onSuccess: onSuccess,
@@ -40,11 +40,11 @@ class LeaveMintDrawer extends StatefulWidget {
   }
 
   @override
-  State<LeaveMintDrawer> createState() => _LeaveMintDrawerState();
+  State<RemoveMintDrawer> createState() => _RemoveMintDrawerState();
 }
 
-class _LeaveMintDrawerState extends State<LeaveMintDrawer> {
-  Future<void> _handleLeaveMint() async {
+class _RemoveMintDrawerState extends State<RemoveMintDrawer> {
+  Future<void> _handleRemoveMint() async {
     await widget.pico.removeMint(mint: widget.account.mint);
 
     if (!mounted) return;
@@ -67,7 +67,7 @@ class _LeaveMintDrawerState extends State<LeaveMintDrawer> {
           ],
         ),
         const SizedBox(height: 16),
-        AsyncButton(text: 'Confirm', onPressed: _handleLeaveMint),
+        AsyncButton(text: 'Confirm', onPressed: _handleRemoveMint),
       ],
     );
   }

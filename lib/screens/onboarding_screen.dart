@@ -14,7 +14,7 @@ import 'package:pico/widgets/circular_action_button_widget.dart';
 /// thing to do here, so the screen is just that: the reason and the action.
 ///
 /// Watches for the first mint and hands the wallet to [HomeScreen] for
-/// good — leaving the last mint is blocked, so nothing comes back here
+/// good — removing the last mint is blocked, so nothing comes back here
 /// short of a restart with an empty wallet.
 class OnboardingScreen extends StatefulWidget {
   final Pico pico;
@@ -73,7 +73,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             CircularActionButton(
               icon: PhosphorIconsRegular.qrCode,
               label: 'Scan',
-              // No account to hand the scanner — with none joined it accepts
+              // No account to hand the scanner — with none added it accepts
               // invite codes only, which is exactly the one input this screen
               // is here to take.
               onTap:

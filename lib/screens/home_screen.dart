@@ -14,7 +14,7 @@ import 'package:pico/drawers/ecash_drawer.dart';
 import 'package:pico/drawers/lightning_send_drawer.dart';
 import 'package:pico/drawers/lnurl_drawer.dart';
 import 'package:pico/drawers/invite_drawer.dart';
-import 'package:pico/drawers/leave_mint_drawer.dart';
+import 'package:pico/drawers/remove_mint_drawer.dart';
 import 'package:pico/drawers/payment_details_drawer.dart';
 import 'package:pico/drawers/scanner_drawer.dart';
 import 'package:pico/drawers/select_account_drawer.dart';
@@ -27,7 +27,7 @@ import 'package:pico/screens/display_lnurl_screen.dart';
 import 'package:pico/screens/display_recovery_phrase_screen.dart';
 import 'package:pico/screens/lightning_address_entry_screen.dart';
 import 'package:pico/screens/select_currency_screen.dart';
-import 'package:pico/screens/wallet_v2_receive_screen.dart';
+import 'package:pico/screens/onchain_receive_screen.dart';
 import 'package:pico/utils/account_utils.dart';
 import 'package:pico/utils/auth_utils.dart';
 import 'package:pico/utils/currency_utils.dart';
@@ -65,16 +65,16 @@ String _accountKey(PicoAccount account) =>
 /// worth showing get pages, so a swipe crosses whichever accounts are in use
 /// and then on to the next mint. The page you land on is the balance every
 /// action spends from. The leading gear opens the settings drawer, which is
-/// where the account picker and leaving a mint live. The picomint
+/// where the account picker and removing a mint live. The picomint
 /// eventlog is daemon-wide so recent ops and notifications come from a single
 /// app-level stream — no per-account merging needed.
 ///
 /// Always has a mint: it is only ever mounted with one — from startup
-/// or from [OnboardingScreen] — and the last one can't be left, so nothing
+/// or from [OnboardingScreen] — and the last one can't be removed, so nothing
 /// here renders an empty state.
 class HomeScreen extends StatefulWidget {
   final Pico pico;
-  // The mints already joined at mount, so the first frame has one to
+  // The mints already added at mount, so the first frame has one to
   // render instead of waiting on this screen's own first emission.
   final List<PicoAccount> initialAccounts;
 
@@ -96,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<List<PicoAccount>>? _accountsSubscription;
 
   // Never empty: seeded from the mount-time list and only ever replaced by a
-  // non-empty emission. Every account of every joined mint, shown or
+  // non-empty emission. Every account of every added mint, shown or
   // not — [_visible] is the subset with pages.
   late List<PicoAccount> _accounts = widget.initialAccounts;
   // The accounts the pager carries, in [_accounts] order. Derived state, kept
@@ -157,25 +157,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _accountsSubscription = widget.pico.subscribeAccounts().listen((accounts) {
       if (!mounted) return;
-      // Unreachable while the last mint can't be left, and kept so a
+      // Unreachable while the last mint can't be removed, and kept so a
       // future path to an empty wallet degrades to a stale row rather than a
       // crash on `_accounts.first`.
       if (accounts.isEmpty) return;
       setState(() {
         _accounts = accounts;
         final ids = accounts.map((a) => a.mint.display()).toSet();
-        // A mint that wasn't in the previous list was just joined, so
-        // page to it — the user acted on it, and a join that restored funds
+        // A mint that wasn't in the previous list was just added, so
+        // page to it — the user acted on it, and an add that restored funds
         // arrives with them already on its balances. Its first page is its
         // first account, since the list orders by mint then account.
-        // A mint that left needs no counterpart: the pager clamps onto
+        // A mint that was removed needs no counterpart: the pager clamps onto
         // a page that still exists, and whatever it lands on is the
         // selection.
         final arrived = ids.difference(_knownMintIds);
         _knownMintIds = ids;
 
         _syncSessions(accounts);
-        // A mint that left takes its accounts with it, so a re-join
+        // A mint that was removed takes its accounts with it, so a re-add
         // later in the same session starts from a fresh primary.
         final live = accounts.map(_accountKey).toSet();
         _opened.removeWhere((key) => !live.contains(key));
@@ -250,7 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final parsers = [
       (
         // Invite codes route to the add drawer, which owns the whole
-        // lifecycle — pasting an invite is a first-class way to join.
+        // lifecycle — pasting an invite is a first-class way to add a mint.
         parseInviteCode(invite: input),
         (dynamic result) =>
             InviteDrawer.show(context, invite: result, pico: widget.pico),
@@ -341,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Rounds mid-drag to the page the swipe is committing to, which is the one
   /// the user is looking at. Before the first layout there is no position to
   /// read and the pager sits on its initial page; the clamp covers the frame
-  /// between a mint leaving — taking three pages with it — and the
+  /// between a mint being removed — taking three pages with it — and the
   /// pager laying out over the shorter list.
   PicoAccount _selectedAccount() {
     final page = _pageController.hasClients ? _pageController.page : null;
@@ -355,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ///
   /// Jumps by default: the move is bookkeeping — holding the selection as
   /// pages appear beside it — and there is no swipe to finish. [animate] is
-  /// for the moves the user asked for, joining a mint or picking an
+  /// for the moves the user asked for, adding a mint or picking an
   /// account, where sliding over to the new page shows where it landed among
   /// the others instead of teleporting onto it.
   void _pageTo(int index, {bool animate = false}) {
@@ -385,8 +385,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Brings [_sessions] into step with the account set: an account that
-  /// arrived gets its streams opened, one that went gets them closed. A join
-  /// brings three at once and a leave takes three, since a mint's
+  /// arrived gets its streams opened, one that went gets them closed. An add
+  /// brings three at once and a removal takes three, since a mint's
   /// accounts arrive and depart together. Called inside the same `setState`
   /// that swaps [_accounts], so the two never disagree by the time anything
   /// builds.
@@ -439,7 +439,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ///
   /// Three accounts each is more pages than a wallet with two mints wants to
   /// swipe through when it is using one of them, so an account earns its page
-  /// rather than being given one. Primary always has one — it is where a join
+  /// rather than being given one. Primary always has one — it is where an add
   /// lands. The rest earned theirs into [_opened], by being opened from the
   /// picker or by money turning up in them: a balance is never hidden, which
   /// is what makes a restore that finds funds in an account nobody ever
@@ -480,8 +480,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final index = keys.indexOf(selected);
 
     // The page in view is one that just went — pages are held for the
-    // session, so only its mint leaving takes it. Its mint's
-    // primary is the nearest page to it, and when that left too, the
+    // session, so only its mint being removed takes it. Its mint's
+    // primary is the nearest page to it, and when that was removed too, the
     // fallback lands on the first page.
     _pageTo(index >= 0 ? index : _primaryIndexOf(selected, next));
   }
@@ -529,7 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Receive Onchain derives the address from the mirrored wallet state, so
+  /// Receive Onchain derives the address from the mirrored onchain state, so
   /// like the lnurl it needs no round trip and the screen opens with the
   /// address already in hand. The bridge throws only while the initial
   /// derivation is still running, which surfaces as a notification here.
@@ -550,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
-            (_) => WalletV2ReceiveScreen(
+            (_) => OnchainReceiveScreen(
               address: address,
               pico: widget.pico,
               mint: account.mint,
@@ -595,9 +595,9 @@ class _HomeScreenState extends State<HomeScreen> {
       onSelectCurrency: _openCurrency,
       onSelectAccount: _openSelectAccount,
       onSelectConnectivity: _openConnectivity,
-      // Leaving the last mint would strand the wallet on onboarding, so
+      // Removing the last mint would strand the wallet on onboarding, so
       // the row only appears once there is another to fall back to.
-      onSelectLeave: _knownMintIds.length > 1 ? _openLeave : null,
+      onSelectRemove: _knownMintIds.length > 1 ? _openRemove : null,
     );
   }
 
@@ -699,8 +699,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openLeave() {
-    LeaveMintDrawer.show(
+  void _openRemove() {
+    RemoveMintDrawer.show(
       context,
       account: _selectedAccount(),
       pico: widget.pico,
@@ -832,8 +832,8 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// The UI's half of one account: its two streams, listened to once and held
-/// open for as long as that account's mint is joined. Held by
-/// [_HomeScreenState._sessions], one per joined `(mint, account)` row —
+/// open for as long as that account's mint is added. Held by
+/// [_HomeScreenState._sessions], one per added `(mint, account)` row —
 /// so three per mint, each carrying its own account's balance and all
 /// three carrying the same connectivity.
 ///
@@ -846,7 +846,7 @@ class _MintSession {
   // Null until the first value lands: an unresolved balance is not a zero
   // one, and no status yet is not "offline".
   final ValueNotifier<int?> balance = ValueNotifier(null);
-  // Each entry is `(name, rttMs)`: a non-null RTT means that guardian is
+  // Each entry is `(name, rttMs)`: a non-null RTT means that node is
   // connected. The stream replays its current snapshot, so this fills in on
   // the first frame rather than after a round trip.
   final ValueNotifier<List<(String, double?)>?> connection = ValueNotifier(
@@ -946,7 +946,7 @@ class _BalanceHero extends StatelessWidget {
 /// this line, and it is the only thing distinguishing three pages that
 /// otherwise look alike.
 ///
-/// Connectivity keeps the chip: it tints amber while too few guardians are
+/// Connectivity keeps the chip: it tints amber while too few nodes are
 /// reachable to sign, so a degraded mint is still flagged on the row it
 /// belongs to rather than from an app-bar icon. The detail behind it is a tap
 /// away on the connection screen.
@@ -987,7 +987,7 @@ class _MintRow extends StatelessWidget {
           leading: IconChip(
             icon: PhosphorIconsRegular.stack,
             // Untinted until the first status lands, so amber only ever means
-            // "too few guardians to sign".
+            // "too few nodes to sign".
             color:
                 statuses == null ? null : (operational ? null : Colors.amber),
           ),

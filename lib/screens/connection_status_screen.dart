@@ -9,7 +9,7 @@ import 'package:pico/widgets/connection_status_header_widget.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
 import 'package:pico/widgets/section_header_widget.dart';
 
-/// Per-guardian reachability for one mint. Leaving it lives in the
+/// Per-node reachability for one mint. Removing it lives in the
 /// settings drawer alongside the row that opens this screen, so there is no
 /// destructive action up here.
 class ConnectionStatusScreen extends StatefulWidget {
@@ -30,12 +30,12 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
   // The same stream the home ring reads — backed by the client's kept-alive
   // connections and emitting the current snapshot first, so dots don't
   // flicker in. Each entry is `(name, rttMs)`: a non-null RTT means that
-  // guardian is connected, and carries its round-trip time in milliseconds.
+  // node is connected, and carries its round-trip time in milliseconds.
   late final Stream<List<(String, double?)>> _stream = widget.pico
       .subscribeConnectionStatus(mint: widget.account.mint);
 
   // Round-trip time, sampled at connect. Sub-10ms links keep one decimal so
-  // a fast guardian doesn't collapse to a misleading "0 ms".
+  // a fast node doesn't collapse to a misleading "0 ms".
   String _formatRtt(double ms) =>
       '${ms < 10 ? ms.toStringAsFixed(1) : ms.round()} ms';
 
@@ -72,7 +72,7 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                const SectionHeader(title: 'Guardians'),
+                const SectionHeader(title: 'Nodes'),
                 BorderedList.column(
                   children: [
                     for (final (name, rttMs) in statuses)

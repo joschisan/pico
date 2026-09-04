@@ -4,12 +4,12 @@ import 'package:pico/utils/mint_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
 
-/// Overall mint reachability shown above the guardian list, as a row that
-/// mirrors the guardian rows: the mint's icon-chip badge with its name as the
+/// Overall mint reachability shown above the node list, as a row that
+/// mirrors the node rows: the mint's icon-chip badge with its name as the
 /// header and an online/offline status beneath.
 ///
 /// The mint is reachable once [mintOperational] holds. The badge carries
-/// the primary colour while reachable and turns amber when too few guardians
+/// the primary colour while reachable and turns amber when too few nodes
 /// are connected — the same split the mint row on home uses.
 class ConnectionStatusHeader extends StatelessWidget {
   final String name;

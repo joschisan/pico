@@ -21,7 +21,7 @@ Stream<String> _createFrameStream(EcashEncoder encoder) async* {
 
 class DisplayEcashScreen extends StatelessWidget {
   // Optional so the payment-details drawer can replay an old ecash
-  // bundle even after the user has left the issuing mint — in
+  // bundle even after the user has removed the issuing mint — in
   // that case we drop the cancel action since reissuing requires an
   // account at the same mint.
   final PicoAccount? account;
@@ -71,7 +71,7 @@ class DisplayEcashScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               // Cancelling needs an account at the issuing mint, so
-              // it is dropped when replaying an old bundle after leaving.
+              // it is dropped when replaying an old bundle after removal.
               if (account != null) ...[
                 AsyncButton(
                   text: 'Cancel',

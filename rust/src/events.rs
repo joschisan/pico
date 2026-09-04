@@ -188,7 +188,7 @@ pub enum PaymentEvent {
 /// and `is_summary_trigger` so the snapshot recorder and the card parser
 /// never disagree on which operations count.
 ///
-/// A join's restored notes need no entry of its own, and get none: they are
+/// An add's restored notes need no entry of their own, and get none: they are
 /// written straight into the wallet beside the counter marks, before the
 /// client that would log anything exists. A restore surfaces as balance
 /// rather than as history — the transactions that earned those notes belong
