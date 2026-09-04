@@ -13,9 +13,9 @@ table!(
 );
 
 table!(
-    SelectedCurrencyTable,
+    SelectedCurrencyCodeTable,
     () => String,
-    "pico-selected-currency",
+    "pico-selected-currency-code",
 );
 
 // Exchange rate snapshotted against an operation when its trigger event is
@@ -25,9 +25,9 @@ table!(
 // exactly. Absent for operations that predate the feature or landed with no
 // fresh rate cached.
 table!(
-    OperationFiatTable,
+    OperationFiatPriceTable,
     OperationId => (String, u64),
-    "pico-operation-fiat",
+    "pico-operation-fiat-price",
 );
 
 table!(

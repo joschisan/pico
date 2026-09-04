@@ -14,7 +14,9 @@ use picomint_redb::{Database, DbRead};
 use tokio::sync::{Mutex, Notify};
 
 use crate::client::PicoAccount;
-use crate::db::{ContactTable, OperationFiatTable, RootEntropyTable, SelectedCurrencyTable};
+use crate::db::{
+    ContactTable, OperationFiatPriceTable, RootEntropyTable, SelectedCurrencyCodeTable,
+};
 use crate::events::{
     Notification, OperationSummary, PaymentEvent, is_summary_trigger, parse_notification,
     parse_payment_event, parse_summary,
@@ -192,7 +194,7 @@ impl Pico {
     pub fn set_currency(&self, currency_code: &str) {
         let dbtx = self.db.begin_write();
 
-        dbtx.insert(&SelectedCurrencyTable, &(), &currency_code.to_string());
+        dbtx.insert(&SelectedCurrencyCodeTable, &(), &currency_code.to_string());
 
         dbtx.commit();
     }
@@ -201,7 +203,7 @@ impl Pico {
     pub fn currency_code(&self) -> String {
         self.db
             .begin_read()
-            .get(&SelectedCurrencyTable, &())
+            .get(&SelectedCurrencyCodeTable, &())
             .unwrap_or_else(|| "USD".to_string())
     }
 
@@ -396,7 +398,7 @@ impl Pico {
             let fiat = self
                 .db
                 .begin_read()
-                .get(&OperationFiatTable, &entry.operation)
+                .get(&OperationFiatPriceTable, &entry.operation)
                 .map(|snapshot| (snapshot.0, f64::from_bits(snapshot.1)));
             if let Some(summary) = parse_summary(entry, fiat) {
                 summaries.push(summary);
@@ -610,13 +612,13 @@ fn snapshot_fiat(
     cache: &ExchangeRateCache,
     op: &OperationId,
 ) -> Option<(String, f64)> {
-    if let Some(existing) = db.begin_read().get(&OperationFiatTable, op) {
+    if let Some(existing) = db.begin_read().get(&OperationFiatPriceTable, op) {
         return Some((existing.0, f64::from_bits(existing.1)));
     }
 
     let currency = db
         .begin_read()
-        .get(&SelectedCurrencyTable, &())
+        .get(&SelectedCurrencyCodeTable, &())
         .unwrap_or_else(|| "USD".to_string());
 
     // Derive the selected currency's rate from the cached map without hitting
@@ -632,7 +634,11 @@ fn snapshot_fiat(
     };
 
     let dbtx = db.begin_write();
-    dbtx.insert(&OperationFiatTable, op, &(currency.clone(), rate.to_bits()));
+    dbtx.insert(
+        &OperationFiatPriceTable,
+        op,
+        &(currency.clone(), rate.to_bits()),
+    );
     dbtx.commit();
 
     Some((currency, rate))
