@@ -9,13 +9,13 @@ use picomint_redb::table;
 table!(
     RootEntropyTable,
     () => Vec<u8>,
-    "root-entropy",
+    "pico-root-entropy",
 );
 
 table!(
-    SelectedCurrencyTable,
+    SelectedCurrencyCodeTable,
     () => String,
-    "selected-currency",
+    "pico-selected-currency-code",
 );
 
 // Exchange rate snapshotted against an operation when its trigger event is
@@ -25,13 +25,13 @@ table!(
 // exactly. Absent for operations that predate the feature or landed with no
 // fresh rate cached.
 table!(
-    OperationFiatTable,
+    OperationFiatPriceTable,
     OperationId => (String, u64),
-    "operation-fiat",
+    "pico-operation-fiat-price",
 );
 
 table!(
     ContactTable,
     String => String,
-    "contact",
+    "pico-contact",
 );
