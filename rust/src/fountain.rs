@@ -1,15 +1,15 @@
 use flutter_rust_bridge::frb;
-use picomint_client::mint::ECash;
+use picomint_client::ecash::Ecash;
 use picomint_fountain::{FountainDecoder, FountainEncoder, Fragment};
 
-use crate::ECashWrapper;
+use crate::EcashWrapper;
 
 #[frb(opaque)]
-pub struct ECashEncoder(FountainEncoder);
+pub struct EcashEncoder(FountainEncoder);
 
-impl ECashEncoder {
+impl EcashEncoder {
     #[frb(sync)]
-    pub fn new(ecash: &ECashWrapper) -> Self {
+    pub fn new(ecash: &EcashWrapper) -> Self {
         Self(FountainEncoder::new(&ecash.0, 512))
     }
 
@@ -20,11 +20,11 @@ impl ECashEncoder {
 }
 
 #[frb(opaque)]
-pub struct ECashDecoder {
-    inner: FountainDecoder<ECash>,
+pub struct EcashDecoder {
+    inner: FountainDecoder<Ecash>,
 }
 
-impl ECashDecoder {
+impl EcashDecoder {
     #[frb(sync)]
     pub fn new() -> Self {
         Self {
@@ -33,9 +33,9 @@ impl ECashDecoder {
     }
 
     #[frb(sync)]
-    pub fn add_fragment(&mut self, fragment: &str) -> Option<ECashWrapper> {
+    pub fn add_fragment(&mut self, fragment: &str) -> Option<EcashWrapper> {
         let decoded = picomint_base32::decode::<Fragment>(fragment).ok()?;
 
-        self.inner.add_fragment(&decoded).map(ECashWrapper)
+        self.inner.add_fragment(&decoded).map(EcashWrapper)
     }
 }

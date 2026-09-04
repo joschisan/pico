@@ -45,14 +45,14 @@ class _ConfirmOnchainSendScreenState extends State<ConfirmOnchainSendScreen> {
     await requireBiometricAuth(context);
 
     if (widget.isMax) {
-      await widget.pico.walletSendMax(
-        federation: widget.account.federation,
+      await widget.pico.onchainSendMax(
+        mint: widget.account.mint,
         account: widget.account.account,
         address: widget.address,
       );
     } else {
-      await widget.pico.walletSend(
-        federation: widget.account.federation,
+      await widget.pico.onchainSend(
+        mint: widget.account.mint,
         account: widget.account.account,
         address: widget.address,
         amountSats: widget.amountSats,

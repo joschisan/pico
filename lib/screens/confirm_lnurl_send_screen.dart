@@ -71,15 +71,15 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
     await requireBiometricAuth(context);
 
     if (widget.isMax) {
-      await widget.pico.lnSendMax(
-        federation: widget.account.federation,
+      await widget.pico.lightningSendMax(
+        mint: widget.account.mint,
         account: widget.account.account,
         gateway: widget.gateway,
         lnurl: widget.lnurl.encode(),
       );
     } else {
-      await widget.pico.lnSend(
-        federation: widget.account.federation,
+      await widget.pico.lightningSend(
+        mint: widget.account.mint,
         account: widget.account.account,
         gateway: widget.gateway,
         invoice: widget.invoice!,

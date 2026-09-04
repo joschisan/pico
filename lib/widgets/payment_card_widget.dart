@@ -14,11 +14,11 @@ enum _Status { ok, warning, error }
 
 _Status? _classify(PaymentEvent event) => switch (event) {
   PaymentEvent_TxReject() => _Status.error,
-  PaymentEvent_LnSendRefund() => _Status.warning,
-  PaymentEvent_LnSendFailure() => _Status.error,
-  PaymentEvent_MintSendFailure() => _Status.error,
-  PaymentEvent_MintFailure() => _Status.error,
-  PaymentEvent_WalletSendFailure() => _Status.error,
+  PaymentEvent_LightningSendRefund() => _Status.warning,
+  PaymentEvent_LightningSendFailure() => _Status.error,
+  PaymentEvent_EcashSendFailure() => _Status.error,
+  PaymentEvent_EcashFailure() => _Status.error,
+  PaymentEvent_OnchainSendFailure() => _Status.error,
   _ => null,
 };
 
@@ -45,7 +45,7 @@ class _PaymentCardState extends State<PaymentCard> {
   // in either direction flickers for the other case while the answer
   // round-trips the bridge.
   late bool _inProgress = widget.pico.operationIsActive(
-    federation: widget.event.federation,
+    mint: widget.event.mint,
     operation: widget.event.operation,
   );
 
@@ -68,14 +68,14 @@ class _PaymentCardState extends State<PaymentCard> {
     if (_inProgress) {
       widget.pico
           .subscribeCompletion(
-            federation: widget.event.federation,
+            mint: widget.event.mint,
             operation: widget.event.operation,
           )
           .then((_) {
             if (mounted) setState(() => _inProgress = false);
           });
     }
-    // A relative label goes stale where the federation name it replaced never
+    // A relative label goes stale where the mint name it replaced never
     // could: a settled payment emits no further events, so a row built as
     // "Just now" would still read that an hour on. Half a minute keeps it
     // inside the finest step the label has, and only a step that actually

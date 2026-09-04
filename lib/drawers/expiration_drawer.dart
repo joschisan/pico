@@ -39,7 +39,7 @@ class ExpirationDrawer extends StatelessWidget {
   }
 
   Future<void> _joinSuccessor(BuildContext context) async {
-    await pico.add(invite: successor!);
+    await pico.addMint(invite: successor!);
 
     if (!context.mounted) return;
 

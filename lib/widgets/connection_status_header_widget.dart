@@ -1,6 +1,6 @@
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:pico/utils/federation_utils.dart';
+import 'package:pico/utils/mint_utils.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
 
@@ -8,7 +8,7 @@ import 'package:pico/widgets/icon_chip_widget.dart';
 /// mirrors the guardian rows: the mint's icon-chip badge with its name as the
 /// header and an online/offline status beneath.
 ///
-/// The mint is reachable once [federationOperational] holds. The badge carries
+/// The mint is reachable once [mintOperational] holds. The badge carries
 /// the primary colour while reachable and turns amber when too few guardians
 /// are connected — the same split the mint row on home uses.
 class ConnectionStatusHeader extends StatelessWidget {
@@ -25,7 +25,7 @@ class ConnectionStatusHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final operational = federationOperational(online: online, total: total);
+    final operational = mintOperational(online: online, total: total);
     final color =
         operational ? Theme.of(context).colorScheme.primary : Colors.amber;
 

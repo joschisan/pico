@@ -75,7 +75,7 @@ class _RecentPaymentsState extends State<RecentPayments> {
               operations:
                   widget.pico
                       .listOperations(
-                        federation: account.federation,
+                        mint: account.mint,
                         account: account.account,
                       )
                       .reversed

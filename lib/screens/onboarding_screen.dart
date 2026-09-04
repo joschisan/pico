@@ -10,11 +10,11 @@ import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/balanced_text_widget.dart';
 import 'package:pico/widgets/circular_action_button_widget.dart';
 
-/// Where a wallet with no federation lands. Scanning an invite is the only
+/// Where a wallet with no mint lands. Scanning an invite is the only
 /// thing to do here, so the screen is just that: the reason and the action.
 ///
-/// Watches for the first federation and hands the wallet to [HomeScreen] for
-/// good — leaving the last federation is blocked, so nothing comes back here
+/// Watches for the first mint and hands the wallet to [HomeScreen] for
+/// good — leaving the last mint is blocked, so nothing comes back here
 /// short of a restart with an empty wallet.
 class OnboardingScreen extends StatefulWidget {
   final Pico pico;

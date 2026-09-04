@@ -14,10 +14,10 @@ import 'package:pico/bridge_generated.dart/events.dart';
 class EcashDrawer extends StatefulWidget {
   /// The account in view when the bundle arrived — the balance the user is
   /// looking at is the one they mean. A bundle issued by a different
-  /// federation is rejected by the receive itself with an explicit error.
+  /// mint is rejected by the receive itself with an explicit error.
   final PicoAccount selected;
   final Pico pico;
-  final ECashWrapper ecash;
+  final EcashWrapper ecash;
 
   const EcashDrawer({
     super.key,
@@ -30,7 +30,7 @@ class EcashDrawer extends StatefulWidget {
     BuildContext context, {
     required PicoAccount selected,
     required Pico pico,
-    required ECashWrapper ecash,
+    required EcashWrapper ecash,
   }) {
     return DrawerUtils.show<bool>(
       context: context,
@@ -44,8 +44,8 @@ class EcashDrawer extends StatefulWidget {
 
 class _EcashDrawerState extends State<EcashDrawer> {
   Future<void> _handleReceive() async {
-    await widget.pico.mintReceive(
-      federation: widget.selected.federation,
+    await widget.pico.ecashReceive(
+      mint: widget.selected.mint,
       account: widget.selected.account,
       ecash: widget.ecash,
     );

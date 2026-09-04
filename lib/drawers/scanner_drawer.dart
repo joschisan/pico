@@ -15,8 +15,8 @@ import 'package:pico/widgets/scanner_overlay_widget.dart';
 import 'package:pico/screens/onchain_amount_screen.dart';
 
 /// One scanner for everything: invite codes (always allowed),
-/// payment-method inputs (only when a federation is warm). With no
-/// federations joined the user can still scan an invite to onboard.
+/// payment-method inputs (only when a mint is warm). With no
+/// mints joined the user can still scan an invite to onboard.
 ///
 /// Presented full-screen rather than in a sheet, so the camera gets the whole
 /// viewport and a QR only has to fill the viewfinder to read.
@@ -44,13 +44,13 @@ class ScannerDrawer extends StatefulWidget {
 }
 
 class _ScannerDrawerState extends State<ScannerDrawer> {
-  final _decoder = ECashDecoder();
+  final _decoder = EcashDecoder();
   bool _isScanning = true;
 
   void _processInput(String input) {
     if (!_isScanning) return;
 
-    // Invite codes always win and don't need a joined federation — that's
+    // Invite codes always win and don't need a joined mint — that's
     // how the user joins their first one. InviteDrawer owns the add
     // lifecycle so its own (still-mounted) context drives the pop
     // and toast.

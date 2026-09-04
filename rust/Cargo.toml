@@ -16,7 +16,6 @@ lightning-invoice = { version = "0.34", features = ["std"] }
 picomint-base32 = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-client = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-core = { git = "https://github.com/joschisan/picomint", branch = "main" }
-picomint-eventlog = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-fountain = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-lnurl = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-redb = { git = "https://github.com/joschisan/picomint", branch = "main" }

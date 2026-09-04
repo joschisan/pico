@@ -27,8 +27,8 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
     await requireBiometricAuth(context);
 
     _display(
-      await widget.pico.mintSend(
-        federation: widget.account.federation,
+      await widget.pico.ecashSend(
+        mint: widget.account.mint,
         account: widget.account.account,
         amountSat: amountSats,
       ),
@@ -42,8 +42,8 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
   Future<void> _handleConfirmMax() async {
     await requireBiometricAuth(context);
 
-    final ecash = await widget.pico.mintSendMax(
-      federation: widget.account.federation,
+    final ecash = await widget.pico.ecashSendMax(
+      mint: widget.account.mint,
       account: widget.account.account,
     );
 
@@ -55,7 +55,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
   /// Hands the notes to the screen that shows them. Until it has them they
   /// are held nowhere else: the send returned them by value and took them out
   /// of the account.
-  void _display(ECashWrapper ecash) {
+  void _display(EcashWrapper ecash) {
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
@@ -65,7 +65,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
               account: widget.account,
               pico: widget.pico,
               ecash: ecash,
-              encoder: ECashEncoder(ecash: ecash),
+              encoder: EcashEncoder(ecash: ecash),
             ),
       ),
     );

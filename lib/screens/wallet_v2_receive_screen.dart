@@ -21,19 +21,19 @@ import 'package:pico/widgets/scrollable_body_widget.dart';
 class WalletV2ReceiveScreen extends StatelessWidget {
   final String address;
   final Pico pico;
-  final FederationIdWrapper federation;
+  final MintIdWrapper mint;
 
   const WalletV2ReceiveScreen({
     super.key,
     required this.address,
     required this.pico,
-    required this.federation,
+    required this.mint,
   });
 
   Future<void> _showDetails(BuildContext context) async {
-    final FederationStats stats;
+    final MintStats stats;
     try {
-      stats = await pico.federationStats(federation: federation);
+      stats = await pico.mintStats(mint: mint);
     } catch (error) {
       if (context.mounted) {
         NotificationUtils.showError(context, error.toString());

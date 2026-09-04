@@ -271,68 +271,68 @@ _Description _describe(
     PaymentEvent_TxReject() => _Description(label: 'Transaction Rejected'),
 
     // ── Lightning ───────────────────────────────────────────────────────
-    PaymentEvent_LnSend(:final amountSats, :final feeSats) => _Description(
+    PaymentEvent_LightningSend(:final amountSats, :final feeSats) => _Description(
       label: 'Send Lightning',
       subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
     ),
-    PaymentEvent_LnSendSuccess(:final preimage) => _Description(
+    PaymentEvent_LightningSendSuccess(:final preimage) => _Description(
       label: 'Send Success',
       subtitle: 'Tap to share Preimage',
       onTap: () => _share(preimage),
     ),
-    PaymentEvent_LnSendRefund(:final expired) => _Description(
+    PaymentEvent_LightningSendRefund(:final expired) => _Description(
       label: 'Refund',
       subtitle: expired ? 'contract expired' : 'gateway cancelled',
     ),
-    PaymentEvent_LnSendFailure() => _Description(
+    PaymentEvent_LightningSendFailure() => _Description(
       label: 'Send Failure',
       subtitle: 'missing preimage',
     ),
-    PaymentEvent_LnReceive(:final amountSats, :final feeSats) => _Description(
+    PaymentEvent_LightningReceive(:final amountSats, :final feeSats) => _Description(
       label: 'Receive Lightning',
       subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
     ),
 
-    // ── Mint (ECash) ────────────────────────────────────────────────────
-    PaymentEvent_MintSend(:final amountSats) => _Description(
+    // ── Mint (Ecash) ────────────────────────────────────────────────────
+    PaymentEvent_EcashSend(:final amountSats) => _Description(
       label: 'Send eCash',
       subtitle: amount(amountSats.toInt()),
     ),
-    PaymentEvent_MintSendSuccess(:final ecash) => _Description(
+    PaymentEvent_EcashSendSuccess(:final ecash) => _Description(
       label: 'Send Success',
       subtitle: 'Tap to share eCash',
       onTap: () => _share(ecash),
     ),
-    PaymentEvent_MintSendFailure() => _Description(label: 'Send Failure'),
-    PaymentEvent_MintRemint() => _Description(label: 'Remint eCash'),
-    PaymentEvent_MintReceive(:final amountSats) => _Description(
+    PaymentEvent_EcashSendFailure() => _Description(label: 'Send Failure'),
+    PaymentEvent_EcashRemint() => _Description(label: 'Remint eCash'),
+    PaymentEvent_EcashReceive(:final amountSats) => _Description(
       label: 'Receive eCash',
       subtitle: amount(amountSats.toInt()),
     ),
-    PaymentEvent_MintSuccess(:final amountSats) => _Description(
+    PaymentEvent_EcashSuccess(:final amountSats) => _Description(
       label: 'Mint Success',
       subtitle: amount(amountSats.toInt()),
     ),
-    PaymentEvent_MintFailure() => _Description(
+    PaymentEvent_EcashFailure() => _Description(
       label: 'Mint Failure',
       subtitle: 'threshold signature invalid',
     ),
 
     // ── Wallet (on-chain) ───────────────────────────────────────────────
-    PaymentEvent_WalletSend(:final amountSats, :final feeSats) => _Description(
+    PaymentEvent_OnchainSend(:final amountSats, :final feeSats) => _Description(
       label: 'Send Onchain',
       subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',
     ),
-    PaymentEvent_WalletSendSuccess(:final txid) => _Description(
+    PaymentEvent_OnchainSendSuccess(:final txid) => _Description(
       label: 'Send Success',
       subtitle: 'Tap to share txid',
       onTap: () => _share(txid),
     ),
-    PaymentEvent_WalletSendFailure() => _Description(
+    PaymentEvent_OnchainSendFailure() => _Description(
       label: 'Send Failure',
       subtitle: 'missing txid',
     ),
-    PaymentEvent_WalletReceive(:final amountSats, :final feeSats) =>
+    PaymentEvent_OnchainReceive(:final amountSats, :final feeSats) =>
       _Description(
         label: 'Receive Onchain',
         subtitle: '${amount(amountSats.toInt())} · ${amount(feeSats.toInt())}',

@@ -9,7 +9,7 @@ import 'package:pico/widgets/connection_status_header_widget.dart';
 import 'package:pico/widgets/icon_chip_widget.dart';
 import 'package:pico/widgets/section_header_widget.dart';
 
-/// Per-guardian reachability for one federation. Leaving it lives in the
+/// Per-guardian reachability for one mint. Leaving it lives in the
 /// settings drawer alongside the row that opens this screen, so there is no
 /// destructive action up here.
 class ConnectionStatusScreen extends StatefulWidget {
@@ -32,7 +32,7 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
   // flicker in. Each entry is `(name, rttMs)`: a non-null RTT means that
   // guardian is connected, and carries its round-trip time in milliseconds.
   late final Stream<List<(String, double?)>> _stream = widget.pico
-      .subscribeConnectionStatus(federation: widget.account.federation);
+      .subscribeConnectionStatus(mint: widget.account.mint);
 
   // Round-trip time, sampled at connect. Sub-10ms links keep one decimal so
   // a fast guardian doesn't collapse to a misleading "0 ms".
@@ -65,7 +65,7 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
                 BorderedList.column(
                   children: [
                     ConnectionStatusHeader(
-                      name: widget.account.federationName,
+                      name: widget.account.mintName,
                       online: online,
                       total: statuses.length,
                     ),

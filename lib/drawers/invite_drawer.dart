@@ -39,7 +39,7 @@ class InviteDrawer extends StatelessWidget {
   // is selected on arrival and its row names it, which says more than a
   // one-off message would.
   Future<void> _handleAdd(BuildContext context) async {
-    await pico.add(invite: invite);
+    await pico.addMint(invite: invite);
     if (!context.mounted) return;
     Navigator.of(context).pop();
   }

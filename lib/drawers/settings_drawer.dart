@@ -4,7 +4,7 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/currency.dart';
 import 'package:pico/utils/drawer_utils.dart';
-import 'package:pico/utils/federation_utils.dart';
+import 'package:pico/utils/mint_utils.dart';
 import 'package:pico/widgets/bordered_list_widget.dart';
 import 'package:pico/widgets/drawer_shell_widget.dart';
 import 'package:pico/widgets/settings_card_widget.dart';
@@ -21,7 +21,7 @@ class SettingsDrawer extends StatefulWidget {
   final VoidCallback onSelectCurrency;
   final VoidCallback onSelectAccount;
   final VoidCallback onSelectConnectivity;
-  // Null with only one federation joined: leaving the last one would strand
+  // Null with only one mint joined: leaving the last one would strand
   // the wallet on onboarding, so the row is left out entirely.
   final VoidCallback? onSelectLeave;
 
@@ -68,7 +68,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
   // Cached so rebuilds don't re-subscribe. Each entry is `(name, rttMs)`: a
   // non-null RTT means that guardian is connected.
   late final Stream<List<(String, double?)>> _connectionStream = widget.pico
-      .subscribeConnectionStatus(federation: widget.account.federation);
+      .subscribeConnectionStatus(mint: widget.account.mint);
 
   late final String? _currencyName =
       findFiatCurrency(code: widget.pico.currencyCode())?.name;
@@ -112,7 +112,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
               SettingsCard(
                 icon: PhosphorIconsRegular.trash,
                 title: 'Remove Mint',
-                subtitle: widget.account.federationName,
+                subtitle: widget.account.mintName,
                 onTap: () => _select(onSelectLeave),
               ),
           ],
@@ -122,7 +122,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
   }
 
   /// Carries the same amber/plain split as the home row, so opening settings
-  /// on a degraded federation says so before the screen behind it is gone.
+  /// on a degraded mint says so before the screen behind it is gone.
   Widget _buildConnectivityCard() {
     return StreamBuilder<List<(String, double?)>>(
       stream: _connectionStream,
@@ -131,7 +131,7 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
 
         final operational =
             statuses != null &&
-            federationOperational(
+            mintOperational(
               online: statuses.where((s) => s.$2 != null).length,
               total: statuses.length,
             );

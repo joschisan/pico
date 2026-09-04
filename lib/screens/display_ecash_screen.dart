@@ -12,7 +12,7 @@ import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/widgets/shareable_row_widget.dart';
 import 'package:pico/widgets/amount_rows.dart';
 
-Stream<String> _createFrameStream(ECashEncoder encoder) async* {
+Stream<String> _createFrameStream(EcashEncoder encoder) async* {
   while (true) {
     yield await encoder.nextFragment();
     await Future.delayed(const Duration(milliseconds: 300));
@@ -21,13 +21,13 @@ Stream<String> _createFrameStream(ECashEncoder encoder) async* {
 
 class DisplayEcashScreen extends StatelessWidget {
   // Optional so the payment-details drawer can replay an old ecash
-  // bundle even after the user has left the issuing federation — in
+  // bundle even after the user has left the issuing mint — in
   // that case we drop the cancel action since reissuing requires an
-  // account at the same federation.
+  // account at the same mint.
   final PicoAccount? account;
   final Pico pico;
-  final ECashWrapper ecash;
-  final ECashEncoder encoder;
+  final EcashWrapper ecash;
+  final EcashEncoder encoder;
 
   const DisplayEcashScreen({
     super.key,
@@ -39,8 +39,8 @@ class DisplayEcashScreen extends StatelessWidget {
 
   /// Reclaim the unsent eCash back into the balance, then return home.
   Future<void> _handleCancel(BuildContext context, PicoAccount account) async {
-    await pico.mintReceive(
-      federation: account.federation,
+    await pico.ecashReceive(
+      mint: account.mint,
       account: account.account,
       ecash: ecash,
     );
@@ -70,7 +70,7 @@ class DisplayEcashScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 16),
-              // Cancelling needs an account at the issuing federation, so
+              // Cancelling needs an account at the issuing mint, so
               // it is dropped when replaying an old bundle after leaving.
               if (account != null) ...[
                 AsyncButton(

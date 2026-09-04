@@ -4,30 +4,30 @@
 //! - [`parse_summary`] — six trigger events (`*Send`/`*Receive`) → static
 //!   [`OperationSummary`] for the recent-payments / history card.
 //! - [`parse_outcome`] — terminal events → `Some(success)` for one-shot
-//!   notifications. Trigger events that the federation has nothing further
+//!   notifications. Trigger events that the mint has nothing further
 //!   to do for ("immediately terminal") also return `Some(true)` here.
 //! - [`parse_payment_event`] — every public picomint event → rich
 //!   [`PaymentEvent`] for the per-op timeline drawer.
 
 use flutter_rust_bridge::frb;
-use picomint_client::ln::events::{
-    ReceiveEvent as LnReceive, SendEvent as LnSend, SendFailureEvent as LnSendFailureEvent,
-    SendRefundEvent, SendSuccessEvent,
+use picomint_client::ecash::{
+    EcashFailureEvent, EcashSuccessEvent, ReceiveEvent as EcashReceive, RemintEvent,
+    SendEvent as EcashSend, SendFailureEvent as EcashSendFailureEvent,
+    SendSuccessEvent as EcashSendSuccessEvent,
 };
-use picomint_client::mint::{
-    MintFailureEvent, MintSuccessEvent, ReceiveEvent as MintReceive, RemintEvent,
-    SendEvent as MintSend, SendFailureEvent as MintSendFailureEvent,
-    SendSuccessEvent as MintSendSuccessEvent,
+use picomint_client::eventlog::EventLogEntry;
+use picomint_client::lightning::events::{
+    ReceiveEvent as LightningReceive, SendEvent as LightningSend,
+    SendFailureEvent as LightningSendFailureEvent, SendRefundEvent, SendSuccessEvent,
 };
-use picomint_client::wallet::events::{
-    ReceiveEvent as WalletReceive, SendEvent as WalletSend, SendFailureEvent,
-    SendSuccessEvent as WalletSendSuccessEvent,
+use picomint_client::onchain::events::{
+    ReceiveEvent as OnchainReceive, SendEvent as OnchainSend,
+    SendFailureEvent as OnchainSendFailureEvent, SendSuccessEvent as OnchainSendSuccessEvent,
 };
-use picomint_client::{Account, TxAcceptEvent, TxCreateEvent, TxRejectEvent};
+use picomint_client::{TxAcceptEvent, TxCreateEvent, TxRejectEvent};
 use picomint_core::bitcoin::hex::DisplayHex;
-use picomint_eventlog::EventLogEntry;
 
-use crate::{FederationIdWrapper, OperationIdWrapper};
+use crate::{MintIdWrapper, OperationIdWrapper};
 
 #[frb]
 #[derive(Clone)]
@@ -44,7 +44,7 @@ pub enum PaymentType {
 #[derive(Clone)]
 pub struct OperationSummary {
     pub operation: OperationIdWrapper,
-    pub federation: FederationIdWrapper,
+    pub mint: MintIdWrapper,
     pub incoming: bool,
     pub payment_type: PaymentType,
     pub amount_sats: i64,
@@ -75,7 +75,7 @@ pub enum Notification {
 
 /// One-to-one mirror of every public picomint client event, flattened for
 /// transport over the frb bridge. Variant names follow `<Module><Event>`
-/// (e.g. `LnSend`, `MintIssuanceComplete`) so the Dart side can match the
+/// (e.g. `LightningSend`, `MintIssuanceComplete`) so the Dart side can match the
 /// picomint source on sight. All amounts are converted to sats; all hashes
 /// (txids, preimages, signatures) are rendered as lowercase hex.
 #[frb]
@@ -99,37 +99,37 @@ pub enum PaymentEvent {
     },
 
     // ── Lightning (`picomint_client::ln`) ────────────────────────────────
-    LnSend {
+    LightningSend {
         timestamp: i64,
         txid: String,
         amount_sats: i64,
         fee_sats: i64,
     },
-    LnSendSuccess {
+    LightningSendSuccess {
         timestamp: i64,
         preimage: String,
     },
-    LnSendRefund {
+    LightningSendRefund {
         timestamp: i64,
         txid: String,
         expired: bool,
     },
-    LnSendFailure {
+    LightningSendFailure {
         timestamp: i64,
     },
-    LnReceive {
+    LightningReceive {
         timestamp: i64,
         txid: String,
         amount_sats: i64,
         fee_sats: i64,
     },
 
-    // ── Mint / ECash (`picomint_client::mint`) ───────────────────────────
-    MintSend {
+    // ── Mint / Ecash (`picomint_client::mint`) ───────────────────────────
+    EcashSend {
         timestamp: i64,
         amount_sats: i64,
     },
-    MintSendSuccess {
+    EcashSendSuccess {
         timestamp: i64,
         /// Base32-encoded ecash, passed through verbatim from the picomint
         /// event — which carries the string for the same reasons this
@@ -139,42 +139,42 @@ pub enum PaymentEvent {
         /// for the display screen.
         ecash: String,
     },
-    MintSendFailure {
+    EcashSendFailure {
         timestamp: i64,
     },
-    MintRemint {
-        timestamp: i64,
-        txid: String,
-    },
-    MintReceive {
+    EcashRemint {
         timestamp: i64,
         txid: String,
-        amount_sats: i64,
     },
-    MintSuccess {
+    EcashReceive {
         timestamp: i64,
         txid: String,
         amount_sats: i64,
     },
-    MintFailure {
+    EcashSuccess {
+        timestamp: i64,
+        txid: String,
+        amount_sats: i64,
+    },
+    EcashFailure {
         timestamp: i64,
     },
 
     // ── Wallet / on-chain (`picomint_client::wallet`) ────────────────────
-    WalletSend {
+    OnchainSend {
         timestamp: i64,
         txid: String,
         amount_sats: i64,
         fee_sats: i64,
     },
-    WalletSendSuccess {
+    OnchainSendSuccess {
         timestamp: i64,
         txid: String,
     },
-    WalletSendFailure {
+    OnchainSendFailure {
         timestamp: i64,
     },
-    WalletReceive {
+    OnchainReceive {
         timestamp: i64,
         txid: String,
         amount_sats: i64,
@@ -194,55 +194,30 @@ pub enum PaymentEvent {
 /// rather than as history — the transactions that earned those notes belong
 /// to the session that was lost.
 fn trigger_fields(entry: &EventLogEntry) -> Option<(bool, PaymentType, i64)> {
-    if !is_user_account(entry) {
-        return None;
-    }
-
-    if let Some(e) = entry.to_event::<MintSend>() {
+    if let Some(e) = entry.to_event::<EcashSend>() {
         return Some((false, PaymentType::Ecash, (e.amount.msat / 1000) as i64));
     }
-    if let Some(e) = entry.to_event::<MintReceive>() {
+    if let Some(e) = entry.to_event::<EcashReceive>() {
         return Some((true, PaymentType::Ecash, (e.amount.msat / 1000) as i64));
     }
-    if let Some(e) = entry.to_event::<LnSend>() {
+    if let Some(e) = entry.to_event::<LightningSend>() {
         return Some((false, PaymentType::Lightning, (e.amount.msat / 1000) as i64));
     }
-    if let Some(e) = entry.to_event::<LnReceive>() {
+    if let Some(e) = entry.to_event::<LightningReceive>() {
         return Some((true, PaymentType::Lightning, (e.amount.msat / 1000) as i64));
     }
-    if let Some(e) = entry.to_event::<WalletSend>() {
+    if let Some(e) = entry.to_event::<OnchainSend>() {
         return Some((false, PaymentType::Bitcoin, e.amount.to_sat() as i64));
     }
-    if let Some(e) = entry.to_event::<WalletReceive>() {
+    if let Some(e) = entry.to_event::<OnchainReceive>() {
         return Some((true, PaymentType::Bitcoin, e.amount.to_sat() as i64));
     }
     None
 }
 
-/// `true` for entries belonging to a balance the user spends.
-///
-/// Every account shares one event log, so a fee account being swept appends
-/// the same `SendEvent` a user's own Lightning payment does. It is not the
-/// user's payment, and a card for it would be money leaving a balance they
-/// were never shown. The same reasoning covers the toasts: a sweep that gets
-/// rejected or refunded is for whoever charged the cut to see in the log, not
-/// something to interrupt the user about.
-///
-/// Written as a positive match on the user's balances rather than against the
-/// fee accounts by name, so it has held across upstream both adding a second
-/// one and collapsing back to a single one.
-///
-/// Checked at all three entry points rather than only the two that can be
-/// reached today. The drawer timeline needs an operation id, and only a card
-/// hands one out, so filtering the cards already hides it — but that leaves
-/// the invariant living in the caller. Here it holds by construction.
-fn is_user_account(entry: &EventLogEntry) -> bool {
-    matches!(entry.account, Account::User(_))
-}
-
 /// `true` for the trigger events that materialize an `OperationSummary` card.
 /// Used by the fiat-snapshot recorder to decide which operations to price,
-/// without needing the federation-name map `parse_summary` requires.
+/// without needing the mint-name map `parse_summary` requires.
 pub(crate) fn is_summary_trigger(entry: &EventLogEntry) -> bool {
     trigger_fields(entry).is_some()
 }
@@ -267,7 +242,7 @@ pub(crate) fn parse_summary(
 
     Some(OperationSummary {
         operation: OperationIdWrapper(entry.operation),
-        federation: FederationIdWrapper(entry.federation),
+        mint: MintIdWrapper(entry.mint),
         incoming,
         payment_type,
         amount_sats,
@@ -282,16 +257,12 @@ pub(crate) fn parse_summary(
 /// either internal status updates (visible only via the per-op drawer) or
 /// would require summary lookup we deliberately avoid.
 pub(crate) fn parse_notification(entry: &EventLogEntry) -> Option<Notification> {
-    if !is_user_account(entry) {
-        return None;
-    }
-
-    if let Some(e) = entry.to_event::<LnReceive>() {
+    if let Some(e) = entry.to_event::<LightningReceive>() {
         return Some(Notification::LightningReceived {
             amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
-    if let Some(e) = entry.to_event::<WalletReceive>() {
+    if let Some(e) = entry.to_event::<OnchainReceive>() {
         return Some(Notification::OnchainReceived {
             amount_sats: e.amount.to_sat() as i64,
         });
@@ -309,10 +280,6 @@ pub(crate) fn parse_notification(entry: &EventLogEntry) -> Option<Notification> 
 /// `None` for entries that don't correspond to any known picomint client
 /// event type (forward-compatible with new modules added upstream).
 pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent> {
-    if !is_user_account(entry) {
-        return None;
-    }
-
     let timestamp = entry.timestamp as i64;
 
     // ── Core ────────────────────────────────────────────────────────────
@@ -321,7 +288,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
             timestamp,
             txid: e.txid.to_string(),
             change_sats: (e.remint.msat / 1000) as i64,
-            fee_sats: ((e.tx_fee.msat + e.app_fee.msat) / 1000) as i64,
+            fee_sats: (e.fee.msat / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<TxAcceptEvent>() {
@@ -339,8 +306,8 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     }
 
     // ── Lightning ───────────────────────────────────────────────────────
-    if let Some(e) = entry.to_event::<LnSend>() {
-        return Some(PaymentEvent::LnSend {
+    if let Some(e) = entry.to_event::<LightningSend>() {
+        return Some(PaymentEvent::LightningSend {
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: (e.amount.msat / 1000) as i64,
@@ -348,23 +315,23 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         });
     }
     if let Some(e) = entry.to_event::<SendSuccessEvent>() {
-        return Some(PaymentEvent::LnSendSuccess {
+        return Some(PaymentEvent::LightningSendSuccess {
             timestamp,
             preimage: e.preimage.to_lower_hex_string(),
         });
     }
     if let Some(e) = entry.to_event::<SendRefundEvent>() {
-        return Some(PaymentEvent::LnSendRefund {
+        return Some(PaymentEvent::LightningSendRefund {
             timestamp,
             txid: e.txid.to_string(),
             expired: e.expired,
         });
     }
-    if entry.to_event::<LnSendFailureEvent>().is_some() {
-        return Some(PaymentEvent::LnSendFailure { timestamp });
+    if entry.to_event::<LightningSendFailureEvent>().is_some() {
+        return Some(PaymentEvent::LightningSendFailure { timestamp });
     }
-    if let Some(e) = entry.to_event::<LnReceive>() {
-        return Some(PaymentEvent::LnReceive {
+    if let Some(e) = entry.to_event::<LightningReceive>() {
+        return Some(PaymentEvent::LightningReceive {
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: (e.amount.msat / 1000) as i64,
@@ -372,66 +339,66 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         });
     }
 
-    // ── Mint (ECash) ────────────────────────────────────────────────────
-    if let Some(e) = entry.to_event::<MintSend>() {
-        return Some(PaymentEvent::MintSend {
+    // ── Mint (Ecash) ────────────────────────────────────────────────────
+    if let Some(e) = entry.to_event::<EcashSend>() {
+        return Some(PaymentEvent::EcashSend {
             timestamp,
             amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
-    if let Some(e) = entry.to_event::<MintSendSuccessEvent>() {
-        return Some(PaymentEvent::MintSendSuccess {
+    if let Some(e) = entry.to_event::<EcashSendSuccessEvent>() {
+        return Some(PaymentEvent::EcashSendSuccess {
             timestamp,
             ecash: e.ecash.clone(),
         });
     }
-    if entry.to_event::<MintSendFailureEvent>().is_some() {
-        return Some(PaymentEvent::MintSendFailure { timestamp });
+    if entry.to_event::<EcashSendFailureEvent>().is_some() {
+        return Some(PaymentEvent::EcashSendFailure { timestamp });
     }
     if let Some(e) = entry.to_event::<RemintEvent>() {
-        return Some(PaymentEvent::MintRemint {
+        return Some(PaymentEvent::EcashRemint {
             timestamp,
             txid: e.txid.to_string(),
         });
     }
-    if let Some(e) = entry.to_event::<MintReceive>() {
-        return Some(PaymentEvent::MintReceive {
-            timestamp,
-            txid: e.txid.to_string(),
-            amount_sats: (e.amount.msat / 1000) as i64,
-        });
-    }
-    if let Some(e) = entry.to_event::<MintSuccessEvent>() {
-        return Some(PaymentEvent::MintSuccess {
+    if let Some(e) = entry.to_event::<EcashReceive>() {
+        return Some(PaymentEvent::EcashReceive {
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
-    if entry.to_event::<MintFailureEvent>().is_some() {
-        return Some(PaymentEvent::MintFailure { timestamp });
+    if let Some(e) = entry.to_event::<EcashSuccessEvent>() {
+        return Some(PaymentEvent::EcashSuccess {
+            timestamp,
+            txid: e.txid.to_string(),
+            amount_sats: (e.amount.msat / 1000) as i64,
+        });
+    }
+    if entry.to_event::<EcashFailureEvent>().is_some() {
+        return Some(PaymentEvent::EcashFailure { timestamp });
     }
 
     // ── Wallet (on-chain) ───────────────────────────────────────────────
-    if let Some(e) = entry.to_event::<WalletSend>() {
-        return Some(PaymentEvent::WalletSend {
+    if let Some(e) = entry.to_event::<OnchainSend>() {
+        return Some(PaymentEvent::OnchainSend {
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: e.amount.to_sat() as i64,
             fee_sats: e.fee.to_sat() as i64,
         });
     }
-    if let Some(e) = entry.to_event::<WalletSendSuccessEvent>() {
-        return Some(PaymentEvent::WalletSendSuccess {
+    if let Some(e) = entry.to_event::<OnchainSendSuccessEvent>() {
+        return Some(PaymentEvent::OnchainSendSuccess {
             timestamp,
             txid: e.txid.to_string(),
         });
     }
-    if entry.to_event::<SendFailureEvent>().is_some() {
-        return Some(PaymentEvent::WalletSendFailure { timestamp });
+    if entry.to_event::<OnchainSendFailureEvent>().is_some() {
+        return Some(PaymentEvent::OnchainSendFailure { timestamp });
     }
-    if let Some(e) = entry.to_event::<WalletReceive>() {
-        return Some(PaymentEvent::WalletReceive {
+    if let Some(e) = entry.to_event::<OnchainReceive>() {
+        return Some(PaymentEvent::OnchainReceive {
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: e.amount.to_sat() as i64,

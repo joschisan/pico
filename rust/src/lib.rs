@@ -7,7 +7,6 @@ mod exchange;
 mod fountain;
 mod frb_generated;
 mod lnurl;
-mod payout;
 
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -15,9 +14,9 @@ use std::str::FromStr;
 use bitcoin::address::NetworkUnchecked;
 use flutter_rust_bridge::frb;
 use lightning_invoice::Bolt11Invoice;
-use picomint_client::mint::ECash;
+use picomint_client::ecash::Ecash;
 use picomint_client::{Account, Mnemonic, OperationId};
-use picomint_core::config::FederationId;
+use picomint_core::config::MintId;
 use picomint_core::invite::InviteCode;
 use picomint_redb::Database;
 
@@ -25,7 +24,7 @@ pub use app::{Pico, PicoContact};
 pub use client::{GatewayInfoWrapper, PicoAccount};
 pub use currency::{FiatCurrency, find_fiat_currency, list_fiat_currencies};
 pub use events::{Notification, OperationSummary, PaymentEvent, PaymentType};
-pub use fountain::{ECashDecoder, ECashEncoder};
+pub use fountain::{EcashDecoder, EcashEncoder};
 pub use lnurl::{LnurlWrapper, PayResponseWrapper, lnurl_fetch_limits, lnurl_resolve, parse_lnurl};
 
 /// Runs once when the Rust library is initialized (before any API call).
@@ -94,9 +93,9 @@ pub fn parse_invite_code(invite: &str) -> Option<InviteCodeWrapper> {
 // derives the string form via `display()` instead.
 #[frb(opaque)]
 #[derive(Clone)]
-pub struct FederationIdWrapper(pub(crate) FederationId);
+pub struct MintIdWrapper(pub(crate) MintId);
 
-impl FederationIdWrapper {
+impl MintIdWrapper {
     #[frb(sync)]
     pub fn display(&self) -> String {
         self.0.to_string()
@@ -127,19 +126,19 @@ impl OperationIdWrapper {
 
 #[frb(opaque)]
 #[derive(Clone)]
-pub struct ECashWrapper(pub(crate) ECash);
+pub struct EcashWrapper(pub(crate) Ecash);
 
-impl ECashWrapper {
+impl EcashWrapper {
     #[frb(sync)]
     pub fn amount_sats(&self) -> i64 {
         (self.0.amount().msat / 1000) as i64
     }
 
-    /// Federation that minted these notes — needed to look up the
+    /// Mint that minted these notes — needed to look up the
     /// reissuing account when displaying ecash from history.
     #[frb(sync)]
-    pub fn federation(&self) -> FederationIdWrapper {
-        FederationIdWrapper(self.0.mint)
+    pub fn mint(&self) -> MintIdWrapper {
+        MintIdWrapper(self.0.mint)
     }
 
     #[frb(sync)]
@@ -149,14 +148,14 @@ impl ECashWrapper {
 }
 
 #[frb(sync)]
-pub fn parse_ecash(ecash: &str) -> Option<ECashWrapper> {
+pub fn parse_ecash(ecash: &str) -> Option<EcashWrapper> {
     if let Some(stripped) = ecash.strip_prefix("picomint:") {
         return parse_ecash(stripped);
     }
 
-    picomint_base32::decode::<ECash>(ecash)
+    picomint_base32::decode::<Ecash>(ecash)
         .ok()
-        .map(ECashWrapper)
+        .map(EcashWrapper)
 }
 
 #[frb]

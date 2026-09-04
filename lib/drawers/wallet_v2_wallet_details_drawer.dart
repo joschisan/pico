@@ -11,7 +11,7 @@ import 'package:pico/utils/currency_utils.dart';
 
 class WalletV2WalletDetailsDrawer extends StatelessWidget {
   final Pico pico;
-  final FederationStats stats;
+  final MintStats stats;
 
   const WalletV2WalletDetailsDrawer({
     super.key,
@@ -22,7 +22,7 @@ class WalletV2WalletDetailsDrawer extends StatelessWidget {
   static Future<void> show(
     BuildContext context, {
     required Pico pico,
-    required FederationStats stats,
+    required MintStats stats,
   }) {
     return DrawerUtils.show(
       context: context,

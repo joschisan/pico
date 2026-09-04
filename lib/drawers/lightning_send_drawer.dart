@@ -20,7 +20,7 @@ import 'package:pico/utils/notification_utils.dart';
 /// as soon as the drawer opens; the fee row shows a spinner until the quote
 /// arrives and the confirm button stays disabled without one. A failed quote
 /// pops the drawer and surfaces an error notification. The quoted gateway is
-/// passed to [Pico.lnSend] so the fee shown here matches what is charged.
+/// passed to [Pico.lightningSend] so the fee shown here matches what is charged.
 class LightningSendDrawer extends StatefulWidget {
   final PicoAccount account;
   final Pico pico;
@@ -54,7 +54,7 @@ class LightningSendDrawer extends StatefulWidget {
 }
 
 /// The selected gateway paired with the fee it quoted for this invoice. Kept
-/// together so `lnSend` can't be handed a gateway other than the one the
+/// together so `lightningSend` can't be handed a gateway other than the one the
 /// displayed fee came from.
 typedef _Quote = ({GatewayInfoWrapper gateway, int feeSats});
 
@@ -69,8 +69,8 @@ class _LightningSendDrawerState extends State<LightningSendDrawer> {
 
   Future<void> _loadQuote() async {
     try {
-      final gateway = await widget.pico.lnSelectGateway(
-        federation: widget.account.federation,
+      final gateway = await widget.pico.lightningSelectGateway(
+        mint: widget.account.mint,
       );
 
       final feeSats = gateway.gatewayFeeForInvoice(invoice: widget.invoice);
@@ -89,8 +89,8 @@ class _LightningSendDrawerState extends State<LightningSendDrawer> {
   Future<void> _handleConfirm(_Quote quote) async {
     await requireBiometricAuth(context);
 
-    await widget.pico.lnSend(
-      federation: widget.account.federation,
+    await widget.pico.lightningSend(
+      mint: widget.account.mint,
       account: widget.account.account,
       gateway: quote.gateway,
       invoice: widget.invoice,
