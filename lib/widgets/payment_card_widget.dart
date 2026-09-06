@@ -17,7 +17,7 @@ _Status? _classify(PaymentEvent event) => switch (event) {
   PaymentEvent_LightningSendRefund() => _Status.warning,
   PaymentEvent_LightningSendFailure() => _Status.error,
   PaymentEvent_EcashSendFailure() => _Status.error,
-  PaymentEvent_EcashFailure() => _Status.error,
+  PaymentEvent_EcashIssuanceFailure() => _Status.error,
   PaymentEvent_OnchainSendFailure() => _Status.error,
   _ => null,
 };

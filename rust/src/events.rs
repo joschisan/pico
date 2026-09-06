@@ -74,7 +74,7 @@ pub enum Notification {
 
 /// One-to-one mirror of every public picomint client event, flattened for
 /// transport over the frb bridge. Variant names follow `<Module><Event>`
-/// (e.g. `LightningSend`, `EcashRemint`) so the Dart side can match the
+/// (e.g. `LightningSend`, `EcashReissuance`) so the Dart side can match the
 /// picomint source on sight. All amounts are converted to sats; all hashes
 /// (txids, preimages, signatures) are rendered as lowercase hex.
 #[frb]
@@ -141,7 +141,7 @@ pub enum PaymentEvent {
     EcashSendFailure {
         timestamp: i64,
     },
-    EcashRemint {
+    EcashReissuance {
         timestamp: i64,
         txid: String,
     },
@@ -150,12 +150,12 @@ pub enum PaymentEvent {
         txid: String,
         amount_sats: i64,
     },
-    EcashSuccess {
+    EcashIssuanceSuccess {
         timestamp: i64,
         txid: String,
         amount_sats: i64,
     },
-    EcashFailure {
+    EcashIssuanceFailure {
         timestamp: i64,
     },
 
@@ -355,7 +355,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::EcashSendFailure { timestamp });
     }
     if let Some(e) = entry.to_event::<ReissuanceEvent>() {
-        return Some(PaymentEvent::EcashRemint {
+        return Some(PaymentEvent::EcashReissuance {
             timestamp,
             txid: e.txid.to_string(),
         });
@@ -368,14 +368,14 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         });
     }
     if let Some(e) = entry.to_event::<IssuanceSuccessEvent>() {
-        return Some(PaymentEvent::EcashSuccess {
+        return Some(PaymentEvent::EcashIssuanceSuccess {
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
     if entry.to_event::<IssuanceFailureEvent>().is_some() {
-        return Some(PaymentEvent::EcashFailure { timestamp });
+        return Some(PaymentEvent::EcashIssuanceFailure { timestamp });
     }
 
     // ── Onchain ─────────────────────────────────────────────────────────
