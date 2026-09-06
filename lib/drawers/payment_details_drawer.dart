@@ -306,16 +306,16 @@ _Description _describe(
       onTap: () => _share(ecash),
     ),
     PaymentEvent_EcashSendFailure() => _Description(label: 'Send Failure'),
-    PaymentEvent_EcashRemint() => _Description(label: 'Remint Ecash'),
+    PaymentEvent_EcashReissuance() => _Description(label: 'Reissue Ecash'),
     PaymentEvent_EcashReceive(:final amountSats) => _Description(
       label: 'Receive Ecash',
       subtitle: amount(amountSats.toInt()),
     ),
-    PaymentEvent_EcashSuccess(:final amountSats) => _Description(
+    PaymentEvent_EcashIssuanceSuccess(:final amountSats) => _Description(
       label: 'Issuance Success',
       subtitle: amount(amountSats.toInt()),
     ),
-    PaymentEvent_EcashFailure() => _Description(
+    PaymentEvent_EcashIssuanceFailure() => _Description(
       label: 'Issuance Failure',
       subtitle: 'threshold signature invalid',
     ),
