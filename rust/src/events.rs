@@ -10,7 +10,7 @@
 
 use flutter_rust_bridge::frb;
 use picomint_client::ecash::{
-    EcashFailureEvent, EcashSuccessEvent, ReceiveEvent as EcashReceive, RemintEvent,
+    IssuanceFailureEvent, IssuanceSuccessEvent, ReceiveEvent as EcashReceive, ReissuanceEvent,
     SendEvent as EcashSend, SendFailureEvent as EcashSendFailureEvent,
     SendSuccessEvent as EcashSendSuccessEvent,
 };
@@ -354,7 +354,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     if entry.to_event::<EcashSendFailureEvent>().is_some() {
         return Some(PaymentEvent::EcashSendFailure { timestamp });
     }
-    if let Some(e) = entry.to_event::<RemintEvent>() {
+    if let Some(e) = entry.to_event::<ReissuanceEvent>() {
         return Some(PaymentEvent::EcashRemint {
             timestamp,
             txid: e.txid.to_string(),
@@ -367,14 +367,14 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
             amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
-    if let Some(e) = entry.to_event::<EcashSuccessEvent>() {
+    if let Some(e) = entry.to_event::<IssuanceSuccessEvent>() {
         return Some(PaymentEvent::EcashSuccess {
             timestamp,
             txid: e.txid.to_string(),
             amount_sats: (e.amount.msat / 1000) as i64,
         });
     }
-    if entry.to_event::<EcashFailureEvent>().is_some() {
+    if entry.to_event::<IssuanceFailureEvent>().is_some() {
         return Some(PaymentEvent::EcashFailure { timestamp });
     }
 
