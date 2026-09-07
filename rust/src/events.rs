@@ -286,7 +286,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::TxCreate {
             timestamp,
             txid: e.txid.to_string(),
-            change_sats: (e.remint.msat / 1000) as i64,
+            change_sats: (e.reissue.msat / 1000) as i64,
             fee_sats: (e.fee.msat / 1000) as i64,
         });
     }
