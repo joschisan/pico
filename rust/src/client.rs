@@ -116,7 +116,7 @@ pub struct MintConnectivity {
 #[frb]
 pub struct MintStats {
     pub total_value_sat: i64,
-    pub block_count: i64,
+    pub block_height: i64,
     pub feerate: Option<i64>,
 }
 
@@ -400,7 +400,7 @@ impl Pico {
     }
 
     /// Mint-wide wallet stats for the receive screen's details drawer:
-    /// bitcoin in custody, consensus block count and consensus feerate.
+    /// bitcoin in custody, consensus block height and consensus feerate.
     #[frb]
     pub async fn mint_stats(&self, mint: &MintIdWrapper) -> Result<MintStats, String> {
         let total_value = self
@@ -409,9 +409,9 @@ impl Pico {
             .await
             .map_err(|e| e.to_string())?;
 
-        let block_count = self
+        let block_height = self
             .client
-            .block_count(mint.0)
+            .block_height(mint.0)
             .await
             .map_err(|e| e.to_string())?;
 
@@ -423,7 +423,7 @@ impl Pico {
 
         Ok(MintStats {
             total_value_sat: total_value.to_sat() as i64,
-            block_count: i64::from(block_count),
+            block_height: i64::from(block_height),
             feerate: feerate.map(i64::from),
         })
     }

@@ -60,8 +60,8 @@ class MintDetailsDrawer extends StatelessWidget {
               ),
             DetailRow(
               icon: PhosphorIconsRegular.cube,
-              label: 'Block Count',
-              value: _count(stats.blockCount),
+              label: 'Block Height',
+              value: _count(stats.blockHeight),
             ),
             if (feerate != null)
               DetailRow(
