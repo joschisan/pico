@@ -75,7 +75,7 @@ class _EcashAmountScreenState extends State<EcashAmountScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Send Ecash'),
+        title: const Text('Send eCash'),
         actions: [MaxAction(onPressed: _handleConfirmMax)],
       ),
       body: SafeArea(

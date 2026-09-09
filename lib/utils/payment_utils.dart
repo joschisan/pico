@@ -21,7 +21,7 @@ class PaymentTypeUtils {
     return switch (type) {
       PaymentType.lightning => 'Lightning',
       PaymentType.onchain => 'Onchain',
-      PaymentType.ecash => 'Ecash',
+      PaymentType.ecash => 'eCash',
     };
   }
 }

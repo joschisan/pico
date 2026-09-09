@@ -730,9 +730,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.05),
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: cornerRadius,
                   ),
                   // Each button gets an equal share of the row, so the
@@ -756,7 +754,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: CircularActionButton(
                           icon: PhosphorIconsRegular.coinVertical,
-                          label: 'Ecash',
+                          label: 'eCash',
                           onTap: _onSendEcash,
                         ),
                       ),
