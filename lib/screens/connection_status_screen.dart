@@ -28,7 +28,7 @@ class ConnectionStatusScreen extends StatefulWidget {
 
 class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
   // The same stream the home row reads — backed by the client's kept-alive
-  // connections and emitting the current snapshot first, so statuses don't
+  // connections and opening with the complete snapshot, so statuses don't
   // flicker in.
   late final Stream<MintConnectivity> _stream = widget.pico
       .subscribeConnectivity(mint: widget.account.mint);
@@ -48,9 +48,9 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
         stream: _stream,
         builder: (context, snapshot) {
           final connectivity = snapshot.data;
-          if (connectivity == null) {
-            return const Center(child: smallSpinner);
-          }
+          // The snapshot crosses the bridge within the page transition, so
+          // the first build stays empty rather than flashing a spinner.
+          if (connectivity == null) return const SizedBox.shrink();
 
           return SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -85,7 +85,28 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(node.name, style: mediumStyle),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(node.name, style: mediumStyle),
+                                ),
+                                // The round-trip time of the live link,
+                                // measured over the same kept-alive
+                                // connection requests use. It sits on the
+                                // name's line, as the elapsed time does on
+                                // the timeline in the payment details.
+                                if (node.rttMs case final rtt?)
+                                  Text(
+                                    _formatRtt(rtt),
+                                    style: smallStyle.copyWith(
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                              ],
+                            ),
                             Text(
                               node.rttMs != null ? 'Online' : 'Offline',
                               style: smallStyle.copyWith(
@@ -94,12 +115,6 @@ class _ConnectionStatusScreenState extends State<ConnectionStatusScreen> {
                             ),
                           ],
                         ),
-                        // The round-trip time of the live link, measured
-                        // over the same kept-alive connection requests use.
-                        trailing: switch (node.rttMs) {
-                          null => null,
-                          final rtt => Text(_formatRtt(rtt), style: smallStyle),
-                        },
                       ),
                   ],
                 ),

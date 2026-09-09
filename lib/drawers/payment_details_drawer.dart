@@ -297,18 +297,18 @@ _Description _describe(
 
     // ── Ecash ───────────────────────────────────────────────────────────
     PaymentEvent_EcashSend(:final amountSats) => _Description(
-      label: 'Send Ecash',
+      label: 'Send eCash',
       subtitle: amount(amountSats.toInt()),
     ),
     PaymentEvent_EcashSendSuccess(:final ecash) => _Description(
       label: 'Send Success',
-      subtitle: 'Tap to share Ecash',
+      subtitle: 'Tap to share eCash',
       onTap: () => _share(ecash),
     ),
     PaymentEvent_EcashSendFailure() => _Description(label: 'Send Failure'),
-    PaymentEvent_EcashReissuance() => _Description(label: 'Reissue Ecash'),
+    PaymentEvent_EcashReissuance() => _Description(label: 'Reissue eCash'),
     PaymentEvent_EcashReceive(:final amountSats) => _Description(
-      label: 'Receive Ecash',
+      label: 'Receive eCash',
       subtitle: amount(amountSats.toInt()),
     ),
     PaymentEvent_EcashIssuanceSuccess(:final amountSats) => _Description(

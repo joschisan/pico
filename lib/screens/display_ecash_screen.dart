@@ -63,7 +63,7 @@ class _DisplayEcashScreenState extends State<DisplayEcashScreen> {
   Widget build(BuildContext context) {
     final account = widget.account;
     return Scaffold(
-      appBar: AppBar(title: const Text('Send Ecash')),
+      appBar: AppBar(title: const Text('Send eCash')),
       body: ScrollableBody(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -90,7 +90,7 @@ class _DisplayEcashScreenState extends State<DisplayEcashScreen> {
               ],
               BleedList.column(
                 children: [
-                  ShareableRow(data: widget.ecash.toString(), label: 'Ecash'),
+                  ShareableRow(data: widget.ecash.toString(), label: 'eCash'),
                   ...amountRows(
                     pico: widget.pico,
                     amountSats: widget.ecash.amountSats(),
