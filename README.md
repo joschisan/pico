@@ -1,4 +1,6 @@
-# Pico
+# Pico - Alpha
+
+Pico is unfinished and unaudited, and currently refuses to add a mainnet mint.
 
 A minimal Picomint wallet built with Flutter and Rust.
 

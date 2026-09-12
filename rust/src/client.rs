@@ -14,6 +14,7 @@ use picomint_core::Amount;
 use picomint_core::NodeId;
 use picomint_core::config::MintId;
 use picomint_core::lightning::gateway::{GatewayInfo, GatewayPk};
+use rand::seq::IteratorRandom;
 
 use picomint_core::NumNodesExt;
 
@@ -24,10 +25,11 @@ use crate::{
     MintIdWrapper,
 };
 
-/// Holds a caller-selected gateway plus its routing info, returned by
-/// [`Pico::lightning_select_gateway`] and handed back to
-/// [`Pico::lightning_send`] so the fee we previewed is the fee we pay.
-/// Opaque on purpose — Dart only needs the two fee getters.
+/// A gateway picked by [`Pico::lightning_select_gateway`] with the info
+/// that priced it, handed back to [`Pico::lightning_send`] by pk. Picomint
+/// prices the payment from the same pooled info until the next refresh, so
+/// the fee we previewed is the fee we pay. Opaque on purpose — Dart only
+/// needs the fee getters.
 #[frb(opaque)]
 #[derive(Clone)]
 pub struct GatewayInfoWrapper {
@@ -190,23 +192,25 @@ impl Pico {
         }
     }
 
-    /// Pre-select an online gateway. Any will do for any payment: a gateway
-    /// charges the same fee however a payment settles, so there is nothing
-    /// about an invoice to select one by.
+    /// Pick one of the mint's probed gateways at random, for load
+    /// distribution. Any will do for any payment: a gateway charges the same
+    /// fee however a payment settles, so there is nothing about an invoice
+    /// to select one by.
     #[frb]
     pub async fn lightning_select_gateway(
         &self,
         mint: &MintIdWrapper,
     ) -> Result<GatewayInfoWrapper, String> {
-        let (gateway_pk, gateway_info) = self
-            .client
-            .lightning_select_gateway(mint.0)
-            .map_err(|e| e.to_string())?;
-
-        Ok(GatewayInfoWrapper {
-            gateway_pk,
-            gateway_info,
-        })
+        self.client
+            .lightning_gateways(mint.0)
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .choose(&mut rand::thread_rng())
+            .map(|gateway| GatewayInfoWrapper {
+                gateway_pk: gateway.0,
+                gateway_info: gateway.1,
+            })
+            .ok_or_else(|| "No gateways are available".to_string())
     }
 
     #[frb]
@@ -218,13 +222,7 @@ impl Pico {
         invoice: &Bolt11InvoiceWrapper,
     ) -> Result<String, String> {
         self.client
-            .lightning_send(
-                mint.0,
-                account.0,
-                gateway.gateway_pk,
-                gateway.gateway_info.clone(),
-                invoice.0.clone(),
-            )
+            .lightning_send(mint.0, account.0, gateway.gateway_pk, invoice.0.clone())
             .await
             .map(|op| op.to_string())
             .map_err(|e| e.to_string())
@@ -244,7 +242,6 @@ impl Pico {
                 mint.0,
                 account.0,
                 gateway.gateway_pk,
-                gateway.gateway_info.clone(),
                 Amount::from_sat(amount_sats as u64),
             )
             .await
@@ -270,7 +267,7 @@ impl Pico {
         gateway: &GatewayInfoWrapper,
     ) -> i64 {
         self.client
-            .lightning_send_max_amount(mint.0, account.0, &gateway.gateway_info)
+            .lightning_send_max_amount(mint.0, account.0, gateway.gateway_pk)
             .map(|amount| (amount.msat / 1000) as i64)
             .unwrap_or(0)
     }
@@ -290,13 +287,7 @@ impl Pico {
         lnurl: String,
     ) -> Result<String, String> {
         self.client
-            .lightning_send_max(
-                mint.0,
-                account.0,
-                gateway.gateway_pk,
-                gateway.gateway_info.clone(),
-                &lnurl,
-            )
+            .lightning_send_max(mint.0, account.0, gateway.gateway_pk, &lnurl)
             .await
             .map(|op| op.to_string())
             .map_err(|e| e.to_string())
