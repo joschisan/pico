@@ -20,6 +20,7 @@ picomint-fountain = { git = "https://github.com/joschisan/picomint", branch = "m
 picomint-lnurl = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-redb = { git = "https://github.com/joschisan/picomint", branch = "main" }
 picomint-rpc = { git = "https://github.com/joschisan/picomint", branch = "main" }
+rand = "0.8"
 regex = "1"
 reqwest = { version = "=0.12.22", features = ["rustls-tls", "json"], default-features = false }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
