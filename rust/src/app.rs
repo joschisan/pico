@@ -321,7 +321,7 @@ impl Pico {
                 let stream = self
                     .client
                     .ecash_subscribe_balance(key.0, key.1)
-                    .map(move |amt| (key, (amt.msat / 1000) as i64));
+                    .map(move |amt| (key, (amt.0 / 1000) as i64));
                 tagged.push(stream.boxed());
             }
             let mut merged = stream::select_all(tagged);

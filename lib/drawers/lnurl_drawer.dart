@@ -10,6 +10,7 @@ import 'package:pico/widgets/async_button_widget.dart';
 import 'package:pico/screens/lnurl_amount_screen.dart';
 import 'package:pico/drawers/lightning_send_drawer.dart';
 import 'package:pico/utils/drawer_utils.dart';
+import 'package:pico/utils/lnurl_utils.dart';
 
 class LnurlDrawer extends StatefulWidget {
   final PicoAccount account;
@@ -41,11 +42,15 @@ class LnurlDrawer extends StatefulWidget {
 
 class _LnurlDrawerState extends State<LnurlDrawer> {
   Future<void> _handleContinue() async {
-    final payResponse = await lnurlFetchLimits(lnurl: widget.lnurl);
+    final payResponse = await fetchLimitsUnlessDirect(
+      pico: widget.pico,
+      account: widget.account,
+      lnurl: widget.lnurl,
+    );
 
     if (!mounted) return;
 
-    if (payResponse.isFixedAmount()) {
+    if (payResponse != null && payResponse.isFixedAmount()) {
       final invoice = await lnurlResolve(
         payResponse: payResponse,
         amountSats: payResponse.minSats,
@@ -84,7 +89,8 @@ class _LnurlDrawerState extends State<LnurlDrawer> {
       children: [
         // No amount row yet: a variable-amount lnurl has none until the
         // amount screen, and a fixed-amount one only after its limits are
-        // fetched — both of which happen behind the button below.
+        // fetched — both of which happen behind the button below. An lnurl
+        // of this mint skips the fetch and goes to the amount screen too.
         BleedList.column(
           children: const [
             PaymentSummaryRow(

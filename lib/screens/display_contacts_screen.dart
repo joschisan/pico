@@ -2,9 +2,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
-import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/utils/async_button_mixin.dart';
 import 'package:pico/screens/lnurl_amount_screen.dart';
+import 'package:pico/utils/lnurl_utils.dart';
 import 'package:pico/screens/contact_name_entry_screen.dart';
 import 'package:pico/utils/styles.dart';
 import 'package:pico/widgets/search_field_widget.dart';
@@ -115,7 +115,11 @@ class _DisplayContactsScreenState extends State<DisplayContactsScreen> {
   }
 
   Future<void> _handleContactTap(PicoContact contact) async {
-    final payResponse = await lnurlFetchLimits(lnurl: contact.lnurl);
+    final payResponse = await fetchLimitsUnlessDirect(
+      pico: widget.pico,
+      account: widget.account,
+      lnurl: contact.lnurl,
+    );
 
     if (!mounted) return;
 

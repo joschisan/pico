@@ -11,7 +11,9 @@ class LnurlAmountScreen extends StatefulWidget {
   final PicoAccount account;
   final Pico pico;
   final LnurlWrapper lnurl;
-  final PayResponseWrapper payResponse;
+  // Null when the lnurl is this mint's own: the payment goes direct, with
+  // no gateway, no fee and no endpoint to ask limits of.
+  final PayResponseWrapper? payResponse;
   final String? contactName;
 
   const LnurlAmountScreen({
@@ -29,10 +31,25 @@ class LnurlAmountScreen extends StatefulWidget {
 
 class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   /// Resolves the invoice for the entered amount, selects a gateway and
-  /// quotes its fee, then hands both off to the confirmation screen.
+  /// quotes its fee, then hands both off to the confirmation screen. A
+  /// direct payment has neither: the amount goes straight through at no
+  /// fee.
   Future<void> _handleConfirm(int amountSats) async {
+    final payResponse = widget.payResponse;
+
+    if (payResponse == null) {
+      _confirm(
+        invoice: null,
+        amountSats: amountSats,
+        gateway: null,
+        feeSats: 0,
+        isMax: false,
+      );
+      return;
+    }
+
     final invoice = await lnurlResolve(
-      payResponse: widget.payResponse,
+      payResponse: payResponse,
       amountSats: amountSats,
     );
 
@@ -62,11 +79,31 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   /// payment capped to the payee's limit would leave notes behind, and the
   /// max path exists precisely to leave none.
   Future<void> _handleConfirmMax() async {
+    final payResponse = widget.payResponse;
+
+    if (payResponse == null) {
+      final amountSats = await widget.pico.lightningLnurlSendDirectMaxAmount(
+        mint: widget.account.mint,
+        account: widget.account.account,
+      );
+
+      if (amountSats <= 0) throw 'This account is empty';
+
+      _confirm(
+        invoice: null,
+        amountSats: amountSats,
+        gateway: null,
+        feeSats: 0,
+        isMax: true,
+      );
+      return;
+    }
+
     final gateway = await widget.pico.lightningSelectGateway(
       mint: widget.account.mint,
     );
 
-    final amountSats = await widget.pico.lightningSendMaxAmount(
+    final amountSats = await widget.pico.lightningLnurlSendMaxAmount(
       mint: widget.account.mint,
       account: widget.account.account,
       gateway: gateway,
@@ -74,11 +111,11 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
 
     if (amountSats <= 0) throw 'This account is empty';
 
-    if (amountSats < widget.payResponse.minSats) {
+    if (amountSats < payResponse.minSats) {
       throw 'This account holds less than this address accepts';
     }
 
-    if (widget.payResponse.maxSats < amountSats) {
+    if (payResponse.maxSats < amountSats) {
       throw 'This account holds more than this address accepts';
     }
 
@@ -94,7 +131,7 @@ class _LnurlAmountScreenState extends State<LnurlAmountScreen> {
   void _confirm({
     required Bolt11InvoiceWrapper? invoice,
     required int amountSats,
-    required GatewayInfoWrapper gateway,
+    required GatewayInfoWrapper? gateway,
     required int feeSats,
     required bool isMax,
   }) {

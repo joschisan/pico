@@ -16,8 +16,7 @@ use picomint_client::ecash::{
 };
 use picomint_client::eventlog::EventLogEntry;
 use picomint_client::lightning::events::{
-    ReceiveEvent as LightningReceive, SendEvent as LightningSend,
-    SendFailureEvent as LightningSendFailureEvent, SendRefundEvent, SendSuccessEvent,
+    ReceiveEvent as LightningReceive, SendEvent as LightningSend, SendRefundEvent, SendSuccessEvent,
 };
 use picomint_client::onchain::events::{
     ReceiveEvent as OnchainReceive, SendEvent as OnchainSend,
@@ -111,10 +110,6 @@ pub enum PaymentEvent {
     LightningSendRefund {
         timestamp: i64,
         txid: String,
-        expired: bool,
-    },
-    LightningSendFailure {
-        timestamp: i64,
     },
     LightningReceive {
         timestamp: i64,
@@ -194,16 +189,16 @@ pub enum PaymentEvent {
 /// to the session that was lost.
 fn trigger_fields(entry: &EventLogEntry) -> Option<(bool, PaymentType, i64)> {
     if let Some(e) = entry.to_event::<EcashSend>() {
-        return Some((false, PaymentType::Ecash, (e.amount.msat / 1000) as i64));
+        return Some((false, PaymentType::Ecash, (e.amount.0 / 1000) as i64));
     }
     if let Some(e) = entry.to_event::<EcashReceive>() {
-        return Some((true, PaymentType::Ecash, (e.amount.msat / 1000) as i64));
+        return Some((true, PaymentType::Ecash, (e.amount.0 / 1000) as i64));
     }
     if let Some(e) = entry.to_event::<LightningSend>() {
-        return Some((false, PaymentType::Lightning, (e.amount.msat / 1000) as i64));
+        return Some((false, PaymentType::Lightning, (e.amount.0 / 1000) as i64));
     }
     if let Some(e) = entry.to_event::<LightningReceive>() {
-        return Some((true, PaymentType::Lightning, (e.amount.msat / 1000) as i64));
+        return Some((true, PaymentType::Lightning, (e.amount.0 / 1000) as i64));
     }
     if let Some(e) = entry.to_event::<OnchainSend>() {
         return Some((false, PaymentType::Onchain, e.amount.to_sat() as i64));
@@ -258,7 +253,7 @@ pub(crate) fn parse_summary(
 pub(crate) fn parse_notification(entry: &EventLogEntry) -> Option<Notification> {
     if let Some(e) = entry.to_event::<LightningReceive>() {
         return Some(Notification::LightningReceived {
-            amount_sats: (e.amount.msat / 1000) as i64,
+            amount_sats: (e.amount.0 / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<OnchainReceive>() {
@@ -286,8 +281,8 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::TxCreate {
             timestamp,
             txid: e.txid.to_string(),
-            change_sats: (e.reissue.msat / 1000) as i64,
-            fee_sats: (e.fee.msat / 1000) as i64,
+            change_sats: (e.reissue.0 / 1000) as i64,
+            fee_sats: (e.fee.0 / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<TxAcceptEvent>() {
@@ -309,8 +304,8 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::LightningSend {
             timestamp,
             txid: e.txid.to_string(),
-            amount_sats: (e.amount.msat / 1000) as i64,
-            fee_sats: (e.fee.msat / 1000) as i64,
+            amount_sats: (e.amount.0 / 1000) as i64,
+            fee_sats: (e.fee.0 / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<SendSuccessEvent>() {
@@ -323,18 +318,14 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::LightningSendRefund {
             timestamp,
             txid: e.txid.to_string(),
-            expired: e.expired,
         });
-    }
-    if entry.to_event::<LightningSendFailureEvent>().is_some() {
-        return Some(PaymentEvent::LightningSendFailure { timestamp });
     }
     if let Some(e) = entry.to_event::<LightningReceive>() {
         return Some(PaymentEvent::LightningReceive {
             timestamp,
             txid: e.txid.to_string(),
-            amount_sats: (e.amount.msat / 1000) as i64,
-            fee_sats: (e.fee.msat / 1000) as i64,
+            amount_sats: (e.amount.0 / 1000) as i64,
+            fee_sats: (e.fee.0 / 1000) as i64,
         });
     }
 
@@ -342,7 +333,7 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
     if let Some(e) = entry.to_event::<EcashSend>() {
         return Some(PaymentEvent::EcashSend {
             timestamp,
-            amount_sats: (e.amount.msat / 1000) as i64,
+            amount_sats: (e.amount.0 / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<EcashSendSuccessEvent>() {
@@ -364,14 +355,14 @@ pub(crate) fn parse_payment_event(entry: &EventLogEntry) -> Option<PaymentEvent>
         return Some(PaymentEvent::EcashReceive {
             timestamp,
             txid: e.txid.to_string(),
-            amount_sats: (e.amount.msat / 1000) as i64,
+            amount_sats: (e.amount.0 / 1000) as i64,
         });
     }
     if let Some(e) = entry.to_event::<IssuanceSuccessEvent>() {
         return Some(PaymentEvent::EcashIssuanceSuccess {
             timestamp,
             txid: e.txid.to_string(),
-            amount_sats: (e.amount.msat / 1000) as i64,
+            amount_sats: (e.amount.0 / 1000) as i64,
         });
     }
     if entry.to_event::<IssuanceFailureEvent>().is_some() {

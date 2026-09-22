@@ -15,7 +15,6 @@ enum _Status { ok, warning, error }
 _Status? _classify(PaymentEvent event) => switch (event) {
   PaymentEvent_TxReject() => _Status.error,
   PaymentEvent_LightningSendRefund() => _Status.warning,
-  PaymentEvent_LightningSendFailure() => _Status.error,
   PaymentEvent_EcashSendFailure() => _Status.error,
   PaymentEvent_EcashIssuanceFailure() => _Status.error,
   PaymentEvent_OnchainSendFailure() => _Status.error,

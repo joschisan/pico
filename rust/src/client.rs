@@ -1,6 +1,6 @@
 //! The flat money surface, mirroring the picomint client: every operation
 //! is a method on [`Pico`] named for the module that serves it —
-//! `ecash_send`, `onchain_send`, `lightning_receive` — and takes the
+//! `ecash_send`, `onchain_send`, `lightning_invoice_receive` — and takes the
 //! `(mint, account)` it acts on as arguments. There is no per-account handle to hold or leak;
 //! [`PicoAccount`] is the plain data row the home pager renders.
 
@@ -14,19 +14,21 @@ use picomint_core::Amount;
 use picomint_core::NodeId;
 use picomint_core::config::MintId;
 use picomint_core::lightning::gateway::{GatewayInfo, GatewayPk};
+use picomint_lnurl::Lnurl;
 use rand::seq::IteratorRandom;
 
 use picomint_core::NumNodesExt;
 
 use crate::app::Pico;
 use crate::frb_generated::StreamSink;
+use crate::lnurl::LnurlWrapper;
 use crate::{
     AccountWrapper, BitcoinAddressWrapper, Bolt11InvoiceWrapper, EcashWrapper, InviteCodeWrapper,
     MintIdWrapper,
 };
 
 /// A gateway picked by [`Pico::lightning_select_gateway`] with the info
-/// that priced it, handed back to [`Pico::lightning_send`] by pk. Picomint
+/// that priced it, handed back to [`Pico::lightning_invoice_send`] by pk. Picomint
 /// prices the payment from the same pooled info until the next refresh, so
 /// the fee we previewed is the fee we pay. Opaque on purpose — Dart only
 /// needs the fee getters.
@@ -53,7 +55,7 @@ impl GatewayInfoWrapper {
     pub fn gateway_fee_for_amount(&self, amount_sats: i64) -> i64 {
         let msats = (amount_sats as u64).saturating_mul(1000);
 
-        (self.gateway_info.send_fee.fee(msats).msat / 1000) as i64
+        (self.gateway_info.send_fee.fee(msats).0 / 1000) as i64
     }
 
     /// Fee (sats) the gateway deducts from a `amount_sats` incoming
@@ -61,7 +63,7 @@ impl GatewayInfoWrapper {
     #[frb(sync)]
     pub fn gateway_fee_for_receive_amount(&self, amount_sats: i64) -> i64 {
         let msats = (amount_sats as u64).saturating_mul(1000);
-        (self.gateway_info.receive_fee.fee(msats).msat / 1000) as i64
+        (self.gateway_info.receive_fee.fee(msats).0 / 1000) as i64
     }
 }
 
@@ -71,6 +73,12 @@ impl GatewayInfoWrapper {
 /// relays lnurl requests to the recipient's mint — so swapping it only
 /// changes who serves the codes, not who can spend them.
 const LNURL_DAEMON_URL: &str = "http://159.223.25.182:8082/";
+
+/// Picomint's lnurl type from the wrapper's URL, by way of the bech32 form
+/// it parses.
+fn parse(lnurl: &LnurlWrapper) -> Result<Lnurl, String> {
+    lnurl.encode().parse()
+}
 
 /// One `(mint, account)` row of the wallet, as plain data — every
 /// money method on [`Pico`] takes the typed pair back. The name rides along
@@ -186,7 +194,7 @@ impl Pico {
         let mut stream = self.client.ecash_subscribe_balance(mint.0, account.0);
 
         while let Some(amount) = stream.next().await {
-            if sink.add((amount.msat / 1000) as i64).is_err() {
+            if sink.add((amount.0 / 1000) as i64).is_err() {
                 break;
             }
         }
@@ -214,7 +222,7 @@ impl Pico {
     }
 
     #[frb]
-    pub async fn lightning_send(
+    pub async fn lightning_invoice_send(
         &self,
         mint: &MintIdWrapper,
         account: &AccountWrapper,
@@ -222,14 +230,14 @@ impl Pico {
         invoice: &Bolt11InvoiceWrapper,
     ) -> Result<String, String> {
         self.client
-            .lightning_send(mint.0, account.0, gateway.gateway_pk, invoice.0.clone())
+            .lightning_invoice_send(mint.0, account.0, gateway.gateway_pk, invoice.0.clone())
             .await
             .map(|op| op.to_string())
             .map_err(|e| e.to_string())
     }
 
     #[frb]
-    pub async fn lightning_receive(
+    pub async fn lightning_invoice_receive(
         &self,
         mint: &MintIdWrapper,
         account: &AccountWrapper,
@@ -238,7 +246,7 @@ impl Pico {
     ) -> Result<String, String> {
         let invoice = self
             .client
-            .lightning_receive(
+            .lightning_invoice_receive(
                 mint.0,
                 account.0,
                 gateway.gateway_pk,
@@ -248,6 +256,20 @@ impl Pico {
             .map_err(|e| e.to_string())?;
 
         Ok(invoice.to_string())
+    }
+
+    /// Whether `lnurl` names an account of `mint`, so that a payment to it
+    /// from this mint goes direct: funded straight from the account with no
+    /// gateway, no fee and no call to the lnurl's endpoint. Local, never
+    /// touches the network.
+    #[frb(sync)]
+    pub fn lightning_lnurl_is_direct(&self, mint: &MintIdWrapper, lnurl: &LnurlWrapper) -> bool {
+        lnurl
+            .encode()
+            .parse::<Lnurl>()
+            .ok()
+            .and_then(|lnurl| self.client.lightning_lnurl_mint(&lnurl))
+            .is_some_and(|lnurl_mint| lnurl_mint == mint.0)
     }
 
     /// The largest whole-sat payment this account can make through `gateway`:
@@ -260,48 +282,105 @@ impl Pico {
     /// mints no change at exactly this amount, so the sizing has to live
     /// where the spending does.
     #[frb]
-    pub async fn lightning_send_max_amount(
+    pub async fn lightning_lnurl_send_max_amount(
         &self,
         mint: &MintIdWrapper,
         account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
     ) -> i64 {
         self.client
-            .lightning_send_max_amount(mint.0, account.0, gateway.gateway_pk)
-            .map(|amount| (amount.msat / 1000) as i64)
+            .lightning_lnurl_send_max_amount(mint.0, account.0, gateway.gateway_pk)
+            .map(|amount| (amount.0 / 1000) as i64)
             .unwrap_or(0)
     }
 
     /// Empties the account to `lnurl` through `gateway`: picomint resolves
     /// the one invoice it pays, sized fresh by the same code that spends it,
     /// so every note goes in and no change comes back. The figure
-    /// [`Self::lightning_send_max_amount`] previewed through this gateway is the
-    /// figure paid, short of the balance moving in between — which moves the
-    /// payment with it.
+    /// [`Self::lightning_lnurl_send_max_amount`] previewed through this
+    /// gateway is the figure paid, short of the balance moving in between —
+    /// which moves the payment with it.
     #[frb]
-    pub async fn lightning_send_max(
+    pub async fn lightning_lnurl_send_max(
         &self,
         mint: &MintIdWrapper,
         account: &AccountWrapper,
         gateway: &GatewayInfoWrapper,
-        lnurl: String,
+        lnurl: &LnurlWrapper,
     ) -> Result<String, String> {
         self.client
-            .lightning_send_max(mint.0, account.0, gateway.gateway_pk, &lnurl)
+            .lightning_lnurl_send_max(mint.0, account.0, gateway.gateway_pk, &parse(lnurl)?)
             .await
+            .map(|op| op.to_string())
+            .map_err(|e| e.to_string())
+    }
+
+    /// Pays `amount_sats` to an lnurl of this mint straight from the account:
+    /// no gateway, no fee, and the funding's acceptance is the payment. Only
+    /// for an lnurl [`Self::lightning_lnurl_is_direct`] says yes to.
+    #[frb]
+    pub async fn lightning_lnurl_send_direct(
+        &self,
+        mint: &MintIdWrapper,
+        account: &AccountWrapper,
+        lnurl: &LnurlWrapper,
+        amount_sats: i64,
+    ) -> Result<String, String> {
+        self.client
+            .lightning_lnurl_send_direct(
+                mint.0,
+                account.0,
+                &parse(lnurl)?,
+                Amount::from_sat(amount_sats as u64),
+            )
+            .map(|op| op.to_string())
+            .map_err(|e| e.to_string())
+    }
+
+    /// The largest whole-sat direct payment this account can make: what its
+    /// notes deliver when spent in full, less the transaction fee alone.
+    #[frb]
+    pub async fn lightning_lnurl_send_direct_max_amount(
+        &self,
+        mint: &MintIdWrapper,
+        account: &AccountWrapper,
+    ) -> i64 {
+        self.client
+            .lightning_lnurl_send_direct_max_amount(mint.0, account.0)
+            .map(|amount| (amount.0 / 1000) as i64)
+            .unwrap_or(0)
+    }
+
+    /// Empties the account to an lnurl of this mint, as
+    /// [`Self::lightning_lnurl_send_direct`] pays it.
+    #[frb]
+    pub async fn lightning_lnurl_send_direct_max(
+        &self,
+        mint: &MintIdWrapper,
+        account: &AccountWrapper,
+        lnurl: &LnurlWrapper,
+    ) -> Result<String, String> {
+        self.client
+            .lightning_lnurl_send_direct_max(mint.0, account.0, &parse(lnurl)?)
             .map(|op| op.to_string())
             .map_err(|e| e.to_string())
     }
 
     /// Reads the locally mirrored gateway set, so it never touches the network.
     #[frb(sync)]
-    pub fn lightning_generate_lnurl(
+    pub fn lightning_lnurl_receive(
         &self,
         mint: &MintIdWrapper,
         account: &AccountWrapper,
     ) -> String {
         self.client
-            .lightning_generate_lnurl(mint.0, account.0, LNURL_DAEMON_URL.to_string())
+            .lightning_lnurl_receive(
+                mint.0,
+                account.0,
+                LNURL_DAEMON_URL
+                    .parse()
+                    .expect("the lnurl daemon url is a literal"),
+            )
             .unwrap_or_default()
     }
 

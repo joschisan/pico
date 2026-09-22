@@ -464,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (_) => DisplayLnurlScreen(
               account: account,
               pico: widget.pico,
-              lnurl: widget.pico.lightningGenerateLnurl(
+              lnurl: widget.pico.lightningLnurlReceive(
                 mint: account.mint,
                 account: account.account,
               ),
