@@ -138,7 +138,7 @@ pub struct EcashWrapper(pub(crate) Ecash);
 impl EcashWrapper {
     #[frb(sync)]
     pub fn amount_sats(&self) -> i64 {
-        (self.0.amount().msat / 1000) as i64
+        (self.0.amount().0 / 1000) as i64
     }
 
     /// Mint that minted these notes — needed to look up the

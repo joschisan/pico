@@ -3,6 +3,7 @@ import 'package:pico/bridge_generated.dart/app.dart';
 import 'package:pico/bridge_generated.dart/client.dart';
 import 'package:pico/bridge_generated.dart/lnurl.dart';
 import 'package:pico/screens/lnurl_amount_screen.dart';
+import 'package:pico/utils/lnurl_utils.dart';
 import 'package:pico/widgets/text_entry_body_widget.dart';
 
 class _AddressTextController extends TextEditingController {
@@ -73,7 +74,11 @@ class _LightningAddressEntryScreenState
       throw 'Failed to parse lightning address';
     }
 
-    final payResponse = await lnurlFetchLimits(lnurl: lnurl);
+    final payResponse = await fetchLimitsUnlessDirect(
+      pico: widget.pico,
+      account: widget.account,
+      lnurl: lnurl,
+    );
 
     final contactName = widget.pico.getContactName(lnurl: lnurl);
 

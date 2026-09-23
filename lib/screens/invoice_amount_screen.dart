@@ -26,7 +26,7 @@ class _InvoiceAmountScreenState extends State<InvoiceAmountScreen> {
 
     final feeSats = gateway.gatewayFeeForReceiveAmount(amountSats: amountSats);
 
-    final invoice = await widget.pico.lightningReceive(
+    final invoice = await widget.pico.lightningInvoiceReceive(
       mint: widget.account.mint,
       account: widget.account.account,
       gateway: gateway,

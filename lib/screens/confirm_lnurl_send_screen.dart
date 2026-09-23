@@ -26,7 +26,9 @@ class ConfirmLnurlSendScreen extends StatefulWidget {
   final Bolt11InvoiceWrapper? invoice;
   final LnurlWrapper lnurl;
   final int amountSats;
-  final GatewayInfoWrapper gateway;
+  // Null when the lnurl is this mint's own: the payment goes direct, funded
+  // straight from the account with no gateway and no fee.
+  final GatewayInfoWrapper? gateway;
   final int feeSats;
   final String? contactName;
   // Whether this empties the account: the send goes by the lnurl rather
@@ -70,18 +72,35 @@ class _ConfirmLnurlSendScreenState extends State<ConfirmLnurlSendScreen> {
   Future<void> _handleConfirm() async {
     await requireBiometricAuth(context);
 
-    if (widget.isMax) {
-      await widget.pico.lightningSendMax(
+    final gateway = widget.gateway;
+
+    if (gateway == null) {
+      if (widget.isMax) {
+        await widget.pico.lightningLnurlSendDirectMax(
+          mint: widget.account.mint,
+          account: widget.account.account,
+          lnurl: widget.lnurl,
+        );
+      } else {
+        await widget.pico.lightningLnurlSendDirect(
+          mint: widget.account.mint,
+          account: widget.account.account,
+          lnurl: widget.lnurl,
+          amountSats: widget.amountSats,
+        );
+      }
+    } else if (widget.isMax) {
+      await widget.pico.lightningLnurlSendMax(
         mint: widget.account.mint,
         account: widget.account.account,
-        gateway: widget.gateway,
-        lnurl: widget.lnurl.encode(),
+        gateway: gateway,
+        lnurl: widget.lnurl,
       );
     } else {
-      await widget.pico.lightningSend(
+      await widget.pico.lightningInvoiceSend(
         mint: widget.account.mint,
         account: widget.account.account,
-        gateway: widget.gateway,
+        gateway: gateway,
         invoice: widget.invoice!,
       );
     }

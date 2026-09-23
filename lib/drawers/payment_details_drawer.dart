@@ -281,13 +281,9 @@ _Description _describe(
       subtitle: 'Tap to share Preimage',
       onTap: () => _share(preimage),
     ),
-    PaymentEvent_LightningSendRefund(:final expired) => _Description(
+    PaymentEvent_LightningSendRefund() => _Description(
       label: 'Refund',
-      subtitle: expired ? 'contract expired' : 'gateway cancelled',
-    ),
-    PaymentEvent_LightningSendFailure() => _Description(
-      label: 'Send Failure',
-      subtitle: 'missing preimage',
+      subtitle: 'gateway cancelled',
     ),
     PaymentEvent_LightningReceive(:final amountSats, :final feeSats) =>
       _Description(
